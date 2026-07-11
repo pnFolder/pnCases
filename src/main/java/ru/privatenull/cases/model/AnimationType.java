@@ -1,4 +1,4 @@
-package ru.privatenull.cases.animation;
+package ru.privatenull.cases.model;
 
 import org.bukkit.Material;
 import ru.privatenull.util.MaterialCompat;

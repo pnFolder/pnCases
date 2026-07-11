@@ -1,4 +1,4 @@
-package ru.privatenull.listeners;
+package ru.privatenull.gui.machine;
 
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
