@@ -1,700 +1,254 @@
-<img src="assets/pncases-cover-1.4.7.png"
-     alt="Paper и Purpur 1.16.5–1.21.11"
-     style="width: 100%;">
 <p align="center">
-  <a href="https://github.com/Dy6HiLa/pnCases/releases -cover-v2.png" alt="pnCases — плагин кейсов для Minecraft" width="100%">
-  </a>
+  <img src="assets/pncases-cover-v2.png" alt="pnCases — кейсы для Minecraft" width="100%">
 </p>
 
 <h1 align="center">pnCases</h1>
 
 <p align="center">
-  Бесплатный плагин кейсов для серверов Paper и Purpur
-  <br>
-  с анимациями, наградами, голограммами и удобной настройкой.
+  Настраиваемая система кейсов для Paper и Purpur с анимациями,
+  виртуальными ключами, витринами, голограммами и Machine GUI.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.0/pnCases-1.5.0.jar">
-    <img src="https://img.shields.io/badge/Скачать-1.5.0-429F91?style=for-the-badge&labelColor=17241F" alt="Скачать pnCases 1.5.0">
+  <a href="https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.1/pnCases-1.5.1.jar">
+    <img src="https://img.shields.io/badge/Скачать-1.5.1-EFF7B9?style=for-the-badge&labelColor=17241F" alt="Скачать pnCases 1.5.1">
   </a>
-  <a href="https://github.com/Dy6HiLa/pnCases/releases/tag/v1.5.0">
-    <img src="https://img.shields.io/badge/Changelog-1.5.0-D8DF9D?style=for-the-badge&labelColor=17241F" alt="Changelog pnCases 1.5.0">
+  <a href="https://github.com/Dy6HiLa/pnCases/releases/tag/v1.5.1">
+    <img src="https://img.shields.io/badge/Что%20нового-1.5.1-65D1FC?style=for-the-badge&labelColor=17241F" alt="Изменения pnCases 1.5.1">
   </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-429F91?style=for-the-badge&labelColor=17241F" alt="Лицензия MIT">
+  <a href="https://discord.gg/J2cTeTQsy8">
+    <img src="https://img.shields.io/badge/Discord-Поддержка-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord pnCases">
   </a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Paper%20%2F%20Purpur-1.16.5--1.21.11-429F91?style=flat-square" alt="Paper и Purpur 1.16.5–1.21.11">
-  <img src="https://img.shields.io/badge/Java-17%2B-D8DF9D?style=flat-square" alt="Java 17+">
-  <img src="https://img.shields.io/badge/Хранилище-SQLite%20%2F%20MySQL%20%2F%20MongoDB-429F91?style=flat-square" alt="SQLite, MySQL и MongoDB">
+  <img src="https://img.shields.io/badge/Paper%20%2F%20Purpur-1.16.5--1.21.11-EFF7B9?style=flat-square" alt="Paper и Purpur 1.16.5–1.21.11">
+  <img src="https://img.shields.io/badge/Java-17%2B-FCA865?style=flat-square" alt="Java 17+">
+  <img src="https://img.shields.io/badge/Storage-SQLite%20%7C%20MySQL%20%7C%20MongoDB-65D1FC?style=flat-square" alt="SQLite, MySQL и MongoDB">
 </p>
 
-<p align="center">
-  <a href="#-возможности">Возможности</a>
-  ·
-  <a href="#-установка">Установка</a>
-  ·
-  <a href="#-команды">Команды</a>
-  ·
-  <a href="#-награды">Награды</a>
-  ·
-  <a href="#-анимации">Анимации</a>
-  ·
-  <a href="#-поддержка">Поддержка</a>
-</p>
+## Возможности
 
-<hr>
+- Каждый кейс хранится отдельно в `plugins/pnCases/cases/<id>.yml`.
+- Создание и полная настройка кейсов без заранее заданных типов.
+- Один виртуальный ключ на кейс: ID ключа всегда совпадает с ID кейса.
+- Типы наград: `ITEM`, `VAULT`, `PLAYERPOINTS`, `LUCKPERMS`, `PERSONAL`.
+- Кастомные предметы и головы через Base64.
+- Редкости `COMMON`, `UNCOMMON`, `RARE`, `EPIC`, `LEGENDARY`, `MYTHIC`.
+- Настраиваемые шансы, сообщения наград и broadcast для каждого кейса.
+- Предпросмотр содержимого, история открытий и выбор анимации игроком.
+- Machine GUI для настройки меню, голограммы, витрины, анимации и покупки ключа за опыт.
+- Точечное обновление слотов GUI через ProtocolLib без полного переоткрытия меню.
+- Голограммы через FancyHolograms или DecentHolograms.
+- Хранение ключей, истории, выбранных анимаций и pending-наград в SQLite, MySQL или MongoDB.
 
-<h2 id="-возможности">✨ Возможности</h2>
+## Установка
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🎁 Система кейсов</h3>
-      <p>
-        Создание кейсов с собственными ключами, наградами,
-        редкостями и шансами выпадения.
-      </p>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🎬 Анимации открытия</h3>
-      <p>
-        Несколько визуальных сценариев открытия.
-        Игрок может выбрать понравившуюся анимацию через GUI.
-      </p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🖥 Удобный GUI</h3>
-      <p>
-        Просмотр содержимого кейса, выбор анимации,
-        история открытий и предварительный просмотр наград.
-      </p>
-    </td>
-    <td width="50%" valign="top">
-      <h3>💎 Разные типы наград</h3>
-      <p>
-        Поддерживаются предметы, команды, Vault,
-        PlayerPoints и LuckPerms.
-      </p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>🌌 Витрина кейса</h3>
-      <p>
-        Настраиваемый предмет и визуальные эффекты
-        отображаются над свободным кейсом.
-      </p>
-    </td>
-    <td width="50%" valign="top">
-      <h3>💬 Голограммы</h3>
-      <p>
-        Автоматическая интеграция с FancyHolograms
-        и DecentHolograms.
-      </p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>💾 Хранилища</h3>
-      <p>
-        История, ключи, выбор анимации и остальные данные хранятся
-        в SQLite, MySQL или MongoDB.
-      </p>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🔄 Проверка обновлений</h3>
-      <p>
-        Плагин автоматически проверяет новые версии
-        через GitHub Releases и манифест обновлений.
-      </p>
-    </td>
-  </tr>
-</table>
+1. Скачайте [pnCases-1.5.1.jar](https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.1/pnCases-1.5.1.jar).
+2. Поместите JAR в папку `plugins/`.
+3. Полностью перезапустите сервер.
+4. Создайте кейс командой `/pncases createcase <id>`.
+5. Настройте `plugins/pnCases/cases/<id>.yml` или используйте `/pncases machine <id>`.
+6. Посмотрите на нужный блок и выполните `/pncases setcase <id>`.
 
-<hr>
+Не используйте PlugMan и другие средства горячей загрузки. Для корректной регистрации хранилища, голограмм и анимаций требуется полноценный запуск сервера.
 
-<h2>🚀 pnCases 1.5.0</h2>
+## Зависимости
 
-<p>
-  <strong>pnCases 1.5.0</strong> — большое обновление Machine GUI,
-  анимаций открытия и хранения данных.
-</p>
+| Зависимость | Статус | Назначение |
+|---|---:|---|
+| Paper / Purpur | обязательно | Сервер 1.16.5–1.21.11 |
+| LuckPerms | опционально | Группы и права |
+| Vault | опционально | Денежные награды |
+| PlayerPoints | опционально | Поинты |
+| FancyHolograms | опционально | Голограммы |
+| DecentHolograms | опционально | Голограммы |
+| ProtocolLib | опционально | Пакетное обновление отдельных слотов GUI |
 
-<table>
-  <tr>
-    <td>
-      <strong>Версия плагина</strong>
-    </td>
-    <td>
-      <code>1.5.0</code>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <strong>Поддерживаемые серверы</strong>
-    </td>
-    <td>
-      Paper / Purpur <code>1.16.5–1.21.11</code>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <strong>Версия Java</strong>
-    </td>
-    <td>
-      Java <code>17+</code>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <strong>API Version</strong>
-    </td>
-    <td>
-      <code>1.16</code>
-    </td>
-  </tr>
-</table>
+## Быстрый старт
 
-<h3>Что нового в 1.5.0</h3>
+```text
+/pncases createcase donate
+/pncases machine donate
+/pncases setcase donate
+/pncases givekey Player donate 1
+```
 
-<ul>
-  <li>Переработан Machine GUI: компактные разделы, динамическое обновление без мигания, безопасное закрытие меню при выключении плагина.</li>
-  <li>Добавлена анимация «Водяная капсула»: стеклянная капсула, сердце моря, водные частицы, кристаллы призмарина и плавный выход награды.</li>
-  <li>Добавлены типы кейсов, создание кейса сразу с типом <code>money</code> и автоматический ключ для нового кейса.</li>
-  <li>Поддерживаются SQLite, MySQL и MongoDB; текст принимает MiniMessage, <code>&amp;</code>/<code>§</code>-цвета и HEX: <code>&amp;#429F91</code>.</li>
-</ul>
+После `/pncases createcase donate` будет создан файл:
 
-<h3>Что было добавлено в 1.4.7</h3>
+```text
+plugins/pnCases/cases/donate.yml
+```
 
-<ul>
-  <li>
-    У команды <code>/pncases givekey &lt;игрок&gt; &lt;ключ&gt; &lt;кол-во&gt;</code>
-    появился необязательный флаг <code>-s</code> (или <code>-silent</code>).
-  </li>
-  <li>
-    Если указан флаг <code>-s</code>, игрок не получает сообщение о выдаче ключа в чат.
-  </li>
-  <li>
-    Ключ всё равно добавляется на баланс игрока как обычно.
-  </li>
-  <li>
-    Администратору или системе, которая выполнила команду
-    (например, сайт через RCON), по-прежнему приходит подтверждение выдачи.
-  </li>
-  <li>
-    Флаг добавлен в автодополнение команды.
-  </li>
-</ul>
+Кейс автоматически использует один виртуальный ключ с ID `donate`. Отдельно указывать тип ключа, его ID или количество для открытия не требуется.
 
-<details>
-  <summary><strong>Пример использования</strong></summary>
+## Команды
 
-  <br>
+| Команда | Описание |
+|---|---|
+| `/pncases` | Панель администратора |
+| `/pncases reload` | Перезагрузить настройки |
+| `/pncases createcase <id>` | Создать новый кейс |
+| `/pncases machine <кейс>` | Открыть Machine GUI |
+| `/pncases setcase <кейс>` | Привязать кейс к выбранному блоку |
+| `/pncases delcase <кейс>` | Удалить кейс и его виртуальный ключ |
+| `/pncases givekey <игрок> <кейс> <количество> [-s]` | Выдать ключи; `-s` скрывает уведомление игроку |
+| `/pncases takekey <игрок> <кейс> <количество>` | Забрать ключи |
 
-<pre><code>/pncases givekey Evgeniy51234 donate_key 1 -s</code></pre>
+Право администратора:
 
-  <p>
-    Ключ будет выдан скрытно — игрок не увидит уведомление в чате, но получит
-    ключ на баланс. Удобно для связки с сайтом: после доната сайт выполняет
-    команду через RCON или консоль.
-  </p>
-</details>
-
-<p>
-  Предыдущие списки изменений находятся в
-  <a href="docs/releases/">архиве релизов</a>.
-</p>
-
-<hr>
-
-<h2 id="-установка">📦 Установка</h2>
-
-<ol>
-  <li>
-    Скачайте
-    <a href="https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.0/pnCases-1.5.0.jar">
-      <code>pnCases-1.5.0.jar</code>
-    </a>.
-  </li>
-  <li>Переместите JAR-файл в папку <code>plugins/</code>.</li>
-  <li>Перезапустите сервер.</li>
-  <li>
-    Настройте файлы
-    <code>plugins/pnCases/config.yml</code>
-    и
-    <code>plugins/pnCases/messages.yml</code>.
-  </li>
-</ol>
-
-<blockquote>
-  <strong>Важно:</strong> не используйте PlugMan и другие средства горячей
-  загрузки для первой установки плагина. Выполните полноценный перезапуск сервера.
-</blockquote>
-
-<h3>Зависимости</h3>
-
-<table>
-  <thead>
-    <tr>
-      <th align="left">Зависимость</th>
-      <th align="center">Обязательность</th>
-      <th align="left">Назначение</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Paper / Purpur 1.16.5–1.21.11</td>
-      <td align="center"><strong>Обязательно</strong></td>
-      <td>Серверное ядро</td>
-    </tr>
-    <tr>
-      <td>LuckPerms</td>
-      <td align="center">Опционально</td>
-      <td>Выдача групп и прав</td>
-    </tr>
-    <tr>
-      <td>Vault</td>
-      <td align="center">Опционально</td>
-      <td>Денежные награды</td>
-    </tr>
-    <tr>
-      <td>PlayerPoints</td>
-      <td align="center">Опционально</td>
-      <td>Поинтовые награды</td>
-    </tr>
-    <tr>
-      <td>FancyHolograms</td>
-      <td align="center">Опционально</td>
-      <td>Голограммы на новых версиях</td>
-    </tr>
-    <tr>
-      <td>DecentHolograms</td>
-      <td align="center">Опционально</td>
-      <td>Голограммы и совместимость со старыми версиями</td>
-    </tr>
-  </tbody>
-</table>
-
-<hr>
-
-<h2 id="-команды">⌨️ Команды</h2>
-
-<table>
-  <thead>
-    <tr>
-      <th align="left">Команда</th>
-      <th align="left">Описание</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>/pncases</code></td>
-      <td>Показать команды, версию плагина и статус обновления</td>
-    </tr>
-    <tr>
-      <td><code>/pncases reload</code></td>
-      <td>Перезагрузить <code>config.yml</code> и <code>messages.yml</code></td>
-    </tr>
-    <tr>
-      <td><code>/pncases setcase &lt;кейс&gt;</code></td>
-      <td>Установить кейс на блок, на который смотрит администратор</td>
-    </tr>
-    <tr>
-      <td><code>/pncases delcase &lt;кейс&gt;</code></td>
-      <td>Удалить установленные блоки кейса без удаления его настроек</td>
-    </tr>
-    <tr>
-      <td><code>/pncases givekey &lt;игрок&gt; &lt;ключ&gt; &lt;количество&gt; [-s]</code></td>
-      <td>Выдать игроку ключи (<code>-s</code> — скрытно)</td>
-    </tr>
-    <tr>
-      <td><code>/pncases takekey &lt;игрок&gt; &lt;ключ&gt; &lt;количество&gt;</code></td>
-      <td>Забрать ключи у игрока</td>
-    </tr>
-  </tbody>
-</table>
-
-<h3>Право администратора</h3>
-
-```yaml
+```text
 pncases.admin
 ```
 
-<hr>
+## Конфигурация кейса
 
-<h2 id="-награды">🎁 Награды</h2>
-
-<p>
-  pnCases поддерживает предметные, денежные, поинтовые
-  и серверные награды.
-</p>
-
-<table>
-  <thead>
-    <tr>
-      <th align="left">Тип</th>
-      <th align="left">Назначение</th>
-      <th align="left">Зависимость</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>ITEM</code></td>
-      <td>Выдача предмета</td>
-      <td>Не требуется</td>
-    </tr>
-    <tr>
-      <td><code>COMMAND</code></td>
-      <td>Выполнение серверной команды</td>
-      <td>Не требуется</td>
-    </tr>
-    <tr>
-      <td><code>VAULT</code></td>
-      <td>Выдача денег на баланс</td>
-      <td>Vault и плагин экономики</td>
-    </tr>
-    <tr>
-      <td><code>PLAYERPOINTS</code></td>
-      <td>Выдача поинтов</td>
-      <td>PlayerPoints</td>
-    </tr>
-    <tr>
-      <td><code>LUCKPERMS</code></td>
-      <td>Выдача группы или прав</td>
-      <td>LuckPerms</td>
-    </tr>
-  </tbody>
-</table>
-
-<details open>
-  <summary><strong>Пример предметной награды</strong></summary>
-
-  <br>
+Сокращённый пример:
 
 ```yaml
-rewards:
-  - chance: 45
-    rarity: COMMON
-    type: ITEM
-    item:
-      material: DIAMOND
-      amount: 8
-      name: '&bАлмазы &8x8'
-```
+blocks: []
 
-</details>
+display-name: '&#429F91Донат-кейс'
 
-<details>
-  <summary><strong>Пример денежной награды через Vault</strong></summary>
-
-  <br>
-
-```yaml
-rewards:
-  - chance: 30
-    rarity: RARE
-    type: VAULT
-    vault:
-      amount: 2500
-    visual:
-      material: GOLD_INGOT
-      name: '&e2500 монет'
-    message: '&aВы получили &f{amount}&a на баланс!'
-```
-
-</details>
-
-<blockquote>
-  Для наград <code>VAULT</code>, <code>PLAYERPOINTS</code>
-  и <code>LUCKPERMS</code> секция <code>visual</code>
-  используется только для отображения награды в GUI и анимациях.
-</blockquote>
-
-<hr>
-
-<h2 id="-анимации">🎬 Анимации</h2>
-
-<p>
-  Игрок выбирает анимацию через интерфейс кейса.
-  Выбранный вариант сохраняется в SQLite.
-</p>
-
-<p>
-  На Minecraft 1.21+ используется полный визуальный режим.
-  На Minecraft 1.17–1.20 автоматически включается совместимый режим.
-  На Minecraft 1.16.5 доступен только «Круг фортуны».
-</p>
-
-<table>
-  <thead>
-    <tr>
-      <th align="left">Анимация</th>
-      <th align="left">Описание</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>⚒️ Наковальня</td>
-      <td>Падение наковальни и появление награды</td>
-    </tr>
-    <tr>
-      <td>🧨 Динамит</td>
-      <td>Полёт TNT, взрыв и выдача приза</td>
-    </tr>
-    <tr>
-      <td>🌀 Портал</td>
-      <td>Портальные эффекты и появление награды</td>
-    </tr>
-    <tr>
-      <td>☠️ Отравление</td>
-      <td>Ядовитый слайм, частицы и выдача приза</td>
-    </tr>
-    <tr>
-      <td>🌌 Астральный разлом</td>
-      <td>Магический разлом с вращением наград</td>
-    </tr>
-  </tbody>
-</table>
-
-<details>
-  <summary><strong>Настройка направления слайма</strong></summary>
-
-  <br>
-
-```yaml
-animation:
-  poison:
-    slime-facing: PLAYER
-    slime-pitch: 0
-```
-
-  <p>
-    Доступные значения:
-    <code>NORTH</code>,
-    <code>SOUTH</code>,
-    <code>EAST</code>,
-    <code>WEST</code>,
-    <code>PLAYER</code>
-    или собственное значение <code>yaw</code>.
-  </p>
-</details>
-
-<hr>
-
-<h2>🌟 Витрина кейса</h2>
-
-<p>
-  Витрина отображает выбранный предмет над свободным кейсом.
-  Предмет настраивается через <code>/pncases machine</code>,
-  а визуальные эффекты можно включить или отключить отдельно.
-</p>
-
-<details open>
-  <summary><strong>Пример конфигурации витрины</strong></summary>
-
-  <br>
-
-```yaml
-idle-particles:
-  enabled: true
-  effects: true
-  style: AURORA
-  theme: MAGIC
-  interval_ticks: 2
-  radius: 0.85
-  height: 1.35
-  speed: 0.14
-  view_distance: 28
-
-  item:
-    material: NETHER_STAR
-    name: "&aДонат кейс"
-```
-
-</details>
-
-<table>
-  <thead>
-    <tr>
-      <th align="left">Параметр</th>
-      <th align="left">Назначение</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>enabled</code></td>
-      <td>Полностью включает или отключает витрину</td>
-    </tr>
-    <tr>
-      <td><code>effects</code></td>
-      <td>Включает или отключает эффекты вокруг предмета</td>
-    </tr>
-    <tr>
-      <td><code>style</code></td>
-      <td>Определяет стиль движения частиц</td>
-    </tr>
-    <tr>
-      <td><code>theme</code></td>
-      <td>Определяет визуальную тему эффектов</td>
-    </tr>
-    <tr>
-      <td><code>view_distance</code></td>
-      <td>Максимальная дистанция отображения витрины</td>
-    </tr>
-  </tbody>
-</table>
-
-<hr>
-
-<h2>💬 Голограммы</h2>
-
-<details open>
-  <summary><strong>Пример конфигурации</strong></summary>
-
-  <br>
-
-```yaml
 hologram:
   enabled: true
   type: TEXT
   y: 1.5
   lines:
-    - "&a&lДонат кейс"
-    - "&7ПКМ, чтобы открыть"
+    - '{display-name}'
+    - '&7ПКМ &8— &fоткрыть'
+
+idle-particles:
+  enabled: true
+  theme: DRAGON
+  view_distance: 28
+
+gui:
+  title: '{display-name}'
+  size: 54
+  open_slot: 22
+  animation_slot: 49
+  preview_enabled: true
+  history:
+    slots: [45, 46, 47, 48, 50, 51, 52, 53]
+  button:
+    material: CHEST
+    name: '{display-name}'
+    lore:
+      - ''
+      - '&#9EFC65 «Текущие параметры»'
+      - ' &7- &fКлючи: &#FCA865{have} &7/ &#FCA865{need}'
+      - ''
+      - '&#65D1FC «Управление»'
+      - ' &7- {left-click}'
+      - ' &7- {right-click}'
+      - ''
+
+cost:
+  xp-purchase:
+    enabled: false
+    levels: 0
+
+broadcast:
+  enabled: true
+  lines:
+    - '&#EFF7B9▸ &fИгрок {player} открыл {case}'
+    - '&#EFF7B9▸ &fНаграда: {reward}'
+
+rewards:
+  - type: ITEM
+    chance: 100
+    rarity: COMMON
+    item:
+      material: DIAMOND
+      amount: 3
+      name: '&b3 алмаза'
+    message: '&aВы получили {reward}&a!'
 ```
 
-</details>
+Полный пример со всеми типами наград и Base64-головами находится в [`cases/test.yml`](cases/test.yml).
 
-<p>
-  pnCases автоматически выбирает доступный провайдер:
-</p>
+## Награды
 
-<ul>
-  <li><strong>FancyHolograms</strong>;</li>
-  <li><strong>DecentHolograms</strong>.</li>
-</ul>
+| Тип | Что выдаёт | Зависимость |
+|---|---|---|
+| `ITEM` | Предмет или Base64-голову | нет |
+| `VAULT` | Деньги | Vault и экономика |
+| `PLAYERPOINTS` | Поинты | PlayerPoints |
+| `LUCKPERMS` | Группу или permission | LuckPerms |
+| `PERSONAL` | Консольную команду | нет |
 
-<p>
-  Если ни один поддерживаемый плагин голограмм не установлен,
-  кейсы продолжат работать без голограмм.
-</p>
+Пример персональной команды:
 
-<hr>
+```yaml
+- type: PERSONAL
+  chance: 10
+  rarity: LEGENDARY
+  command: 'give {player} golden_apple 1'
+  name: '&eЗолотое яблоко'
+  visual:
+    material: GOLDEN_APPLE
+    name: '&eЗолотое яблоко'
+```
 
-<h2>🔄 Обновления</h2>
+В `PERSONAL` доступны `{player}` и `{uuid}`. Для успешного сообщения конкретной награды используется поле `message`.
 
-<p>
-  Проверка обновлений работает через GitHub
-  и не требует дополнительной настройки в <code>config.yml</code>.
-</p>
+## Анимации открытия
 
-<p>При проверке используются:</p>
+Доступные анимации:
 
-<ul>
-  <li><code>update-manifest.json</code>;</li>
-  <li>последний GitHub Release;</li>
-  <li>git tags;</li>
-  <li>версия из <code>plugin.yml</code>.</li>
-</ul>
+- Наковальня;
+- Динамит;
+- Портал;
+- Отравление;
+- Круг фортуны;
+- Осада разбойников;
+- Водяная капсула;
+- Охота на стражей;
+- Дыхание дракона;
+- Голодный мимик.
 
-<p>
-  Когда доступна более новая версия, администраторы с правом
-  <code>pncases.admin</code> получают уведомление
-  со ссылкой на скачивание.
-</p>
+Выбор игрока сохраняется отдельно для каждого кейса. На Minecraft 1.21+ работает полный современный режим, на 1.17–1.20 — совместимый режим, а на 1.16.5 используется «Круг фортуны».
 
-<hr>
+## Витрина
 
-<h2>📁 Файлы плагина</h2>
+Витрина отображает только анимацию частиц без предмета или сундука над кейсом.
+
+Доступные темы:
+
+- Арканный ритуал;
+- Разлом пустоты;
+- Штормовая клетка;
+- Огненный феникс;
+- Ядовитая кобра;
+- Ледяная корона;
+- Плач душ;
+- Зов левиафана;
+- Небесные крылья;
+- Драконья орбита.
+
+Тема и состояние витрины меняются через `/pncases machine <кейс>` или в секции `idle-particles`.
+
+## Файлы
 
 ```text
 plugins/pnCases/
+├── cases/
+│   └── <id>.yml
 ├── config.yml
+├── gui.yml
 ├── messages.yml
 └── data.db
 ```
 
-<p>
-  Старые YAML-файлы с данными автоматически переносятся в SQLite.
-</p>
+- `config.yml` — база данных, провайдер голограмм и символы наград.
+- `gui.yml` — изменяемые тексты интерфейсов и оформление редкостей.
+- `messages.yml` — команды, ошибки и системные сообщения.
+- `cases/<id>.yml` — полная конфигурация конкретного кейса.
 
-<h3>База данных и форматирование</h3>
+## Поддержка
 
-<p>
-  В <code>config.yml</code> можно выбрать SQLite для локального сервера, MySQL для общей базы
-  или MongoDB. Подключение, пул JDBC и миграции обрабатываются pnLibrary.
-</p>
-
-<p>
-  Все названия, lore, сообщения и голограммы поддерживают MiniMessage
-  (<code>&lt;gradient:#4FB6FF:#429F91&gt;Текст&lt;/gradient&gt;</code>), обычные цвета
-  <code>&amp;a</code> / <code>§a</code> и HEX <code>&amp;#429F91</code>.
-</p>
-
-<hr>
-
-<h2>📚 Документация</h2>
-
-<ul>
-  <li>
-    <a href="docs/releases/">Архив предыдущих релизов</a>
-  </li>
-  <li>
-    <a href="https://github.com/Dy6HiLa/pnCases/releases">
-      Все версии pnCases
-    </a>
-  </li>
-</ul>
-
-<hr>
-
-<h2 id="-поддержка">💬 Поддержка</h2>
-
-<p>
-  На официальном Discord-сервере можно:
-</p>
-
-<ul>
-  <li>получить помощь с установкой;</li>
-  <li>задать вопрос по настройке;</li>
-  <li>сообщить об ошибке;</li>
-  <li>предложить новую функцию;</li>
-  <li>следить за развитием pnCases.</li>
-</ul>
-
-<p align="center">
-  <a href="https://discord.gg/J2cTeTQsy8">
-    <img src="https://img.shields.io/badge/Discord-Получить%20поддержку-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord pnCases">
-  </a>
-  <a href="https://github.com/Dy6HiLa/pnCases/issues">
-    <img src="https://img.shields.io/badge/GitHub-Сообщить%20об%20ошибке-429F91?style=for-the-badge&logo=github&logoColor=white" alt="Сообщить об ошибке">
-  </a>
-</p>
-
-<hr>
-
-<p align="center">
-  <strong>pnCases</strong>
-  <br>
-  Бесплатная и настраиваемая система кейсов для Minecraft-серверов.
-</p>
-
-<p align="center">
-  <a href="https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.0/pnCases-1.5.0.jar">
-    Скачать последнюю версию
-  </a>
-  ·
-  <a href="https://github.com/Dy6HiLa/pnCases">
-    GitHub
-  </a>
-  ·
-  <a href="https://discord.gg/J2cTeTQsy8">
-    Discord
-  </a>
-</p>
+- [Discord](https://discord.gg/J2cTeTQsy8)
+- [GitHub Issues](https://github.com/Dy6HiLa/pnCases/issues)
+- [Релизы](https://github.com/Dy6HiLa/pnCases/releases)
+- [Лицензия MIT](LICENSE)
