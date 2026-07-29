@@ -13,29 +13,34 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static ru.privatenull.config.ConfigSections.section;
+import static ru.privatenull.gui.machine.MachineGuiSupport.section;
 
 final class MachineTextEditor {
 
     private final CaseManager caseManager;
-    private final MachineCaseState state;
-    private final MachineConfigEditor configEditor;
+    private final MachineGuiSupport support;
     private final MachineMainScreen mainScreen;
     private final Map<UUID, PendingEdit> pendingEdits = new ConcurrentHashMap<>();
 
     MachineTextEditor(
             CaseManager caseManager,
-            MachineCaseState state,
-            MachineConfigEditor configEditor,
+            MachineGuiSupport support,
             MachineMainScreen mainScreen
     ) {
         this.caseManager = caseManager;
-        this.state = state;
-        this.configEditor = configEditor;
+        this.support = support;
         this.mainScreen = mainScreen;
     }
 
-    void start(Player player, CaseDefinition definition, MachineTextField field) {
+    void startGuiTitle(Player player, CaseDefinition definition) {
+        start(player, definition, Field.GUI_TITLE);
+    }
+
+    void startHologramLines(Player player, CaseDefinition definition) {
+        start(player, definition, Field.HOLOGRAM_LINES);
+    }
+
+    private void start(Player player, CaseDefinition definition, Field field) {
         pendingEdits.put(player.getUniqueId(), new PendingEdit(definition.name(), field));
         player.closeInventory();
 
@@ -81,7 +86,7 @@ final class MachineTextEditor {
         }
 
         switch (pending.field()) {
-            case GUI_TITLE -> configEditor.update(player, pending.caseName(),
+            case GUI_TITLE -> support.update(player, pending.caseName(),
                     root -> section(root, "gui").set("title", value));
             case HOLOGRAM_LINES -> applyHologramLines(player, pending.caseName(), value);
         }
@@ -89,12 +94,12 @@ final class MachineTextEditor {
     }
 
     private void applyHologramLines(Player player, String caseName, String value) {
-        List<String> lines = state.parseHologramLines(value);
+        List<String> lines = support.parseHologramLines(value);
         if (lines.isEmpty()) {
             message(player, "machine-text.hologram-empty");
             return;
         }
-        configEditor.updateHologram(player, caseName, root -> {
+        support.updateHologram(player, caseName, root -> {
             ConfigurationSection hologram = section(root, "hologram");
             hologram.set("enabled", true);
             hologram.set("lines", lines);
@@ -102,9 +107,14 @@ final class MachineTextEditor {
     }
 
     private void message(Player player, String path, String... replacements) {
-        player.sendMessage(caseManager.getPlugin().getMessages().get(path, replacements));
+        player.sendMessage(caseManager.getPlugin().getUi().get(path, replacements));
     }
 
-    private record PendingEdit(String caseName, MachineTextField field) {
+    private enum Field {
+        GUI_TITLE,
+        HOLOGRAM_LINES
+    }
+
+    private record PendingEdit(String caseName, Field field) {
     }
 }

@@ -4,29 +4,62 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.PnCasesPlugin;
-import ru.privatenull.cases.model.AnimationType;
+import ru.privatenull.cases.model.CaseDefinition;
+import ru.privatenull.util.ItemFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.Consumer;
 
 public final class CaseConfigRepository {
+
+    private static final List<String> CASE_FILE_HEADER = List.of(
+            "# pnCases — конфигурация кейса",
+            "#",
+            "# Плейсхолдеры меню и предметов:",
+            "# {display-name} — цветное название кейса из display-name.",
+            "# {case} — то же отображаемое название кейса.",
+            "# {case_id} — ID кейса, то есть имя этого файла без .yml.",
+            "# {title} — заголовок меню кейса.",
+            "# {key} — ID виртуального ключа; он всегда совпадает с ID кейса.",
+            "# {key_name} — отображаемое название требуемого ключа.",
+            "# {have} — сколько ключей есть у игрока.",
+            "# {need} — сколько ключей требуется для открытия.",
+            "# {levels} — цена покупки ключа в уровнях опыта.",
+            "# {left-click} — актуальное действие при нажатии ЛКМ.",
+            "# {right-click} — актуальное действие при нажатии ПКМ.",
+            "#",
+            "# Плейсхолдеры наград, сообщений и команд:",
+            "# {player} — имя игрока, открывшего кейс.",
+            "# {uuid} — UUID игрока, открывшего кейс.",
+            "# {reward} — отображаемое название выпавшей награды.",
+            "# {amount} — количество валюты, поинтов или предметов в награде.",
+            "# {player}, {case}, {case_id}, {reward} также доступны в broadcast.lines.",
+            "#",
+            "# Доступные редкости rewards[].rarity:",
+            "# COMMON — Обычная.",
+            "# UNCOMMON — Необычная.",
+            "# RARE — Редкая.",
+            "# EPIC — Эпическая.",
+            "# LEGENDARY — Легендарная.",
+            "# MYTHIC — Мифическая.",
+            "# Название, цвет, символ и свечение редкостей настраиваются в gui.yml -> preview.rarities.",
+            "#",
+            "# Дополнительные плейсхолдеры голограммы:",
+            "# {world} — название мира, в котором установлен кейс.",
+            "# {x}, {y}, {z} — координаты блока кейса.",
+            "# {gui_title} — заголовок меню с цветами.",
+            "# {gui_title_plain} — заголовок меню без цветов."
+    );
 
     public enum CreateResult {
         CREATED,
@@ -41,16 +74,8 @@ public final class CaseConfigRepository {
         this.plugin = plugin;
     }
 
-    public List<String> configuredNames(Collection<String> fallback) {
+    public List<String> configuredNames() {
         Set<String> names = new TreeSet<>();
-        ConfigurationSection cases = plugin.getConfig().getConfigurationSection("cases");
-        if (cases != null) {
-            for (String configured : cases.getKeys(false)) {
-                String normalized = normalizeName(configured);
-                if (isValidId(normalized)) names.add(normalized);
-            }
-        }
-
         File[] files = directory().listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml"));
         if (files != null) {
             for (File file : files) {
@@ -58,24 +83,17 @@ public final class CaseConfigRepository {
                 if (isValidId(name)) names.add(name);
             }
         }
-        if (names.isEmpty() && fallback != null) {
-            for (String configured : fallback) {
-                String normalized = normalizeName(configured);
-                if (isValidId(normalized)) names.add(normalized);
-            }
-        }
         return new ArrayList<>(names);
     }
 
     public boolean exists(String caseName) {
         String normalized = normalizeName(caseName);
-        return isValidId(normalized) && declaredSourceExists(
-                embeddedCaseDeclared(normalized), matchingCaseFileCount(normalized));
+        return isValidId(normalized) && existingCaseFile(normalized) != null;
     }
 
     public boolean update(String caseName, Consumer<ConfigurationSection> updater) {
         if (!isValidId(normalizeName(caseName)) || updater == null) return false;
-        Writable writable = writable(caseName, false);
+        Writable writable = writable(caseName);
         if (writable == null || writable.section() == null) return false;
         Map<String, Object> before = snapshotSection(writable.section());
         try {
@@ -114,83 +132,34 @@ public final class CaseConfigRepository {
     public LoadResult loadAll() {
         Map<String, Source> sources = new LinkedHashMap<>();
         boolean successful = true;
-        ConfigurationSection root = plugin.getConfig().getConfigurationSection("cases");
-        Set<String> authoritativeEmbedded = new HashSet<>();
-        if (root != null && plugin.getConfig().getBoolean("case-files.auto-export", true)) {
-            for (String caseName : root.getKeys(false)) {
-                authoritativeEmbedded.add(normalizeName(caseName));
-            }
-        }
-
         File casesDirectory = directory();
+        if (!ensureDirectory(casesDirectory)) {
+            return new LoadResult(List.of(), false);
+        }
         File[] files = casesDirectory.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml"));
         if (files == null) {
-            boolean hasEmbeddedCases = root != null && !root.getKeys(false).isEmpty();
-            if (missingCaseDirectoryIsEmpty(casesDirectory.exists(), hasEmbeddedCases)) {
-                files = new File[0];
-            } else {
-                plugin.getLogger().severe("Не удалось прочитать папку cases: путь недоступен, не является папкой "
-                        + "или отсутствует без embedded-кейсов. Reload отменён.");
-                successful = false;
-            }
-        }
-        if (files != null) {
-            Arrays.sort(files, Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER));
-            for (File file : files) {
-                String canonicalId = fileId(file.getName());
-                if (!isValidId(canonicalId)) {
-                    plugin.getLogger().severe("Пропущен конфиг кейса с недопустимым именем файла: " + file.getName());
-                    successful = false;
-                    continue;
-                }
-                if (authoritativeEmbedded.contains(canonicalId)) {
-                    plugin.getLogger().warning("Миграция кейса '" + canonicalId
-                            + "' не завершена; standalone-файл временно игнорируется в пользу config.yml.");
-                    continue;
-                }
-                YamlConfiguration yaml = loadYaml(file);
-                if (yaml == null) {
-                    successful = false;
-                    continue;
-                }
-                ConfigurationSection section = caseSection(yaml);
-                warnIdMismatch(file.getName(), canonicalId, section);
-                if (sources.putIfAbsent(canonicalId, new Source(canonicalId, section, true)) != null) {
-                    plugin.getLogger().severe("Дубликат id кейса '" + canonicalId + "' в папке cases. Файл "
-                            + file.getName() + " пропущен.");
-                    successful = false;
-                }
-            }
+            plugin.getLogger().severe("Не удалось прочитать папку cases: путь недоступен или не является папкой.");
+            return new LoadResult(List.of(), false);
         }
 
-        if (root != null) {
-            for (String caseName : root.getKeys(false)) {
-                ConfigurationSection section = root.getConfigurationSection(caseName);
-                String normalized = normalizeName(caseName);
-                if (!isValidId(normalized) || section == null) {
-                    plugin.getLogger().severe("Пропущен некорректный кейс config.yml: cases." + caseName);
-                    successful = false;
-                    continue;
-                }
-                warnIdMismatch("config.yml:cases." + caseName, normalized, section);
-                Source embedded = new Source(normalized, section, false);
-                Source previous = sources.putIfAbsent(normalized, embedded);
-                if (previous != null) {
-                    if (replaceStandaloneWithEmbedded(
-                            plugin.getConfig().getBoolean("case-files.auto-export", true),
-                            previous.fileBacked())) {
-                        sources.put(normalized, embedded);
-                        plugin.getLogger().warning("Миграция кейса '" + normalized
-                                + "' не завершена; до следующего успешного экспорта используется версия из config.yml.");
-                    } else {
-                        plugin.getLogger().severe(previous.fileBacked()
-                                ? "Дубликат кейса '" + normalized + "': он одновременно объявлен в config.yml и cases/"
-                                + normalized + ".yml."
-                                : "Дубликат embedded-id кейса '" + normalized
-                                + "' в config.yml. Проверьте регистр и повторяющиеся секции.");
-                        successful = false;
-                    }
-                }
+        Arrays.sort(files, Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER));
+        for (File file : files) {
+            String canonicalId = fileId(file.getName());
+            if (!isValidId(canonicalId)) {
+                plugin.getLogger().severe("Пропущен конфиг кейса с недопустимым именем файла: " + file.getName());
+                successful = false;
+                continue;
+            }
+            YamlConfiguration yaml = loadYaml(file);
+            if (yaml == null) {
+                successful = false;
+                continue;
+            }
+            warnIdMismatch(file.getName(), canonicalId, yaml);
+            if (sources.putIfAbsent(canonicalId, new Source(canonicalId, yaml)) != null) {
+                plugin.getLogger().severe("Дубликат id кейса '" + canonicalId + "' в папке cases. Файл "
+                        + file.getName() + " пропущен.");
+                successful = false;
             }
         }
         return new LoadResult(new ArrayList<>(sources.values()), successful);
@@ -200,76 +169,27 @@ public final class CaseConfigRepository {
         String normalized = normalizeName(caseName);
         if (!isValidId(normalized)) return null;
 
-        ConfigurationSection embedded = embeddedCaseSection(normalized);
         File caseFile = existingCaseFile(normalized);
-        if (preferEmbeddedSource(plugin.getConfig().getBoolean("case-files.auto-export", true),
-                embedded != null, caseFile != null)) {
-            warnIdMismatch("config.yml:cases." + normalized, normalized, embedded);
-            return new Source(normalized, embedded, false);
-        }
-
-        if (caseFile != null) {
-            YamlConfiguration yaml = loadYaml(caseFile);
-            if (yaml == null) return null;
-            ConfigurationSection section = caseSection(yaml);
-            warnIdMismatch(caseFile.getName(), normalized, section);
-            return new Source(normalized, section, true);
-        }
-
-        if (embedded == null) return null;
-        warnIdMismatch("config.yml:cases." + normalized, normalized, embedded);
-        return new Source(normalized, embedded, false);
+        if (caseFile == null) return null;
+        YamlConfiguration yaml = loadYaml(caseFile);
+        if (yaml == null) return null;
+        warnIdMismatch(caseFile.getName(), normalized, yaml);
+        return new Source(normalized, yaml);
     }
 
-    public Writable writable(String caseName, boolean create) {
+    public Writable writable(String caseName) {
         String normalized = normalizeName(caseName);
         if (!isValidId(normalized)) return null;
 
-        ConfigurationSection embedded = embeddedCaseSection(normalized);
         File caseFile = existingCaseFile(normalized);
-        if (preferEmbeddedSource(plugin.getConfig().getBoolean("case-files.auto-export", true),
-                embedded != null, caseFile != null)) {
-            return new Writable(embedded, null, null, false);
-        }
-
-        if (caseFile != null) {
-            YamlConfiguration yaml = loadYaml(caseFile);
-            if (yaml == null) return null;
-            return new Writable(caseSection(yaml), yaml, caseFile, true);
-        }
-
-        if (embedded != null) return new Writable(embedded, null, null, false);
-        ConfigurationSection cases = plugin.getConfig().getConfigurationSection("cases");
-        if (cases == null) {
-            if (!create) return null;
-            cases = plugin.getConfig().createSection("cases");
-        }
-        ConfigurationSection section = create ? cases.createSection(normalized) : null;
-        return section == null ? null : new Writable(section, null, null, false);
-    }
-
-    static boolean preferEmbeddedSource(boolean autoExport, boolean embeddedExists, boolean standaloneExists) {
-        return autoExport && embeddedExists && standaloneExists;
-    }
-
-    static boolean replaceStandaloneWithEmbedded(boolean autoExport, boolean previousFileBacked) {
-        return autoExport && previousFileBacked;
-    }
-
-    static boolean declaredSourceExists(boolean embeddedDeclared, int physicalFileMatches) {
-        return embeddedDeclared || physicalFileMatches > 0;
-    }
-
-    static boolean missingCaseDirectoryIsEmpty(boolean pathExists, boolean embeddedCasesExist) {
-        return !pathExists && embeddedCasesExist;
+        if (caseFile == null) return null;
+        YamlConfiguration yaml = loadYaml(caseFile);
+        return yaml == null ? null : new Writable(yaml, caseFile);
     }
 
     public boolean save(Writable writable) {
         if (writable == null) return false;
-        if (writable.fileBacked()) {
-            return saveYamlAtomically(writable.yaml(), writable.file());
-        }
-        return saveMainConfig();
+        return saveYamlAtomically(writable.yaml(), writable.file());
     }
 
     public boolean saveMainConfig() {
@@ -277,80 +197,13 @@ public final class CaseConfigRepository {
     }
 
     public boolean delete(String caseName) {
-        Writable writable = writable(caseName, false);
-        if (writable == null || writable.section() == null) return false;
-
-        if (writable.fileBacked()) {
-            try {
-                return Files.deleteIfExists(writable.file().toPath());
-            } catch (IOException ex) {
-                plugin.getLogger().severe("Не удалось удалить конфиг кейса '" + normalizeName(caseName) + "': " + ex.getMessage());
-                return false;
-            }
-        }
-
-        ConfigurationSection cases = plugin.getConfig().getConfigurationSection("cases");
-        if (cases == null) return false;
-        String normalized = normalizeName(caseName);
-        Object snapshot = cases.get(normalized);
-        cases.set(normalized, null);
-        if (saveMainConfig()) return true;
-        cases.set(normalized, snapshot);
-        return false;
-    }
-
-    public void exportMainCasesIfMissing() {
-        if (!plugin.getConfig().getBoolean("case-files.auto-export", true)) return;
-        File directory = directory();
-        ConfigurationSection root = plugin.getConfig().getConfigurationSection("cases");
-        if (!ensureDirectory(directory)) return;
-        if (root == null || root.getKeys(false).isEmpty()) {
-            return;
-        }
-
-        int expected = root.getKeys(false).size();
-        Set<String> exportedIds = new HashSet<>();
-        Map<String, File> exportTargets = new LinkedHashMap<>();
-        for (String caseName : root.getKeys(false)) {
-            ConfigurationSection source = root.getConfigurationSection(caseName);
-            String normalized = normalizeName(caseName);
-            if (source == null || !isValidId(normalized) || !exportedIds.add(normalized)) {
-                plugin.getLogger().severe("Автоэкспорт остановлен: некорректный или повторяющийся id кейса '" + caseName + "'.");
-                return;
-            }
-            File target = resolveExportTarget(normalized);
-            if (target == null) {
-                plugin.getLogger().severe("Автоэкспорт остановлен: найдено несколько standalone-файлов для кейса '"
-                        + normalized + "'.");
-                return;
-            }
-            exportTargets.put(normalized, target);
-        }
-
-        int exported = 0;
-        for (String caseName : root.getKeys(false)) {
-            String normalized = normalizeName(caseName);
-            ConfigurationSection source = root.getConfigurationSection(caseName);
-            File target = exportTargets.get(normalized);
-            if (sameCaseContent(source, target)) {
-                // A previous migration attempt may already have written this
-                // case. Rewriting it would rotate <case>.yml.bak again and
-                // destroy the original standalone version kept for recovery.
-                exported++;
-                continue;
-            }
-            YamlConfiguration yaml = new YamlConfiguration();
-            copySection(source, yaml);
-            if (saveYamlAtomically(yaml, target)) exported++;
-        }
-        if (exported == expected && exportedIds.size() == expected) {
-            if (removeMainCasesWhenExported(exportTargets)) {
-                plugin.getLogger().info("Созданы отдельные конфиги кейсов: plugins/pnCases/cases/*.yml ("
-                        + exported + ").");
-            }
-        } else {
-            plugin.getLogger().severe("Секция cases оставлена в config.yml: успешно экспортировано "
-                    + exported + " из " + expected + " кейсов.");
+        File caseFile = existingCaseFile(normalizeName(caseName));
+        if (caseFile == null) return false;
+        try {
+            return Files.deleteIfExists(caseFile.toPath());
+        } catch (IOException ex) {
+            plugin.getLogger().severe("Не удалось удалить конфиг кейса '" + normalizeName(caseName) + "': " + ex.getMessage());
+            return false;
         }
     }
 
@@ -368,37 +221,6 @@ public final class CaseConfigRepository {
         return false;
     }
 
-    private ConfigurationSection embeddedCaseSection(String caseId) {
-        ConfigurationSection root = plugin.getConfig().getConfigurationSection("cases");
-        if (root == null) return null;
-        ConfigurationSection exact = root.getConfigurationSection(caseId);
-        if (exact != null) return exact;
-
-        ConfigurationSection match = null;
-        for (String configured : root.getKeys(false)) {
-            if (!normalizeName(configured).equals(caseId)) continue;
-            if (match != null) {
-                plugin.getLogger().severe("Несколько embedded-кейсов имеют id '" + caseId + "'. Редактирование отменено.");
-                return null;
-            }
-            match = root.getConfigurationSection(configured);
-        }
-        return match;
-    }
-
-    private boolean embeddedCaseDeclared(String caseId) {
-        ConfigurationSection root = plugin.getConfig().getConfigurationSection("cases");
-        if (root == null) return false;
-        return root.getKeys(false).stream().anyMatch(configured -> normalizeName(configured).equals(caseId));
-    }
-
-    private int matchingCaseFileCount(String caseId) {
-        File direct = file(caseId);
-        File[] matches = directory().listFiles((dir, name) ->
-                name.toLowerCase(Locale.ROOT).endsWith(".yml") && fileId(name).equals(caseId));
-        return matches == null ? (direct.isFile() ? 1 : 0) : matches.length;
-    }
-
     private File existingCaseFile(String caseId) {
         File resolved = resolveExportTarget(caseId);
         return resolved != null && resolved.isFile() ? resolved : null;
@@ -409,56 +231,6 @@ public final class CaseConfigRepository {
                 name.toLowerCase(Locale.ROOT).endsWith(".yml") && fileId(name).equals(caseId));
         if (matches == null || matches.length == 0) return file(caseId);
         return matches.length == 1 ? matches[0] : null;
-    }
-
-    private boolean removeMainCasesWhenExported(Map<String, File> exportedFiles) {
-        ConfigurationSection root = plugin.getConfig().getConfigurationSection("cases");
-        if (root == null || root.getKeys(false).isEmpty()) return false;
-        for (String caseName : root.getKeys(false)) {
-            String normalized = normalizeName(caseName);
-            ConfigurationSection original = root.getConfigurationSection(caseName);
-            File exported = exportedFiles.get(normalized);
-            if (!isValidId(normalized) || original == null || exported == null) {
-                plugin.getLogger().severe("Секция cases оставлена в config.yml: для кейса '" + caseName
-                        + "' нет корректного отдельного файла.");
-                return false;
-            }
-            YamlConfiguration readback = loadYaml(exported);
-            if (readback == null) return false;
-            ConfigurationSection exportedSection = caseSection(readback);
-            if (exportedSection.getKeys(false).isEmpty()
-                    || !snapshotSection(original).equals(snapshotSection(exportedSection))) {
-                plugin.getLogger().severe("Секция cases оставлена в config.yml: cases/" + exported.getName()
-                        + " не совпадает с исходными настройками кейса '" + caseName + "'.");
-                return false;
-            }
-        }
-
-        File backup = new File(plugin.getDataFolder(), "config.cases-backup.yml");
-        if (!saveYamlAtomically(plugin.getConfig(), backup)) return false;
-
-        Map<String, Object> previousCases = snapshotSection(root);
-        plugin.getConfig().set("cases", null);
-        if (!saveMainConfig()) {
-            ConfigurationSection restoredCases = plugin.getConfig().createSection("cases");
-            restoreSection(restoredCases, previousCases);
-            plugin.getLogger().severe("Секция cases не удалена из config.yml: безопасное сохранение не удалось.");
-            return false;
-        }
-        plugin.getLogger().info("Секция cases перенесена в plugins/pnCases/cases/*.yml. "
-                + "Старый config сохранён как config.cases-backup.yml.");
-        return true;
-    }
-
-    private boolean sameCaseContent(ConfigurationSection source, File target) {
-        if (source == null || target == null || !target.isFile()) return false;
-        YamlConfiguration existing = loadYaml(target);
-        return existing != null && sameCaseContent(source, caseSection(existing));
-    }
-
-    static boolean sameCaseContent(ConfigurationSection source, ConfigurationSection target) {
-        return source != null && target != null
-                && snapshotSection(source).equals(snapshotSection(target));
     }
 
     private File directory() {
@@ -478,30 +250,6 @@ public final class CaseConfigRepository {
         return normalizeName(name);
     }
 
-    private static ConfigurationSection caseSection(YamlConfiguration yaml) {
-        ConfigurationSection nested = yaml.getConfigurationSection("case");
-        return nested == null ? yaml : nested;
-    }
-
-    private static String firstString(ConfigurationSection section, String... keys) {
-        if (section == null) return null;
-        for (String key : keys) {
-            if (section.contains(key)) return section.getString(key);
-        }
-        return null;
-    }
-
-    private static void copySection(ConfigurationSection source, ConfigurationSection target) {
-        for (String key : source.getKeys(false)) {
-            Object value = source.get(key);
-            if (value instanceof ConfigurationSection nested) {
-                copySection(nested, target.createSection(key));
-            } else {
-                target.set(key, value);
-            }
-        }
-    }
-
     private static void clearSection(ConfigurationSection section) {
         for (String key : new ArrayList<>(section.getKeys(false))) {
             section.set(key, null);
@@ -512,6 +260,10 @@ public final class CaseConfigRepository {
         YamlConfiguration yaml = new YamlConfiguration();
         try {
             yaml.load(file);
+            if (migrateCaseGui(yaml) && !saveYamlAtomically(yaml, file)) {
+                plugin.getLogger().warning("Не удалось сохранить новую структуру gui в "
+                        + file.getName() + ".");
+            }
             return yaml;
         } catch (IOException | InvalidConfigurationException ex) {
             plugin.getLogger().severe("Не удалось прочитать конфиг кейса " + file.getName() + ": " + ex.getMessage());
@@ -519,8 +271,118 @@ public final class CaseConfigRepository {
         }
     }
 
+    static boolean migrateCaseGui(ConfigurationSection root) {
+        boolean changed = migrateCost(root);
+        ConfigurationSection gui = root.getConfigurationSection("gui");
+        if (gui == null) return changed;
+
+        ConfigurationSection legacy = gui.getConfigurationSection("open-item");
+        ConfigurationSection button = gui.getConfigurationSection("button");
+        if (button == null && legacy != null) {
+            button = gui.createSection("button", snapshotSection(legacy));
+            changed = true;
+        }
+        if (legacy != null) {
+            gui.set("open-item", null);
+            changed = true;
+        }
+        if (button == null) {
+            button = gui.createSection("button");
+            button.set("material", "CHEST");
+            changed = true;
+        }
+
+        boolean missingName = !button.contains("name", true);
+        boolean missingLore = !button.isList("lore");
+        ItemMeta meta = null;
+        if (missingName || missingLore) {
+            ItemStack configured = ItemFactory.fromSection(button);
+            meta = configured == null ? null : configured.getItemMeta();
+        }
+        if (missingName) {
+            button.set("name", meta != null && meta.hasDisplayName()
+                    ? meta.getDisplayName()
+                    : "{display-name}");
+            changed = true;
+        }
+        if (missingLore) {
+            button.set("lore", meta != null && meta.hasLore() && meta.getLore() != null
+                    ? meta.getLore()
+                    : defaultButtonLore());
+            changed = true;
+        }
+
+        ConfigurationSection history = gui.getConfigurationSection("history");
+        if (history != null) {
+            ConfigurationSection legacyEmpty = history.getConfigurationSection("empty-item");
+            if (history.getConfigurationSection("empty") == null && legacyEmpty != null) {
+                history.createSection("empty", snapshotSection(legacyEmpty));
+                changed = true;
+            }
+            if (legacyEmpty != null) {
+                history.set("empty-item", null);
+                changed = true;
+            }
+        }
+        ConfigurationSection idleParticles = root.getConfigurationSection("idle-particles");
+        if (idleParticles != null && idleParticles.contains("effects", true)) {
+            idleParticles.set("effects", null);
+            changed = true;
+        }
+        if (root.getConfigurationSection("broadcast") == null) {
+            ConfigurationSection broadcast = root.createSection("broadcast");
+            broadcast.set("enabled", true);
+            broadcast.set("lines", CaseDefinition.DEFAULT_BROADCAST_LINES);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static boolean migrateCost(ConfigurationSection root) {
+        ConfigurationSection cost = root.getConfigurationSection("cost");
+        if (cost == null) return false;
+
+        boolean changed = false;
+        boolean hasLegacyEnabled = cost.contains("buy_xp_enabled", true);
+        boolean hasLegacyLevels = cost.contains("buy_xp_levels", true);
+        if (hasLegacyEnabled || hasLegacyLevels) {
+            ConfigurationSection purchase = cost.getConfigurationSection("xp-purchase");
+            if (purchase == null) purchase = cost.createSection("xp-purchase");
+            if (!purchase.contains("enabled", true)) {
+                purchase.set("enabled", cost.getBoolean("buy_xp_enabled", true));
+            }
+            if (!purchase.contains("levels", true)) {
+                purchase.set("levels", cost.getInt("buy_xp_levels", 0));
+            }
+            cost.set("buy_xp_enabled", null);
+            cost.set("buy_xp_levels", null);
+            changed = true;
+        }
+        for (String obsolete : List.of("type", "key", "amount")) {
+            if (cost.contains(obsolete, true)) {
+                cost.set(obsolete, null);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private static List<String> defaultButtonLore() {
+        return List.of(
+                "",
+                "&#9EFC65 «Текущие параметры»",
+                " &7- &fКлючи: &#FCA865{have} &7/ &#FCA865{need}",
+                " &7- &fТип ключа: {key_name}",
+                "",
+                "&#65D1FC «Действия»",
+                " &7- {left-click}",
+                " &7- {right-click}",
+                ""
+        );
+    }
+
     private void warnIdMismatch(String source, String canonicalId, ConfigurationSection section) {
-        String explicitId = firstString(section, "id", "case_id", "case-id");
+        String explicitId = section == null ? null : section.getString("id");
         if (explicitId != null && !explicitId.isBlank() && !canonicalId.equals(normalizeName(explicitId))) {
             plugin.getLogger().warning(source + " содержит id='" + explicitId + "', но используется канонический id '"
                     + canonicalId + "' из имени файла/секции. Измените id, чтобы убрать предупреждение.");
@@ -535,15 +397,16 @@ public final class CaseConfigRepository {
             Path parentPath = parent == null ? target.toPath().toAbsolutePath().getParent() : parent.toPath();
             temporary = Files.createTempFile(parentPath, target.getName() + ".", ".tmp");
             yaml.save(temporary.toFile());
+            if (isCaseFile(target)) {
+                formatCaseYaml(temporary);
+            } else {
+                compactIntegerSlotLists(temporary);
+            }
 
             YamlConfiguration readback = new YamlConfiguration();
             readback.load(temporary.toFile());
 
             Path targetPath = target.toPath();
-            if (Files.isRegularFile(targetPath)) {
-                Files.copy(targetPath, targetPath.resolveSibling(target.getName() + ".bak"),
-                        StandardCopyOption.REPLACE_EXISTING);
-            }
             try {
                 Files.move(temporary, targetPath, StandardCopyOption.ATOMIC_MOVE,
                         StandardCopyOption.REPLACE_EXISTING);
@@ -562,6 +425,141 @@ public final class CaseConfigRepository {
                 }
             }
         }
+    }
+
+    static void compactIntegerSlotLists(Path yamlFile) throws IOException {
+        List<String> lines = Files.readAllLines(yamlFile, StandardCharsets.UTF_8);
+        List<String> compact = new ArrayList<>(lines.size());
+        for (int index = 0; index < lines.size(); index++) {
+            String line = lines.get(index);
+            String trimmed = line.trim();
+            if (!"slots:".equals(trimmed)) {
+                compact.add(line);
+                continue;
+            }
+
+            String indent = line.substring(0, line.indexOf('s'));
+            List<String> values = new ArrayList<>();
+            int cursor = index + 1;
+            while (cursor < lines.size()) {
+                String candidate = lines.get(cursor);
+                String candidateTrimmed = candidate.trim();
+                if (!candidate.startsWith(indent) || !candidateTrimmed.startsWith("- ")) break;
+                String value = candidateTrimmed.substring(2).trim();
+                if (!value.matches("-?\\d+")) break;
+                values.add(value);
+                cursor++;
+            }
+            if (values.isEmpty()) {
+                compact.add(line);
+                continue;
+            }
+
+            compact.add(indent + "slots: [" + String.join(", ", values) + "]");
+            index = cursor - 1;
+        }
+        Files.write(yamlFile, compact, StandardCharsets.UTF_8);
+    }
+
+    static void formatCaseYaml(Path yamlFile) throws IOException {
+        compactIntegerSlotLists(yamlFile);
+        List<String> lines = Files.readAllLines(yamlFile, StandardCharsets.UTF_8);
+        lines = stripManagedDecorations(lines);
+        lines = compactBlockLocations(lines);
+        lines = addCaseHeader(lines);
+        Files.write(yamlFile, lines, StandardCharsets.UTF_8);
+    }
+
+    private static boolean isCaseFile(File target) {
+        File parent = target == null ? null : target.getParentFile();
+        return parent != null
+                && "cases".equalsIgnoreCase(parent.getName())
+                && target.getName().toLowerCase(Locale.ROOT).endsWith(".yml");
+    }
+
+    private static List<String> compactBlockLocations(List<String> source) {
+        List<String> result = new ArrayList<>(source.size());
+        for (int index = 0; index < source.size(); index++) {
+            String line = source.get(index);
+            result.add(line);
+            if (!"blocks:".equals(line.trim()) || !leadingWhitespace(line).isEmpty()) continue;
+
+            int cursor = index + 1;
+            while (cursor < source.size()) {
+                String first = source.get(cursor);
+                if (!first.startsWith("- ")) break;
+                String firstValue = first.substring(2).trim();
+                if (firstValue.startsWith("{") && firstValue.endsWith("}")) {
+                    result.add(first);
+                    cursor++;
+                    continue;
+                }
+                List<String> values = new ArrayList<>();
+                values.add(firstValue);
+                int next = cursor + 1;
+                while (next < source.size()) {
+                    String child = source.get(next);
+                    if (!child.startsWith("  ") || child.trim().startsWith("- ")) break;
+                    values.add(child.trim());
+                    next++;
+                }
+                result.add("- {" + String.join(", ", values) + "}");
+                cursor = next;
+            }
+            if (cursor > index + 1) {
+                index = cursor - 1;
+            }
+        }
+        return result;
+    }
+
+    private static List<String> addCaseHeader(List<String> source) {
+        List<String> result = new ArrayList<>(CASE_FILE_HEADER.size() + source.size() + 1);
+        result.addAll(CASE_FILE_HEADER);
+        result.add("");
+        result.addAll(source);
+        return result;
+    }
+
+    private static List<String> stripManagedDecorations(List<String> source) {
+        Set<String> sectionComments = Set.of(
+                "# Основное",
+                "# Голограмма",
+                "# Витрина",
+                "# Меню",
+                "# Меню кейса",
+                "# Стоимость открытия",
+                "# Анимация",
+                "# Награды"
+        );
+        List<String> result = new ArrayList<>(source.size());
+        for (int index = 0; index < source.size(); index++) {
+            String trimmed = source.get(index).trim();
+            if (trimmed.equals("# Плейсхолдеры pnCases")
+                    || trimmed.equals("# pnCases — конфигурация кейса")) {
+                int cursor = index + 1;
+                while (cursor < source.size()) {
+                    String next = source.get(cursor).trim();
+                    if (!next.isEmpty() && !next.startsWith("#")) break;
+                    cursor++;
+                }
+                index = cursor - 1;
+                continue;
+            }
+            if (sectionComments.contains(trimmed)
+                    || (trimmed.startsWith("# ━") && trimmed.endsWith("━"))) {
+                continue;
+            }
+            result.add(source.get(index));
+        }
+        while (!result.isEmpty() && result.get(0).isBlank()) result.remove(0);
+        return result;
+    }
+
+    private static String leadingWhitespace(String value) {
+        int index = 0;
+        while (index < value.length() && Character.isWhitespace(value.charAt(index))) index++;
+        return value.substring(0, index);
     }
 
     static Map<String, Object> snapshotSection(ConfigurationSection section) {
@@ -611,40 +609,31 @@ public final class CaseConfigRepository {
     }
 
     public static String defaultDisplayName(String caseName) {
-        return "&x&4&2&9&F&9&1Новый кейс &8| &f" + caseName;
+        return "&x&4&2&9&F&9&1" + caseName;
     }
 
     static void writeNewCaseDefaults(ConfigurationSection root, String caseName) {
         String visibleName = defaultDisplayName(caseName);
         root.set("blocks", List.of());
-        root.set("id", caseName);
         root.set("display-name", visibleName);
 
         ConfigurationSection hologram = root.createSection("hologram");
         hologram.set("enabled", true);
         hologram.set("type", "TEXT");
         hologram.set("y", 1.5D);
-        hologram.set("lines", List.of(visibleName, "&7Нажмите ПКМ, чтобы открыть"));
+        hologram.set("lines", List.of("{display-name}", "&7Нажмите ПКМ, чтобы открыть"));
 
         ConfigurationSection showcase = root.createSection("idle-particles");
         showcase.set("enabled", true);
-        showcase.set("effects", true);
-        showcase.set("style", "VERTICAL_SPIRAL");
-        showcase.set("theme", "ELECTRIC");
-        showcase.set("interval_ticks", 3);
-        showcase.set("radius", 0.8D);
-        showcase.set("height", 1.55D);
-        showcase.set("speed", 0.12D);
+        showcase.set("theme", "DRAGON");
         showcase.set("view_distance", 28);
-        ConfigurationSection showcaseItem = showcase.createSection("item");
-        showcaseItem.set("material", "NETHER_STAR");
-        showcaseItem.set("name", visibleName);
 
         ConfigurationSection gui = root.createSection("gui");
         gui.set("title", "{display-name}");
         gui.set("size", 54);
         gui.set("open_slot", 22);
         gui.set("animation_slot", 49);
+        gui.set("preview_enabled", true);
         ConfigurationSection decor = gui.createSection("decor");
         decor.set("slots", List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 26, 27, 35,
                 36, 37, 38, 39, 40, 41, 42, 43, 44));
@@ -652,40 +641,46 @@ public final class CaseConfigRepository {
         decorItem.set("material", "GRAY_STAINED_GLASS_PANE");
         decorItem.set("name", " ");
         ConfigurationSection history = gui.createSection("history");
-        history.set("slots", List.of(45, 46, 47, 48, 51, 52, 53));
-        ConfigurationSection emptyHistory = history.createSection("empty-item");
-        emptyHistory.set("material", "BARRIER");
-        emptyHistory.set("name", "&8История пуста");
-        ConfigurationSection animationItem = gui.createSection("animation-item");
-        animationItem.set("material", "NETHER_STAR");
-        animationItem.set("name", "&eКруг фортуны");
-        animationItem.set("lore", List.of("&7Настройка открытия в Machine GUI."));
-        ConfigurationSection openItem = gui.createSection("open-item");
+        history.set("slots", List.of(45, 46, 47, 48, 50, 51, 52, 53));
+        ConfigurationSection openItem = gui.createSection("button");
         openItem.set("material", "CHEST");
         openItem.set("name", "{display-name}");
-        openItem.set("lore", List.of("", "&7Новый кейс готов к настройке.", ""));
-        openItem.set("extra-lore", List.of(
+        openItem.set("lore", List.of(
                 "",
-                "&7Ключи: &f{have}&7/&f{need} &8({key_name}&8)",
+                "&#9EFC65 «Основная информация»",
+                " &7- &fКейс готов к настройке.",
+                " &7- &fНаград: &#FCA8651",
                 "",
-                "{left-click}",
-                "{right-click}"
+                "&#65D1FC «Текущие параметры»",
+                " &7- &fКлючи: &#FCA865{have} &7/ &#FCA865{need}",
+                " &7- &fТип ключа: {key_name}",
+                "",
+                "&#FCA965 «Управление»",
+                " &7- {left-click}",
+                " &7- {right-click}",
+                ""
         ));
+        ConfigurationSection insufficientKeys = gui.createSection("insufficient-keys");
+        insufficientKeys.set("name", "&#FF5A64Недостаточно ключей");
+        insufficientKeys.set("lore", List.of(
+                "",
+                "&#FC7165 «Недостаточно ключей»",
+                " &7- &fДоступно: &#FCA865{have}",
+                " &7- &fТребуется: &#FCA865{need}",
+                "",
+                "&#65D1FC «Что делать»",
+                " &7- &fПолучите ключ и попробуйте снова.",
+                ""
+        ));
+        ConfigurationSection broadcast = root.createSection("broadcast");
+        broadcast.set("enabled", true);
+        broadcast.set("lines", CaseDefinition.DEFAULT_BROADCAST_LINES);
 
         ConfigurationSection cost = root.createSection("cost");
-        cost.set("type", "KEY");
-        cost.set("key", caseName);
-        cost.set("amount", 1);
-        cost.set("buy_xp_enabled", false);
-        cost.set("buy_xp_levels", 0);
+        ConfigurationSection xpPurchase = cost.createSection("xp-purchase");
+        xpPurchase.set("enabled", false);
+        xpPurchase.set("levels", 0);
 
-        ConfigurationSection animation = root.createSection("animation");
-        animation.set("fixed", AnimationType.FORTUNE_RING.name());
-        animation.set("items", List.of(
-                Map.of("material", "GOLD_INGOT", "name", "&6Золото"),
-                Map.of("material", "DIAMOND", "name", "&bАлмаз"),
-                Map.of("material", "EMERALD", "name", "&aИзумруд")
-        ));
         root.set("rewards", List.of(Map.of(
                 "chance", 100,
                 "rarity", "COMMON",
@@ -695,7 +690,7 @@ public final class CaseConfigRepository {
         )));
     }
 
-    public record Source(String name, ConfigurationSection section, boolean fileBacked) {
+    public record Source(String name, ConfigurationSection section) {
     }
 
     public record LoadResult(List<Source> sources, boolean successful) {
@@ -704,6 +699,9 @@ public final class CaseConfigRepository {
         }
     }
 
-    public record Writable(ConfigurationSection section, YamlConfiguration yaml, File file, boolean fileBacked) {
+    public record Writable(YamlConfiguration yaml, File file) {
+        public ConfigurationSection section() {
+            return yaml;
+        }
     }
 }

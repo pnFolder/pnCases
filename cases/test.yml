@@ -1,0 +1,160 @@
+# Тестовый кейс со всеми типами наград pnCases.
+# После /pncases reload возьми блок-кейс в руку и выполни:
+# /pncases setcase test
+# Затем выдай ключ: /pncases givekey <игрок> test 5
+#
+# Доступные значения rarity:
+# COMMON, UNCOMMON, RARE, EPIC, LEGENDARY, MYTHIC.
+# Их оформление настраивается в gui.yml -> preview.rarities.
+
+# Блоки добавляются автоматически через /pncases setcase test.
+blocks: []
+
+display-name: '&x&4&2&9&F&9&1Тестовый кейс'
+
+hologram:
+  enabled: true
+  type: TEXT
+  y: 1.5
+  lines:
+    - '&x&4&2&9&F&9&1&lТестовый кейс'
+    - '&7ПКМ &8— &fоткрыть'
+    - '&8Ключ: &x&4&2&9&F&9&1test'
+
+idle-particles:
+  enabled: true
+  theme: ELECTRIC
+  view_distance: 28
+
+gui:
+  title: '{display-name}'
+  size: 54
+  open_slot: 22
+  animation_slot: -1
+  # false: и ЛКМ, и ПКМ сразу открывают кейс без меню содержимого.
+  preview_enabled: true
+  decor:
+    slots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 26, 27, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+    item:
+      material: GRAY_STAINED_GLASS_PANE
+      name: ' '
+  history:
+    slots: [45, 46, 47, 48, 49, 50, 51, 52, 53]
+  button:
+    material: CHEST
+    name: '&x&4&2&9&F&9&1&lОткрыть тестовый кейс'
+    lore:
+      - ''
+      - '&#9EFC65 «Основная информация»'
+      - ' &7- &fВнутри примеры всех типов наград.'
+      - ' &7- &fНаград: &#FCA8655'
+      - ''
+      - '&#65D1FC «Текущие параметры»'
+      - ' &7- &fКлючи: &#FCA865{have} &7/ &#FCA865{need}'
+      - ' &7- &fТип ключа: {key_name}'
+      - ''
+      - '&#FCA965 «Управление»'
+      - ' &7- {left-click}'
+      - ' &7- {right-click}'
+      - ''
+  insufficient-keys:
+    name: '&#FF5A64Недостаточно ключей'
+    lore:
+      - ''
+      - '&#FC7165 «Недостаточно ключей»'
+      - ' &7- &fДоступно: &#FCA865{have}'
+      - ' &7- &fТребуется: &#FCA865{need}'
+      - ''
+      - '&#65D1FC «Что делать»'
+      - ' &7- &fПолучите ключ и попробуйте снова.'
+      - ''
+
+broadcast:
+  enabled: true
+  lines:
+    - ''
+    - '&#EFF7B9К§x§6§8§A§F§9§4Е§x§8§D§B§F§9§7Й§x§B§3§C§F§9§AС&#EFF7B9Ы'
+    - ''
+    - '&#EFF7B9▸ &fИгрок &#EFF7B9{player} &fоткрыл кейс &#EFF7B9{case}'
+    - '&#EFF7B9▸ &fНаграда: &f{reward}'
+    - ''
+
+cost:
+  # Кейс всегда использует один виртуальный ключ со своим ID.
+  xp-purchase:
+    enabled: false
+    levels: 0
+
+animation:
+  items:
+    # Кастомная голова в анимации: вместо material указывается base64.
+    - base64: 'eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNTExM2VlNjEwODQxZGVkMjE1YWNkMmI0Y2FhZWVmODdkZmQ2ZTNkNDc2OGU3YWI0ZTE5ZWI3NmIzZDgxMjFjZiJ9fX0='
+      name: '&bКастомная голова'
+    - material: SUNFLOWER
+      name: '&a500 монет'
+    - material: AMETHYST_SHARD
+      name: '&b100 поинтов'
+    - material: NETHER_STAR
+      name: '&dVIP на 1 час'
+    - material: GOLDEN_APPLE
+      name: '&eЗолотое яблоко'
+
+rewards:
+  # ITEM — выдаёт предмет прямо в инвентарь игрока.
+  # Для кастомной головы укажи base64 вместо material. Эта голова реально
+  # попадёт игроку в инвентарь, а не только отобразится в предпросмотре.
+  - type: ITEM
+    chance: 20
+    rarity: COMMON
+    item:
+      base64: 'eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNTExM2VlNjEwODQxZGVkMjE1YWNkMmI0Y2FhZWVmODdkZmQ2ZTNkNDc2OGU3YWI0ZTE5ZWI3NmIzZDgxMjFjZiJ9fX0='
+      name: '&bКастомная голова'
+      lore:
+        - '&7Пример награды через Base64-текстуру.'
+      # Обычный предмет выглядит так:
+      # material: DIAMOND
+      # amount: 3
+
+  # VAULT — выдаёт деньги через Vault. Нужны Vault и плагин экономики.
+  - type: VAULT
+    chance: 20
+    rarity: UNCOMMON
+    vault:
+      amount: 500
+    visual:
+      material: SUNFLOWER
+      name: '&a500 монет'
+
+  # PLAYERPOINTS — выдаёт поинты. Нужен PlayerPoints.
+  - type: PLAYERPOINTS
+    chance: 20
+    rarity: RARE
+    playerpoints:
+      amount: 100
+    visual:
+      material: AMETHYST_SHARD
+      name: '&b100 поинтов'
+
+  # LUCKPERMS — выдаёт группу или право. Нужен LuckPerms.
+  # Можно указать group, node или оба поля; duration необязательно.
+  - type: LUCKPERMS
+    chance: 20
+    rarity: EPIC
+    luckperms:
+      group: vip
+      duration: 1h
+      # node: example.permission
+    visual:
+      material: NETHER_STAR
+      name: '&dVIP на 1 час'
+
+  # PERSONAL — выполняет консольную команду.
+  # Доступны плейсхолдеры {player} и {uuid}; слеш в начале не нужен.
+  - type: PERSONAL
+    chance: 20
+    rarity: LEGENDARY
+    command: 'give {player} golden_apple 1'
+    name: '&eЗолотое яблоко'
+    visual:
+      material: GOLDEN_APPLE
+      name: '&eЗолотое яблоко'

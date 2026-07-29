@@ -17,9 +17,6 @@ database:
     database: pncases
     collection: pncases
 
-case-files:
-  auto-export: true
-
 holograms:
   provider: AUTO # AUTO / FANCY / DECENT
 

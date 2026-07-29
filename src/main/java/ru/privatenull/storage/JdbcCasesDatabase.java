@@ -6,21 +6,11 @@ import ru.privatenull.pnlibrary.database.DatabaseType;
 import ru.privatenull.pnlibrary.database.JdbcDatabase;
 import ru.privatenull.pnlibrary.database.JdbcMigration;
 import ru.privatenull.pnlibrary.database.JdbcSettings;
+import ru.privatenull.storage.CasesDatabase.HistoryEntry;
 
 import java.io.File;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.sql.*;
+import java.util.*;
 
 public final class JdbcCasesDatabase implements CasesDatabase {
     private final JdbcDatabase database;
@@ -41,8 +31,6 @@ public final class JdbcCasesDatabase implements CasesDatabase {
         database.open();
         database.migrate("pncases", migrations());
         ensureRarityColumn();
-        importLegacyMarkers();
-        new LegacyYamlMigrator(dataFolder, this).migrate();
     }
 
     @Override
@@ -124,28 +112,31 @@ public final class JdbcCasesDatabase implements CasesDatabase {
     }
 
     @Override
-    public synchronized AnimationType getAnimation(UUID uuid) {
+    public synchronized AnimationType getAnimation(UUID uuid, String caseId) {
         try (Connection connection = database.connection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT animation FROM player_prefs WHERE player_uuid=?")) {
+                     "SELECT animation FROM player_case_prefs WHERE player_uuid=? AND case_id=?")) {
             statement.setString(1, uuid.toString());
+            statement.setString(2, normalize(caseId));
             try (ResultSet result = statement.executeQuery()) {
-                return result.next() ? parseAnimation(result.getString(1)) : AnimationType.ANVIL;
+                if (result.next()) return parseAnimation(result.getString(1));
             }
+            return getLegacyAnimation(connection, uuid);
         } catch (Exception exception) {
-            throw failure("read player animation", exception);
+            throw failure("read player case animation", exception);
         }
     }
 
     @Override
-    public synchronized void setAnimation(UUID uuid, AnimationType animation) {
+    public synchronized void setAnimation(UUID uuid, String caseId, AnimationType animation) {
         String sql = type == DatabaseType.MYSQL
-                ? "INSERT INTO player_prefs(player_uuid,animation) VALUES (?,?) ON DUPLICATE KEY UPDATE animation=VALUES(animation)"
-                : "INSERT INTO player_prefs(player_uuid,animation) VALUES (?,?) ON CONFLICT(player_uuid) DO UPDATE SET animation=excluded.animation";
+                ? "INSERT INTO player_case_prefs(player_uuid,case_id,animation) VALUES (?,?,?) ON DUPLICATE KEY UPDATE animation=VALUES(animation)"
+                : "INSERT INTO player_case_prefs(player_uuid,case_id,animation) VALUES (?,?,?) ON CONFLICT(player_uuid,case_id) DO UPDATE SET animation=excluded.animation";
         execute(sql, statement -> {
             statement.setString(1, uuid.toString());
-            statement.setString(2, animation.name());
-        }, "save player animation");
+            statement.setString(2, normalize(caseId));
+            statement.setString(3, animation.name());
+        }, "save player case animation");
     }
 
     @Override
@@ -160,15 +151,15 @@ public final class JdbcCasesDatabase implements CasesDatabase {
     }
 
     @Override
-    public synchronized List<OpenHistoryStorage.Entry> getHistory(String caseName, int limit) {
-        List<OpenHistoryStorage.Entry> result = new ArrayList<>();
+    public synchronized List<HistoryEntry> getHistory(String caseName, int limit) {
+        List<HistoryEntry> result = new ArrayList<>();
         try (Connection connection = database.connection();
              PreparedStatement statement = connection.prepareStatement(
                      "SELECT player_name,reward_name,opened_at FROM open_history WHERE case_name=? ORDER BY opened_at DESC,id DESC LIMIT ?")) {
             statement.setString(1, normalize(caseName));
             statement.setInt(2, limit);
             try (ResultSet rows = statement.executeQuery()) {
-                while (rows.next()) result.add(new OpenHistoryStorage.Entry(rows.getString(1), rows.getString(2), rows.getLong(3)));
+                while (rows.next()) result.add(new HistoryEntry(rows.getString(1), rows.getString(2), rows.getLong(3)));
             }
             return result;
         } catch (Exception exception) {
@@ -178,11 +169,11 @@ public final class JdbcCasesDatabase implements CasesDatabase {
 
     @Override
     public synchronized void savePending(UUID uuid, Reward reward) {
-        String columns = "player_uuid,type,chance,rarity,item_base64,lp_group,lp_node,lp_duration,vault_amount,player_points_amount,message,display_name";
+        String columns = "player_uuid,type,chance,rarity,item_base64,lp_group,lp_node,lp_duration,vault_amount,player_points_amount,message,display_name,command";
         String update = type == DatabaseType.MYSQL
-                ? "type=VALUES(type),chance=VALUES(chance),rarity=VALUES(rarity),item_base64=VALUES(item_base64),lp_group=VALUES(lp_group),lp_node=VALUES(lp_node),lp_duration=VALUES(lp_duration),vault_amount=VALUES(vault_amount),player_points_amount=VALUES(player_points_amount),message=VALUES(message),display_name=VALUES(display_name)"
-                : "type=excluded.type,chance=excluded.chance,rarity=excluded.rarity,item_base64=excluded.item_base64,lp_group=excluded.lp_group,lp_node=excluded.lp_node,lp_duration=excluded.lp_duration,vault_amount=excluded.vault_amount,player_points_amount=excluded.player_points_amount,message=excluded.message,display_name=excluded.display_name";
-        String sql = "INSERT INTO pending_rewards(" + columns + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+                ? "type=VALUES(type),chance=VALUES(chance),rarity=VALUES(rarity),item_base64=VALUES(item_base64),lp_group=VALUES(lp_group),lp_node=VALUES(lp_node),lp_duration=VALUES(lp_duration),vault_amount=VALUES(vault_amount),player_points_amount=VALUES(player_points_amount),message=VALUES(message),display_name=VALUES(display_name),command=VALUES(command)"
+                : "type=excluded.type,chance=excluded.chance,rarity=excluded.rarity,item_base64=excluded.item_base64,lp_group=excluded.lp_group,lp_node=excluded.lp_node,lp_duration=excluded.lp_duration,vault_amount=excluded.vault_amount,player_points_amount=excluded.player_points_amount,message=excluded.message,display_name=excluded.display_name,command=excluded.command";
+        String sql = "INSERT INTO pending_rewards(" + columns + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 + (type == DatabaseType.MYSQL ? "ON DUPLICATE KEY UPDATE " : "ON CONFLICT(player_uuid) DO UPDATE SET ") + update;
         execute(sql, statement -> writeReward(statement, uuid, reward), "save pending reward");
     }
@@ -191,7 +182,7 @@ public final class JdbcCasesDatabase implements CasesDatabase {
     public synchronized Reward loadPending(UUID uuid) {
         try (Connection connection = database.connection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT type,chance,rarity,item_base64,lp_group,lp_node,lp_duration,vault_amount,player_points_amount,message,display_name FROM pending_rewards WHERE player_uuid=?")) {
+                     "SELECT type,chance,rarity,item_base64,lp_group,lp_node,lp_duration,vault_amount,player_points_amount,message,display_name,command FROM pending_rewards WHERE player_uuid=?")) {
             statement.setString(1, uuid.toString());
             try (ResultSet result = statement.executeQuery()) {
                 if (!result.next()) return null;
@@ -221,28 +212,6 @@ public final class JdbcCasesDatabase implements CasesDatabase {
     }
 
     @Override
-    public synchronized boolean isMigrationApplied(String key) {
-        try (Connection connection = database.connection();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT marker_key FROM pncases_migration_markers WHERE marker_key=?")) {
-            statement.setString(1, key);
-            try (ResultSet result = statement.executeQuery()) {
-                return result.next();
-            }
-        } catch (Exception exception) {
-            throw failure("read migration marker", exception);
-        }
-    }
-
-    @Override
-    public synchronized void markMigrationApplied(String key) {
-        String sql = type == DatabaseType.MYSQL
-                ? "INSERT IGNORE INTO pncases_migration_markers(marker_key) VALUES (?)"
-                : "INSERT OR IGNORE INTO pncases_migration_markers(marker_key) VALUES (?)";
-        execute(sql, statement -> statement.setString(1, key), "save migration marker");
-    }
-
-    @Override
     public void close() {
         database.close();
     }
@@ -261,7 +230,7 @@ public final class JdbcCasesDatabase implements CasesDatabase {
         statement.setString(2, reward.type().name());
         statement.setInt(3, reward.chance());
         statement.setString(4, reward.rarityId());
-        statement.setString(5, ItemCodec.serialize(reward.item()));
+        statement.setString(5, CasesDatabase.encodeItem(reward.item()));
         statement.setString(6, reward.lpGroup());
         statement.setString(7, reward.lpNode());
         statement.setString(8, reward.lpDuration());
@@ -269,14 +238,15 @@ public final class JdbcCasesDatabase implements CasesDatabase {
         statement.setInt(10, reward.playerPointsAmount());
         statement.setString(11, reward.message());
         statement.setString(12, reward.displayName());
+        statement.setString(13, reward.command());
     }
 
     private Reward readReward(ResultSet result) throws SQLException {
         return new Reward(result.getInt("chance"), parseType(result.getString("type")),
-                ItemCodec.deserialize(result.getString("item_base64")), result.getString("lp_group"),
+                CasesDatabase.decodeItem(result.getString("item_base64")), result.getString("lp_group"),
                 result.getString("lp_node"), result.getString("lp_duration"), result.getDouble("vault_amount"),
                 result.getInt("player_points_amount"), result.getString("message"), result.getString("display_name"),
-                result.getString("rarity"));
+                result.getString("rarity"), null, result.getString("command"));
     }
 
     private void execute(String sql, SqlBinder binder, String action) {
@@ -303,38 +273,37 @@ public final class JdbcCasesDatabase implements CasesDatabase {
         }
     }
 
-    private void importLegacyMarkers() throws Exception {
-        List<String> markers = new ArrayList<>();
-        try (Connection connection = database.connection()) {
-            boolean oldMetaExists;
-            try (ResultSet tables = connection.getMetaData().getTables(null, null, "schema_meta", new String[]{"TABLE"})) {
-                oldMetaExists = tables.next();
-            }
-            if (!oldMetaExists) return;
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "SELECT key FROM schema_meta WHERE key LIKE 'legacy.%' AND value='true'");
-                 ResultSet rows = statement.executeQuery()) {
-                while (rows.next()) markers.add(rows.getString(1));
-            }
-        }
-        for (String marker : markers) markMigrationApplied(marker);
-    }
-
     private List<JdbcMigration> migrations() {
         return List.of(new JdbcMigration(1, "create pnCases storage", List.of(
                 "CREATE TABLE IF NOT EXISTS player_keys(player_uuid TEXT NOT NULL,key_id TEXT NOT NULL,amount INTEGER NOT NULL CHECK(amount>=0),PRIMARY KEY(player_uuid,key_id))",
                 "CREATE TABLE IF NOT EXISTS player_prefs(player_uuid TEXT PRIMARY KEY,animation TEXT NOT NULL)",
                 "CREATE TABLE IF NOT EXISTS open_history(id INTEGER PRIMARY KEY AUTOINCREMENT,case_name TEXT NOT NULL,player_name TEXT NOT NULL,reward_name TEXT NOT NULL,opened_at INTEGER NOT NULL)",
                 "CREATE INDEX IF NOT EXISTS idx_open_history_case_time ON open_history(case_name,opened_at DESC,id DESC)",
-                "CREATE TABLE IF NOT EXISTS pending_rewards(player_uuid TEXT PRIMARY KEY,type TEXT NOT NULL,chance INTEGER NOT NULL,rarity VARCHAR(64),item_base64 TEXT,lp_group TEXT,lp_node TEXT,lp_duration TEXT,vault_amount REAL NOT NULL DEFAULT 0,player_points_amount INTEGER NOT NULL DEFAULT 0,message TEXT,display_name TEXT)",
-                "CREATE TABLE IF NOT EXISTS pncases_migration_markers(marker_key TEXT PRIMARY KEY)"
+                "CREATE TABLE IF NOT EXISTS pending_rewards(player_uuid TEXT PRIMARY KEY,type TEXT NOT NULL,chance INTEGER NOT NULL,rarity VARCHAR(64),item_base64 TEXT,lp_group TEXT,lp_node TEXT,lp_duration TEXT,vault_amount REAL NOT NULL DEFAULT 0,player_points_amount INTEGER NOT NULL DEFAULT 0,message TEXT,display_name TEXT)"
         ), List.of(
                 "CREATE TABLE IF NOT EXISTS player_keys(player_uuid VARCHAR(36) NOT NULL,key_id VARCHAR(191) NOT NULL,amount INT NOT NULL,PRIMARY KEY(player_uuid,key_id)) ENGINE=InnoDB",
                 "CREATE TABLE IF NOT EXISTS player_prefs(player_uuid VARCHAR(36) PRIMARY KEY,animation VARCHAR(64) NOT NULL) ENGINE=InnoDB",
                 "CREATE TABLE IF NOT EXISTS open_history(id BIGINT AUTO_INCREMENT PRIMARY KEY,case_name VARCHAR(191) NOT NULL,player_name VARCHAR(191) NOT NULL,reward_name TEXT NOT NULL,opened_at BIGINT NOT NULL,INDEX idx_open_history_case_time(case_name,opened_at,id)) ENGINE=InnoDB",
-                "CREATE TABLE IF NOT EXISTS pending_rewards(player_uuid VARCHAR(36) PRIMARY KEY,type VARCHAR(64) NOT NULL,chance INT NOT NULL,rarity VARCHAR(64),item_base64 LONGTEXT,lp_group VARCHAR(191),lp_node TEXT,lp_duration VARCHAR(191),vault_amount DOUBLE NOT NULL DEFAULT 0,player_points_amount INT NOT NULL DEFAULT 0,message TEXT,display_name TEXT) ENGINE=InnoDB",
-                "CREATE TABLE IF NOT EXISTS pncases_migration_markers(marker_key VARCHAR(191) PRIMARY KEY) ENGINE=InnoDB"
+                "CREATE TABLE IF NOT EXISTS pending_rewards(player_uuid VARCHAR(36) PRIMARY KEY,type VARCHAR(64) NOT NULL,chance INT NOT NULL,rarity VARCHAR(64),item_base64 LONGTEXT,lp_group VARCHAR(191),lp_node TEXT,lp_duration VARCHAR(191),vault_amount DOUBLE NOT NULL DEFAULT 0,player_points_amount INT NOT NULL DEFAULT 0,message TEXT,display_name TEXT) ENGINE=InnoDB"
+        )), new JdbcMigration(2, "persist pending PERSONAL reward commands", List.of(
+                "ALTER TABLE pending_rewards ADD COLUMN command TEXT"
+        ), List.of(
+                "ALTER TABLE pending_rewards ADD COLUMN command TEXT"
+        )), new JdbcMigration(3, "store animation preference per case", List.of(
+                "CREATE TABLE IF NOT EXISTS player_case_prefs(player_uuid TEXT NOT NULL,case_id TEXT NOT NULL,animation TEXT NOT NULL,PRIMARY KEY(player_uuid,case_id))"
+        ), List.of(
+                "CREATE TABLE IF NOT EXISTS player_case_prefs(player_uuid VARCHAR(36) NOT NULL,case_id VARCHAR(191) NOT NULL,animation VARCHAR(64) NOT NULL,PRIMARY KEY(player_uuid,case_id)) ENGINE=InnoDB"
         )));
+    }
+
+    private AnimationType getLegacyAnimation(Connection connection, UUID uuid) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT animation FROM player_prefs WHERE player_uuid=?")) {
+            statement.setString(1, uuid.toString());
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? parseAnimation(result.getString(1)) : AnimationType.ANVIL;
+            }
+        }
     }
 
     private static String normalize(String value) {

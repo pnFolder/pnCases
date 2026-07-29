@@ -10,26 +10,22 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import ru.privatenull.PnCasesPlugin;
 import ru.privatenull.cases.animation.AnimationRegistry;
+import ru.privatenull.cases.animation.AnimationRun;
 import ru.privatenull.cases.animation.CaseAnimation;
-import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.config.CaseBlockCodec;
 import ru.privatenull.cases.config.CaseConfigRepository;
 import ru.privatenull.cases.config.CaseDefinitionLoader;
+import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
 import ru.privatenull.cases.reward.RewardDeliveryService;
 import ru.privatenull.cases.reward.RewardPresentationService;
-import ru.privatenull.cases.reward.RewardSelector;
-import ru.privatenull.cases.view.CaseView;
-import ru.privatenull.gui.caseview.AnimationSelectHolder;
-import ru.privatenull.gui.caseview.CaseGuiHolder;
-import ru.privatenull.gui.machine.MachineGuiHolder;
-import ru.privatenull.PnCasesPlugin;
-import ru.privatenull.storage.OpenHistoryStorage;
-import ru.privatenull.storage.PendingRewardStorage;
-import ru.privatenull.storage.PlayerPrefsStorage;
+import ru.privatenull.gui.GuiSession;
+import ru.privatenull.gui.GuiSession;
 import ru.privatenull.pnlibrary.text.ColorUtil;
+import ru.privatenull.storage.CasesDatabase;
 import ru.privatenull.util.ServerCompatibility;
 
 import java.util.*;
@@ -76,6 +72,12 @@ public class CaseManager {
         RELOAD_FAILED
     }
 
+    public interface View {
+        ItemStack buildOpenButton(Player player, CaseDefinition definition);
+
+        void open(Player player, CaseDefinition definition);
+    }
+
     private final PnCasesPlugin plugin;
 
     private final Map<String, CaseDefinition> casesByName = new HashMap<>();
@@ -86,7 +88,7 @@ public class CaseManager {
     private final Set<UUID> openingPlayers = ConcurrentHashMap.newKeySet();
     private final Map<BlockKey, UUID> busyCases = new ConcurrentHashMap<>();
     private final Map<UUID, BlockKey> selectedCaseBlocks = new ConcurrentHashMap<>();
-    private final Map<UUID, AnimationType> playerAnimations = new ConcurrentHashMap<>();
+    private final Map<PlayerCaseAnimation, AnimationType> playerAnimations = new ConcurrentHashMap<>();
     private final Map<UUID, ActiveOpening> activeOpenings = new ConcurrentHashMap<>();
 
     private final AnimationRegistry animationRegistry;
@@ -95,12 +97,9 @@ public class CaseManager {
     private final CaseDefinitionLoader definitionLoader;
     private final RewardPresentationService rewardPresentation;
     private final RewardDeliveryService rewardDelivery;
-    private final RewardSelector rewardSelector;
-    private CaseView caseView;
+    private View caseView;
     private final IdleParticleService idleParticles;
-    private final OpenHistoryStorage openHistoryStorage;
-    private final PendingRewardStorage pendingRewards;
-    private final PlayerPrefsStorage playerPrefs;
+    private final CasesDatabase database;
     private final BukkitTask openingBarrierTask;
     private volatile boolean shuttingDown;
 
@@ -112,11 +111,8 @@ public class CaseManager {
         this.rewardPresentation = new RewardPresentationService(plugin);
         this.definitionLoader = new CaseDefinitionLoader(blockCodec, rewardPresentation);
         this.idleParticles = new IdleParticleService(plugin, this);
-        this.openHistoryStorage = new OpenHistoryStorage(plugin.getDatabase());
-        this.pendingRewards = plugin.getPendingRewards();
-        this.playerPrefs = new PlayerPrefsStorage(plugin.getDatabase());
-        this.rewardDelivery = new RewardDeliveryService(plugin, openHistoryStorage, rewardPresentation);
-        this.rewardSelector = new RewardSelector();
+        this.database = plugin.getDatabase();
+        this.rewardDelivery = new RewardDeliveryService(plugin, database, rewardPresentation);
         this.openingBarrierTask = plugin.getServer().getScheduler().runTaskTimer(
                 plugin, this::repelPlayersFromActiveCases, 1L, 2L);
     }
@@ -125,12 +121,12 @@ public class CaseManager {
 
     public RewardPresentationService getRewardPresentation() { return rewardPresentation; }
 
-    public void setCaseView(CaseView caseView) {
+    public void setCaseView(View caseView) {
         this.caseView = Objects.requireNonNull(caseView, "caseView");
     }
 
-    public List<OpenHistoryStorage.Entry> getOpenHistory(String caseName) {
-        return openHistoryStorage.get(caseName);
+    public List<CasesDatabase.HistoryEntry> getOpenHistory(String caseName) {
+        return database.getHistory(caseName, 9);
     }
 
     public void shutdown() {
@@ -188,16 +184,24 @@ public class CaseManager {
         player.setFallDistance(0.0F);
     }
     public List<String> getConfiguredCaseNames() {
-        return configRepository.configuredNames(getCaseNames());
+        return configRepository.configuredNames();
     }
 
-    public List<String> getKeyNames()  { return new ArrayList<>(keyNames.keySet()); }
+    public List<String> getKeyNames() {
+        Set<String> active = new TreeSet<>();
+        for (CaseDefinition definition : casesByName.values()) {
+            String normalized = definition.name().toLowerCase(Locale.ROOT);
+            if (keyNames.containsKey(normalized)) active.add(normalized);
+        }
+        return new ArrayList<>(active);
+    }
+
     public boolean keyExists(String keyId) {
-        return keyId != null && keyNames.containsKey(keyId.toLowerCase(Locale.ROOT));
+        return keyId != null && getKeyNames().contains(keyId.toLowerCase(Locale.ROOT));
     }
 
     public int getLoadedCaseCount() { return casesByName.size(); }
-    public int getConfiguredKeyCount() { return keyNames.size(); }
+    public int getConfiguredKeyCount() { return getKeyNames().size(); }
 
     public CaseDefinition getCaseByName(String name) {
         return name == null ? null : casesByName.get(name.toLowerCase(Locale.ROOT));
@@ -310,23 +314,29 @@ public class CaseManager {
 
     public AnimationRegistry getAnimationRegistry() { return animationRegistry; }
 
-    public void exportMainCasesToFilesIfMissing() {
-        configRepository.exportMainCasesIfMissing();
-    }
-
-    public AnimationType getPlayerAnimation(UUID uuid) {
+    public AnimationType getPlayerAnimation(UUID uuid, String caseId) {
         if (ServerCompatibility.useMinecraft1165AnimationMode()) {
             return AnimationType.FORTUNE_RING;
         }
-        return playerAnimations.computeIfAbsent(uuid, playerPrefs::getAnimation);
+        PlayerCaseAnimation key = new PlayerCaseAnimation(uuid, caseId);
+        return playerAnimations.computeIfAbsent(key,
+                ignored -> database.getAnimation(uuid, key.caseId()));
     }
 
-    public void setPlayerAnimation(UUID uuid, AnimationType type) {
+    public void setPlayerAnimation(UUID uuid, String caseId, AnimationType type) {
+        if (type == null) return;
         if (ServerCompatibility.useMinecraft1165AnimationMode()) {
             type = AnimationType.FORTUNE_RING;
         }
-        playerAnimations.put(uuid, type);
-        playerPrefs.setAnimation(uuid, type);
+        PlayerCaseAnimation key = new PlayerCaseAnimation(uuid, caseId);
+        playerAnimations.put(key, type);
+        database.setAnimation(uuid, key.caseId(), type);
+    }
+
+    public void warnAboutMobAnimation(Player player, AnimationType type) {
+        if (player == null || !player.hasPermission("pncases.admin")) return;
+        if (type != AnimationType.MOB_HUNT && type != AnimationType.PILLAGER_RAID) return;
+        player.sendMessage(plugin.getUi().get("animation-mob-warning-self"));
     }
 
     public BindCaseResult bindCaseToBlock(String caseName, Block target) {
@@ -354,7 +364,6 @@ public class CaseManager {
             ));
             cs.set("block", null);
             cs.set("blocks", blocks);
-            ensureBoundCaseDefaults(cs, normalized);
         });
         if (!saved) return BindCaseResult.SAVE_FAILED;
         return refreshCaseFromConfig(normalized, true, true)
@@ -396,44 +405,6 @@ public class CaseManager {
             return Integer.parseInt(String.valueOf(value));
         } catch (RuntimeException ignored) {
             return 0;
-        }
-    }
-
-    private void ensureBoundCaseDefaults(ConfigurationSection cs, String caseName) {
-        if (!cs.isConfigurationSection("gui")) {
-            ConfigurationSection gui = cs.createSection("gui");
-            gui.set("title", "&8Кейс: " + caseName);
-            ConfigurationSection openItem = gui.createSection("open-item");
-            openItem.set("material", "CHEST");
-            openItem.set("name", "&aОткрыть кейс");
-            openItem.set("lore", List.of("&7Нажми, чтобы открыть"));
-        }
-
-        if (!cs.isConfigurationSection("cost")) {
-            ConfigurationSection cost = cs.createSection("cost");
-            cost.set("type", "NONE");
-            cost.set("amount", 0);
-            cost.set("buy_xp_levels", 0);
-        }
-
-        if (!cs.isConfigurationSection("animation")) {
-            ConfigurationSection animation = cs.createSection("animation");
-            animation.set("duration_ticks", 80);
-            animation.set("cycle_every_ticks", 2);
-            animation.set("rise_blocks", 1.2);
-            animation.set("spin_degrees_per_tick", 18);
-            animation.set("items", List.of(
-                    Map.of("material", "SLIME_BALL", "name", "&aСгусток яда"),
-                    Map.of("material", "SPIDER_EYE", "name", "&2Ядовитый глаз")
-            ));
-        }
-
-        if (!cs.isList("rewards")) {
-            cs.set("rewards", List.of(Map.of(
-                    "chance", 100,
-                    "type", "ITEM",
-                    "item", Map.of("material", "DIAMOND", "amount", 1, "name", "&bАлмаз")
-            )));
         }
     }
 
@@ -589,14 +560,10 @@ public class CaseManager {
         for (Player player : Bukkit.getOnlinePlayers()) {
             Inventory top = player.getOpenInventory().getTopInventory();
             Object holder = top == null ? null : top.getHolder();
-            boolean matchingCaseGui = holder instanceof CaseGuiHolder caseHolder
-                    && (caseName == null || caseName.equalsIgnoreCase(caseHolder.caseName()));
-            boolean matchingAnimationGui = holder instanceof AnimationSelectHolder animationHolder
-                    && (caseName == null || caseName.equalsIgnoreCase(animationHolder.caseName()));
-            if (matchingCaseGui || matchingAnimationGui) {
-                if (plugin.getGuiOpenAnimations() != null) plugin.getGuiOpenAnimations().cancel(player);
-                player.closeInventory();
-            } else if (includeMachine && holder instanceof MachineGuiHolder) {
+            boolean matchingSession = holder instanceof GuiSession session
+                    && (caseName == null || caseName.equalsIgnoreCase(session.caseName()))
+                    && (includeMachine || !session.machine());
+            if (matchingSession) {
                 if (plugin.getGuiOpenAnimations() != null) plugin.getGuiOpenAnimations().cancel(player);
                 player.closeInventory();
             }
@@ -640,22 +607,6 @@ public class CaseManager {
         return view().buildOpenButton(p, def);
     }
 
-    public ItemStack buildAnimationSelectorItem(Player p) {
-        return view().buildAnimationButton(p, null);
-    }
-
-    public ItemStack buildAnimationSelectorItem(Player p, CaseDefinition def) {
-        return view().buildAnimationButton(p, def);
-    }
-
-    public ItemStack buildPreviewButton(CaseDefinition def) {
-        return view().buildPreviewButton(def);
-    }
-
-    public void fillCaseGui(Inventory inv, Player p, CaseDefinition def) {
-        view().fill(inv, p, def);
-    }
-
     public void openCaseGui(Player p, CaseDefinition def) {
         BlockKey selected = selectedCaseBlocks.get(p.getUniqueId());
         if (selected == null || !def.name().equals(caseByBlock.get(selected))) {
@@ -681,11 +632,11 @@ public class CaseManager {
 
     public void tryOpenCase(Player p, CaseDefinition def) {
         if (openingPlayers.contains(p.getUniqueId())) {
-            p.sendMessage(plugin.getMessages().get("already-opening"));
+            p.sendMessage(plugin.getUi().get("already-opening"));
             return;
         }
         if (!deliverPendingReward(p)) {
-            p.sendMessage(plugin.getMessages().get("pending-reward-wait"));
+            p.sendMessage(plugin.getUi().get("pending-reward-wait"));
             return;
         }
         BlockKey sourceBlock = selectedBlockKey(p, def);
@@ -695,7 +646,7 @@ public class CaseManager {
             return;
         }
         if (!tryLockCase(p, sourceBlock)) {
-            p.sendMessage(plugin.getMessages().get("case-busy"));
+            p.sendMessage(plugin.getUi().get("case-busy"));
             return;
         }
         CostReceipt cost;
@@ -705,7 +656,7 @@ public class CaseManager {
             plugin.getLogger().log(Level.SEVERE,
                     "Не удалось списать стоимость открытия игрока " + p.getName() + ".", exception);
             releaseOpeningState(p.getUniqueId(), sourceBlock);
-            p.sendMessage(plugin.getMessages().get("case-open-storage-error"));
+            p.sendMessage(plugin.getUi().get("case-open-storage-error"));
             return;
         }
         if (cost == null) {
@@ -725,89 +676,27 @@ public class CaseManager {
         startAnimationAndReward(p, def, sourceBlock, prepared, cost);
     }
 
-    public boolean openCasePaidByXp(Player p, CaseDefinition def, int levels) {
-        if (openingPlayers.contains(p.getUniqueId()) || levels <= 0) return false;
-        if (!deliverPendingReward(p)) {
-            p.sendMessage(plugin.getMessages().get("pending-reward-wait"));
-            return false;
-        }
-        BlockKey sourceBlock = selectedBlockKey(p, def);
-        PreparedOpening prepared = prepareOpening(p, def, sourceBlock);
-        if (prepared == null) {
-            releaseOpeningState(p.getUniqueId(), sourceBlock);
-            return false;
-        }
-        if (!tryLockCase(p, sourceBlock)) return false;
-        int originalLevel = p.getLevel();
-        if (originalLevel < levels) {
-            releaseOpeningState(p.getUniqueId(), sourceBlock);
-            return false;
-        }
-
-        try {
-            p.setLevel(originalLevel - levels);
-            p.closeInventory();
-        } catch (RuntimeException exception) {
-            try {
-                p.setLevel(originalLevel);
-            } catch (RuntimeException restoreFailure) {
-                exception.addSuppressed(restoreFailure);
-            }
-            releaseOpeningState(p.getUniqueId(), sourceBlock);
-            plugin.getLogger().log(Level.WARNING,
-                    "Не удалось закрыть GUI перед XP-открытием кейса игроку " + p.getName() + ".", exception);
-            return false;
-        }
-        return startAnimationAndReward(p, def, sourceBlock, prepared, CostReceipt.xp(levels));
-    }
-
     private CostReceipt takeConfiguredCost(Player p, CaseDefinition def) {
-        if (def.costType() == CaseDefinition.CostType.NONE) return CostReceipt.none();
-
-        if (def.costType() == CaseDefinition.CostType.XP_LEVELS) {
-            int originalLevel = p.getLevel();
-            if (originalLevel < def.costAmount()) {
-                p.sendMessage(plugin.getMessages().get("not-enough-levels", "amount", String.valueOf(def.costAmount())));
-                return null;
-            }
-            try {
-                p.setLevel(originalLevel - def.costAmount());
-            } catch (RuntimeException exception) {
-                try {
-                    p.setLevel(originalLevel);
-                } catch (RuntimeException restoreFailure) {
-                    exception.addSuppressed(restoreFailure);
-                }
-                throw exception;
-            }
-            return CostReceipt.xp(def.costAmount());
-        }
-
-        if (def.costType() == CaseDefinition.CostType.KEY) {
-            String keyId = def.costKeyId();
-            if (keyId == null || !keyExists(keyId)) {
-                p.sendMessage(plugin.getMessages().get("key-not-configured"));
-                return null;
-            }
-            int need = Math.max(1, def.costAmount());
-            int have = plugin.getKeyStorage().get(p.getUniqueId(), keyId);
-            if (have < need) {
-                p.sendMessage(plugin.getMessages().get("not-enough-keys",
-                        "need", String.valueOf(need),
-                        "have", String.valueOf(have)));
-                return null;
-            }
-            if (plugin.getKeyStorage().take(p.getUniqueId(), keyId, need)) {
-                return CostReceipt.key(keyId, need);
-            }
-            int actual = plugin.getKeyStorage().get(p.getUniqueId(), keyId);
-            p.sendMessage(plugin.getMessages().get("not-enough-keys",
-                    "need", String.valueOf(need),
-                    "have", String.valueOf(actual)));
+        String keyId = def.name();
+        if (!keyExists(keyId)) {
+            p.sendMessage(plugin.getUi().get("key-not-configured"));
             return null;
         }
-
-        return CostReceipt.none();
+        int have = database.getKeys(p.getUniqueId(), keyId);
+        if (have < 1) {
+            p.sendMessage(plugin.getUi().get("not-enough-keys",
+                    "need", "1",
+                    "have", String.valueOf(have)));
+            return null;
+        }
+        if (database.takeKeys(p.getUniqueId(), keyId, 1)) {
+            return CostReceipt.key(keyId);
+        }
+        int actual = database.getKeys(p.getUniqueId(), keyId);
+        p.sendMessage(plugin.getUi().get("not-enough-keys",
+                "need", "1",
+                "have", String.valueOf(actual)));
+        return null;
     }
 
     private PreparedOpening prepareOpening(Player p, CaseDefinition def, BlockKey sourceBlock) {
@@ -830,9 +719,9 @@ public class CaseManager {
         Reward finalReward;
         CaseAnimation animation;
         try {
-            finalReward = rewardSelector.select(def.rewards());
+            finalReward = Reward.select(def.rewards());
             AnimationType animationType = def.fixedAnimation() == null
-                    ? getPlayerAnimation(playerId)
+                    ? getPlayerAnimation(playerId, def.name())
                     : def.fixedAnimation();
             if (ServerCompatibility.useMinecraft1165AnimationMode()) {
                 animationType = AnimationType.FORTUNE_RING;
@@ -865,8 +754,7 @@ public class CaseManager {
                 prepared.reward,
                 sourceBlock,
                 prepared.caseBlockLocation,
-                prepared.worldId,
-                prepared.animation
+                prepared.worldId
         );
         ActiveOpening previous = activeOpenings.putIfAbsent(playerId, opening);
         if (previous != null) {
@@ -877,14 +765,14 @@ public class CaseManager {
                 selectedCaseBlocks.remove(playerId, sourceBlock);
                 unlockCase(sourceBlock, playerId);
             }
-            p.sendMessage(plugin.getMessages().get("already-opening"));
+            p.sendMessage(plugin.getUi().get("already-opening"));
             return false;
         }
         openingPlayers.add(playerId);
-        opening.completionCallback = () -> completeOpening(opening, true, null);
+        Runnable completion = () -> completeOpening(opening, true, null);
 
         try {
-            pendingRewards.save(playerId, prepared.reward);
+            database.savePending(playerId, prepared.reward);
             opening.pendingStored = true;
         } catch (RuntimeException exception) {
             plugin.getLogger().log(Level.SEVERE,
@@ -895,7 +783,7 @@ public class CaseManager {
                 refundCost(p, cost);
             }
             completeOpening(opening, false, null);
-            p.sendMessage(plugin.getMessages().get(safelyDiscarded
+            p.sendMessage(plugin.getUi().get(safelyDiscarded
                     ? "pending-reward-save-failed"
                     : "pending-reward-save-uncertain"));
             return false;
@@ -921,7 +809,8 @@ public class CaseManager {
         }
 
         try {
-            prepared.animation.play(p, def, prepared.reward, prepared.base, opening.completionCallback);
+            opening.animationRun = prepared.animation.play(
+                    p, def, prepared.reward, prepared.base, completion);
         } catch (RuntimeException | LinkageError exception) {
             plugin.getLogger().log(Level.SEVERE,
                     "Анимация кейса '" + def.name() + "' аварийно остановлена.", exception);
@@ -947,7 +836,7 @@ public class CaseManager {
 
         Reward pending;
         try {
-            pending = pendingRewards.load(playerId);
+            pending = database.loadPending(playerId);
         } catch (RuntimeException exception) {
             plugin.getLogger().log(Level.SEVERE,
                     "Не удалось проверить отложенную награду игрока " + player.getName() + ".", exception);
@@ -957,7 +846,7 @@ public class CaseManager {
 
         try {
             if (!giveReward(player, pending)) return false;
-            pendingRewards.clear(playerId);
+            database.clearPending(playerId);
             return true;
         } catch (RuntimeException exception) {
             plugin.getLogger().log(Level.SEVERE,
@@ -969,7 +858,7 @@ public class CaseManager {
     public boolean hasPendingReward(UUID playerId) {
         if (playerId == null) return false;
         try {
-            return pendingRewards.load(playerId) != null;
+            return database.loadPending(playerId) != null;
         } catch (RuntimeException exception) {
             plugin.getLogger().log(Level.SEVERE,
                     "Не удалось проверить pending-награду игрока " + playerId + ".", exception);
@@ -988,7 +877,7 @@ public class CaseManager {
     private void cancelAnimationRun(ActiveOpening opening, boolean deliverReward) {
         if (opening == null) return;
         try {
-            animationRegistry.cancelRun(opening.animation, opening.completionCallback);
+            if (opening.animationRun != null) opening.animationRun.cancel();
         } catch (RuntimeException exception) {
             plugin.getLogger().log(Level.SEVERE, "Не удалось полностью отменить анимацию кейса.", exception);
         }
@@ -1005,7 +894,7 @@ public class CaseManager {
                     && opening.player.isOnline();
             if (mayDeliver && giveReward(opening.player, opening.definition, opening.reward)) {
                 if (opening.pendingStored) {
-                    pendingRewards.clear(opening.playerId);
+                    database.clearPending(opening.playerId);
                 }
             }
         } catch (RuntimeException exception) {
@@ -1068,14 +957,19 @@ public class CaseManager {
 
     public void giveKey(Player p, String keyId, int amount) {
         if (amount <= 0) return;
-        plugin.getKeyStorage().add(p.getUniqueId(), keyId.toLowerCase(Locale.ROOT), amount);
+        database.addKeys(p.getUniqueId(), keyId.toLowerCase(Locale.ROOT), amount);
     }
 
     public String getKeyDisplayName(String keyId) {
         if (keyId == null || keyId.isBlank()) {
             return "";
         }
-        return keyNames.getOrDefault(keyId.toLowerCase(Locale.ROOT), humanizeKeyName(keyId));
+        String normalized = keyId.toLowerCase(Locale.ROOT);
+        CaseDefinition matchingCase = casesByName.get(normalized);
+        if (matchingCase != null) {
+            return color(matchingCase.displayName());
+        }
+        return keyNames.getOrDefault(normalized, humanizeKeyName(keyId));
     }
 
     public boolean giveReward(Player p, Reward reward) {
@@ -1090,9 +984,9 @@ public class CaseManager {
         return ColorUtil.colorize(s);
     }
 
-    private CaseView view() {
+    private View view() {
         if (caseView == null) {
-            throw new IllegalStateException("CaseView is not configured");
+            throw new IllegalStateException("Case view is not configured");
         }
         return caseView;
     }
@@ -1165,14 +1059,14 @@ public class CaseManager {
 
     private boolean discardPossiblySavedPending(UUID playerId) {
         try {
-            pendingRewards.clear(playerId);
+            database.clearPending(playerId);
         } catch (RuntimeException clearFailure) {
             plugin.getLogger().log(Level.SEVERE,
                     "Не удалось очистить незавершённую pending-награду игрока " + playerId + ".",
                     clearFailure);
         }
         try {
-            return pendingRewards.load(playerId) == null;
+            return database.loadPending(playerId) == null;
         } catch (RuntimeException verifyFailure) {
             plugin.getLogger().log(Level.SEVERE,
                     "Не удалось подтвердить очистку pending-награды игрока " + playerId + ".",
@@ -1184,12 +1078,7 @@ public class CaseManager {
     private void refundCost(Player player, CostReceipt receipt) {
         if (player == null || receipt == null || !receipt.refunded.compareAndSet(false, true)) return;
         try {
-            switch (receipt.type) {
-                case NONE -> {
-                }
-                case XP -> player.setLevel(player.getLevel() + receipt.amount);
-                case KEY -> plugin.getKeyStorage().add(player.getUniqueId(), receipt.keyId, receipt.amount);
-            }
+            database.addKeys(player.getUniqueId(), receipt.keyId, 1);
         } catch (RuntimeException exception) {
             plugin.getLogger().log(Level.SEVERE,
                     "Не удалось вернуть стоимость открытия игроку " + player.getName() + ".", exception);
@@ -1208,30 +1097,23 @@ public class CaseManager {
     ) {
     }
 
-    private static final class CostReceipt {
-        private enum Type { NONE, XP, KEY }
+    private record PlayerCaseAnimation(UUID playerId, String caseId) {
+        private PlayerCaseAnimation {
+            Objects.requireNonNull(playerId, "playerId");
+            caseId = CaseConfigRepository.normalizeName(caseId);
+        }
+    }
 
-        private final Type type;
+    private static final class CostReceipt {
         private final String keyId;
-        private final int amount;
         private final AtomicBoolean refunded = new AtomicBoolean();
 
-        private CostReceipt(Type type, String keyId, int amount) {
-            this.type = type;
+        private CostReceipt(String keyId) {
             this.keyId = keyId;
-            this.amount = Math.max(0, amount);
         }
 
-        private static CostReceipt none() {
-            return new CostReceipt(Type.NONE, null, 0);
-        }
-
-        private static CostReceipt xp(int amount) {
-            return new CostReceipt(Type.XP, null, amount);
-        }
-
-        private static CostReceipt key(String keyId, int amount) {
-            return new CostReceipt(Type.KEY, keyId, amount);
+        private static CostReceipt key(String keyId) {
+            return new CostReceipt(keyId);
         }
     }
 
@@ -1244,10 +1126,9 @@ public class CaseManager {
         private final BlockKey sourceBlock;
         private final Location caseBlockLocation;
         private final UUID worldId;
-        private final CaseAnimation animation;
         private final AtomicBoolean completed = new AtomicBoolean();
         private volatile BukkitTask watchdog;
-        private volatile Runnable completionCallback;
+        private volatile AnimationRun animationRun;
         private volatile boolean pendingStored;
         private volatile boolean hologramHidden;
 
@@ -1258,8 +1139,7 @@ public class CaseManager {
                 Reward reward,
                 BlockKey sourceBlock,
                 Location caseBlockLocation,
-                UUID worldId,
-                CaseAnimation animation
+                UUID worldId
         ) {
             this.playerId = playerId;
             this.player = player;
@@ -1269,7 +1149,6 @@ public class CaseManager {
             this.sourceBlock = sourceBlock;
             this.caseBlockLocation = caseBlockLocation;
             this.worldId = worldId;
-            this.animation = animation;
         }
     }
 

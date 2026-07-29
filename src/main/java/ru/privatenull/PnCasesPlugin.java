@@ -1,38 +1,30 @@
 package ru.privatenull;
 
-import org.bukkit.plugin.java.JavaPlugin;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
+import org.bukkit.plugin.java.JavaPlugin;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.commands.CasesCommand;
-import ru.privatenull.commands.CasesCommandCompleter;
 import ru.privatenull.config.ConfigValidator;
-import ru.privatenull.config.GuiConfig;
-import ru.privatenull.config.MessagesConfig;
+import ru.privatenull.config.UiConfig;
+import ru.privatenull.gui.GuiSession;
+import ru.privatenull.gui.caseview.CaseGuiListener;
+import ru.privatenull.gui.caseview.CaseMenuService;
+import ru.privatenull.gui.machine.MachineGuiListener;
 import ru.privatenull.hologram.HologramService;
 import ru.privatenull.integrations.PlayerPointsProvider;
 import ru.privatenull.integrations.VaultEconomyProvider;
-import ru.privatenull.gui.machine.MachineGuiListener;
-import ru.privatenull.gui.machine.MachineGuiHolder;
-import ru.privatenull.pnlibrary.gui.GuiUpdateService;
-import ru.privatenull.pnlibrary.gui.GuiOpenAnimationService;
-import ru.privatenull.listeners.CaseBlockListener;
-import ru.privatenull.gui.caseview.CaseGuiListener;
-import ru.privatenull.gui.caseview.CaseGuiHolder;
-import ru.privatenull.gui.caseview.CaseMenuService;
-import ru.privatenull.gui.caseview.AnimationSelectHolder;
 import ru.privatenull.listeners.RuntimeListener;
-import ru.privatenull.pnlibrary.lifecycle.PluginBanner;
 import ru.privatenull.pnlibrary.database.DatabaseSettings;
-import ru.privatenull.pnlibrary.database.jdbcsettings;
+import ru.privatenull.pnlibrary.database.JdbcSettings;
 import ru.privatenull.pnlibrary.database.MongoSettings;
+import ru.privatenull.pnlibrary.gui.GuiOpenAnimationService;
+import ru.privatenull.pnlibrary.gui.GuiUpdateService;
+import ru.privatenull.pnlibrary.gui.protocollib.ProtocolLibSlotPacketSender;
+import ru.privatenull.pnlibrary.lifecycle.PluginBanner;
 import ru.privatenull.pnlibrary.update.UpdateChecker;
 import ru.privatenull.pnlibrary.update.UpdateSettings;
-import ru.privatenull.storage.CasesDatabase;
-import ru.privatenull.storage.JdbcCasesDatabase;
-import ru.privatenull.storage.KeyStorage;
-import ru.privatenull.storage.MongoCasesDatabase;
-import ru.privatenull.storage.PendingRewardStorage;
+import ru.privatenull.storage.*;
 import ru.privatenull.util.ServerCompatibility;
 
 public final class PnCasesPlugin extends JavaPlugin {
@@ -42,16 +34,14 @@ public final class PnCasesPlugin extends JavaPlugin {
     private static final int BSTATS_PLUGIN_ID = 32592;
 
     private CaseManager caseManager;
-    private KeyStorage keyStorage;
     private HologramService holograms;
     private VaultEconomyProvider vaultEconomy;
     private PlayerPointsProvider playerPoints;
-    private MessagesConfig messages;
-    private GuiConfig guiConfig;
+    private UiConfig ui;
     private GuiUpdateService guiUpdates;
+    private AutoCloseable guiPacketSender;
     private GuiOpenAnimationService guiOpenAnimations;
     private CasesDatabase database;
-    private PendingRewardStorage pendingRewards;
     private UpdateChecker updateChecker;
 
     @Override
@@ -75,18 +65,23 @@ public final class PnCasesPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        keyStorage = new KeyStorage(database);
-        pendingRewards = new PendingRewardStorage(database);
-
-        messages = new MessagesConfig(this);
-        guiConfig = new GuiConfig(this);
-        guiUpdates = new GuiUpdateService();
-        guiOpenAnimations = new GuiOpenAnimationService(this);
+        ui = new UiConfig(this);
+        GuiUpdateService.SlotPacketSender packetSender = null;
+        if (getServer().getPluginManager().isPluginEnabled("ProtocolLib")) {
+            try {
+                ProtocolLibSlotPacketSender protocolSender = new ProtocolLibSlotPacketSender(this);
+                packetSender = protocolSender;
+                guiPacketSender = protocolSender;
+            } catch (RuntimeException | LinkageError exception) {
+                getLogger().warning("Не удалось включить ProtocolLib SET_SLOT: " + exception.getMessage());
+            }
+        }
+        guiUpdates = new GuiUpdateService(packetSender);
+        guiOpenAnimations = new GuiOpenAnimationService(this, guiUpdates);
         holograms = new HologramService(this);
 
         caseManager = new CaseManager(this);
         caseManager.setCaseView(new CaseMenuService(this, caseManager));
-        caseManager.exportMainCasesToFilesIfMissing();
         caseManager.reloadFromConfig();
         setupUpdateChecker();
         Metrics metrics = new Metrics(this, BSTATS_PLUGIN_ID);
@@ -99,16 +94,13 @@ public final class PnCasesPlugin extends JavaPlugin {
         var machineGui = new MachineGuiListener(caseManager);
         var exec = new CasesCommand(this, caseManager, machineGui);
         cmd.setExecutor(exec);
-        cmd.setTabCompleter(new CasesCommandCompleter(caseManager));
+        cmd.setTabCompleter(exec);
 
-        getServer().getPluginManager().registerEvents(
-                new CaseBlockListener(caseManager), this
-        );
         getServer().getPluginManager().registerEvents(
                 new CaseGuiListener(caseManager), this
         );
         getServer().getPluginManager().registerEvents(machineGui, this);
-        var runtimeListener = new RuntimeListener(this, caseManager, pendingRewards);
+        var runtimeListener = new RuntimeListener(this, caseManager, database);
         getServer().getPluginManager().registerEvents(runtimeListener, this);
         runtimeListener.deliverPendingToOnlinePlayers();
 
@@ -120,6 +112,13 @@ public final class PnCasesPlugin extends JavaPlugin {
         closePnCasesGuis();
         if (guiOpenAnimations != null) {
             guiOpenAnimations.shutdown();
+        }
+        if (guiPacketSender != null) {
+            try {
+                guiPacketSender.close();
+            } catch (Exception exception) {
+                getLogger().warning("Не удалось остановить ProtocolLib SET_SLOT: " + exception.getMessage());
+            }
         }
         if (updateChecker != null) {
             updateChecker.cancel();
@@ -142,10 +141,6 @@ public final class PnCasesPlugin extends JavaPlugin {
 
     public CaseManager getCaseManager() {
         return caseManager;
-    }
-
-    public KeyStorage getKeyStorage() {
-        return keyStorage;
     }
 
     public CasesDatabase getDatabase() {
@@ -180,12 +175,8 @@ public final class PnCasesPlugin extends JavaPlugin {
         return playerPoints;
     }
 
-    public MessagesConfig getMessages() {
-        return messages;
-    }
-
-    public GuiConfig getGuiConfig() {
-        return guiConfig;
+    public UiConfig getUi() {
+        return ui;
     }
 
     public GuiUpdateService getGuiUpdates() {
@@ -194,10 +185,6 @@ public final class PnCasesPlugin extends JavaPlugin {
 
     public GuiOpenAnimationService getGuiOpenAnimations() {
         return guiOpenAnimations;
-    }
-
-    public PendingRewardStorage getPendingRewards() {
-        return pendingRewards;
     }
 
     public UpdateChecker getUpdateChecker() {
@@ -238,9 +225,7 @@ public final class PnCasesPlugin extends JavaPlugin {
         for (var player : getServer().getOnlinePlayers()) {
             var top = player.getOpenInventory().getTopInventory();
             Object holder = top == null ? null : top.getHolder();
-            if (holder instanceof MachineGuiHolder
-                    || holder instanceof CaseGuiHolder
-                    || holder instanceof AnimationSelectHolder) {
+            if (holder instanceof GuiSession) {
                 player.closeInventory();
             }
         }

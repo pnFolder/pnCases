@@ -1,94 +1,57 @@
 package ru.privatenull.cases.model;
 
-import org.bukkit.Material;
-import org.bukkit.Particle;
-import org.bukkit.inventory.ItemStack;
-import ru.privatenull.util.MaterialCompat;
-import ru.privatenull.util.ParticleCompat;
+import java.util.List;
 
 public record IdleParticleSettings(
         boolean enabled,
-        boolean effectsEnabled,
-        Style style,
         Theme theme,
         int intervalTicks,
         double radius,
         double height,
         double speed,
-        double viewDistance,
-        ItemStack displayItem
+        double viewDistance
 ) {
 
-    public IdleParticleSettings {
-        displayItem = displayItem == null || displayItem.getType().isAir() ? null : displayItem.clone();
-    }
-
     public static IdleParticleSettings defaults() {
-        return new IdleParticleSettings(true, true, Style.AURORA, Theme.MAGIC, 2, 0.85, 1.35, 0.14, 28.0, null);
-    }
-
-    @Override
-    public ItemStack displayItem() {
-        return displayItem == null ? null : displayItem.clone();
-    }
-
-    public enum Style {
-        AURORA("Сияние", MaterialCompat.first("AMETHYST_SHARD", "NETHER_STAR")),
-        HORIZONTAL_RING("Горизонтальное кольцо", Material.ENDER_EYE),
-        VERTICAL_SPIRAL("Вертикальная спираль", Material.BLAZE_ROD),
-        DOUBLE_ORBIT("Двойная орбита", MaterialCompat.first("RECOVERY_COMPASS", "COMPASS")),
-        CROWN("Корона", Material.NETHER_STAR);
-
-        private final String displayName;
-        private final Material icon;
-
-        Style(String displayName, Material icon) {
-            this.displayName = displayName;
-            this.icon = icon;
-        }
-
-        public String displayName() {
-            return displayName;
-        }
-
-        public Material icon() {
-            return icon;
-        }
+        return new IdleParticleSettings(true, Theme.MAGIC, 2, 0.85, 1.35, 0.14, 28.0);
     }
 
     public enum Theme {
-        MAGIC("Магия", MaterialCompat.first("AMETHYST_SHARD", "NETHER_STAR"), new String[]{"END_ROD"}, new String[]{"ENCHANT", "ENCHANTMENT_TABLE"}),
-        PORTAL("Портал", Material.ENDER_EYE, new String[]{"PORTAL"}, new String[]{"REVERSE_PORTAL", "PORTAL"}),
-        ELECTRIC("Искры", MaterialCompat.first("LIGHTNING_ROD", "BLAZE_ROD"), new String[]{"ELECTRIC_SPARK", "END_ROD"}, new String[]{"END_ROD"}),
-        FIRE("Пламя", Material.BLAZE_POWDER, new String[]{"FLAME"}, new String[]{"LAVA"}),
-        TOXIC("Яд", Material.SLIME_BALL, new String[]{"WITCH", "SPELL_WITCH"}, new String[]{"ENCHANT", "ENCHANTMENT_TABLE"});
+        MAGIC("Арканный ритуал",
+                List.of("Пентаграмма собирается над кейсом.", "Руны поднимаются и замыкают ритуал.")),
+        PORTAL("Разлом пустоты",
+                List.of("Разлом удерживается над кейсом.", "Его контур пульсирует и втягивает энергию.")),
+        ELECTRIC("Штормовая клетка",
+                List.of("Над кейсом замыкается клетка из молний.", "Энергия скачет между её узлами.")),
+        FIRE("Огненный феникс",
+                List.of("Крупный феникс летит вокруг кейса.", "Видны тело, голова, хохолок, крылья и хвост.")),
+        TOXIC("Ядовитая кобра",
+                List.of("Кобра охраняет кейс, свернувшись кольцами.", "Видны капюшон, голова, глаза и раздвоенный язык.")),
+        FROST("Ледяная корона",
+                List.of("Большая снежинка вращается над кейсом.", "Каждый луч покрывается ледяными ветвями.")),
+        SOUL("Плач душ",
+                List.of("Призрачный страж парит над кейсом.", "Видны лицо, руки и рваная мантия.")),
+        OCEAN("Зов левиафана",
+                List.of("Миниатюрный левиафан плывёт по кругу.", "Водные течения закручиваются следом.")),
+        WINGS("Небесные крылья",
+                List.of("Большие крылья раскрываются за кейсом.", "Каркас и отдельные перья двигаются при взмахе.")),
+        DRAGON("Драконья орбита",
+                List.of("Миниатюрный дракон облетает витрину.", "Видны тело, хвост, голова и взмахи крыльев."));
 
         private final String displayName;
-        private final Material icon;
-        private final String[] primary;
-        private final String[] secondary;
+        private final List<String> description;
 
-        Theme(String displayName, Material icon, String[] primary, String[] secondary) {
+        Theme(String displayName, List<String> description) {
             this.displayName = displayName;
-            this.icon = icon;
-            this.primary = primary;
-            this.secondary = secondary;
+            this.description = List.copyOf(description);
         }
 
         public String displayName() {
             return displayName;
         }
 
-        public Material icon() {
-            return icon;
-        }
-
-        public Particle primary() {
-            return ParticleCompat.first(primary);
-        }
-
-        public Particle secondary() {
-            return ParticleCompat.first(secondary);
+        public List<String> description() {
+            return description;
         }
     }
 }

@@ -1,5 +1,7 @@
 package ru.privatenull.gui.machine;
 
+import ru.privatenull.gui.GuiSession;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -8,10 +10,11 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.CaseDefinition;
+import ru.privatenull.gui.GuiDesign;
 
 import java.util.List;
 
-import static ru.privatenull.gui.machine.MachineSlots.*;
+import static ru.privatenull.gui.machine.MachineGuiSupport.*;
 
 final class MachineMenuScreen {
 
@@ -26,15 +29,15 @@ final class MachineMenuScreen {
     void open(Player player, String caseName) {
         CaseDefinition definition = caseManager.getCaseByName(caseName);
         if (definition == null) return;
-        if (MachineScreenRefresh.refreshIfOpen(
-                caseManager, player, MachineGuiHolder.Type.MENU, definition.name(),
+        if (MachineGuiSupport.refreshIfOpen(
+                caseManager, player, GuiSession.Screen.MACHINE_MENU, definition.name(),
                 inventory -> fill(inventory, definition))) {
             return;
         }
         Inventory inventory = Bukkit.createInventory(
-                MachineGuiHolder.menu(caseName), 54,
-                caseManager.getPlugin().getGuiConfig().text(
-                        "machine.titles.menu", "&8Настройка меню кейса", items.replacements(definition))
+                GuiSession.machine(GuiSession.Screen.MACHINE_MENU, caseName), 54,
+                caseManager.getPlugin().getUi().text(
+                        "machine.titles.menu", "&0Настройка меню кейса", items.replacements(definition))
         );
         fill(inventory, definition);
         caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
@@ -44,59 +47,87 @@ final class MachineMenuScreen {
     private void fill(Inventory inventory, CaseDefinition definition) {
         items.fill(inventory, items.pane(Material.BLACK_STAINED_GLASS_PANE, " ", List.of()));
         inventory.setItem(4, items.configuredButton(
-                "machine.menu.header", Material.CRAFTING_TABLE,
+                "machine.menu.header", GuiDesign.MENU,
                 "&x&4&2&9&F&9&1Раздел: Меню кейса", List.of(
-                        "", "&6«Оформление»",
-                        "&f- Размер и заголовок игрового меню",
-                        "&f- Раскладка, декор и пустая история", "",
-                        "&8Положите предмет на курсор и нажмите нужную иконку."), definition));
+                        "", "&#9EFC65 «Описание»",
+                        " &7- &fНастройте внешний вид меню кейса.",
+                        " &7- &fЗдесь меняются размер, название",
+                        " &7- &fи расположение всех элементов.",
+                        ""), definition));
         inventory.setItem(SLOT_GUI_SIZE, size(definition));
         inventory.setItem(SLOT_GUI_TITLE, title(definition));
         inventory.setItem(SLOT_LAYOUT, items.configuredButton(
-                "machine.menu.layout", Material.MAP,
+                "machine.menu.layout", GuiDesign.LAYOUT,
                 "&x&4&2&9&F&9&1Расставить слоты", List.of(
-                        "", "&7Открывает сетку меню кейса.",
-                        "&7ЛКМ/ПКМ меняют роль слота.",
-                        "&7Предмет на курсоре заменяет предмет роли.", "",
-                        "&7ЛКМ &8— &fоткрыть"), definition));
+                        "", "&#9EFC65 «Описание»",
+                        " &7- &fНазначьте каждому слоту его роль.",
+                        " &7- &fМожно менять и сами предметы.",
+                        "", "&#FCA965 «Управление»",
+                        " &7- &fЛКМ — открыть редактор", ""), definition));
         inventory.setItem(SLOT_OPEN_ITEM, items.copyItemButton(
-                "machine.menu.open-item", definition.openButton(), Material.CHEST, definition,
+                "machine.menu.button", definition.openButton(), Material.CHEST, definition,
                 "&x&4&2&9&F&9&1Кнопка кейса", "Предмет, по которому игрок открывает кейс."));
         inventory.setItem(SLOT_DECOR_ITEM, items.copyItemButton(
                 "machine.menu.decor-item", definition.guiLayout().decorItem(),
                 Material.GRAY_STAINED_GLASS_PANE, definition,
                 "&x&4&2&9&F&9&1Декор меню", "Предмет, которым заполняются декоративные слоты."));
-        inventory.setItem(SLOT_HISTORY_EMPTY_ITEM, items.copyItemButton(
-                "machine.menu.history-empty-item", definition.guiLayout().emptyHistoryItem(),
+        inventory.setItem(SLOT_EMPTY_HISTORY_ITEM, items.copyItemButton(
+                "machine.menu.empty-history", definition.guiLayout().emptyHistoryItem(),
                 Material.BARRIER, definition,
                 "&x&4&2&9&F&9&1Пустая история",
-                "Предмет, который показывается, когда открытий ещё нет."));
+                "Предмет, который отображается в свободных слотах истории."));
+        inventory.setItem(SLOT_CONTENT_TOGGLE, contentToggle(definition));
         inventory.setItem(SLOT_PREVIEW_CASE, items.configuredButton(
-                "machine.menu.preview-case", Material.ENDER_EYE,
+                "machine.menu.preview-case", GuiDesign.PREVIEW,
                 "&x&4&2&9&F&9&1Предпросмотр меню",
-                List.of("", "&7Открывает обычное меню кейса.", "", "&7ЛКМ &8— &fпосмотреть"),
+                List.of("", "&#9EFC65 «Описание»",
+                        " &7- &fПоказывает итоговое меню кейса",
+                        " &7- &fточно так же, как его увидит игрок.",
+                        "", "&#FCA965 «Управление»",
+                        " &7- &fЛКМ — посмотреть", ""),
                 definition));
         inventory.setItem(SLOT_BACK, items.backButton(definition));
     }
 
     private ItemStack size(CaseDefinition definition) {
         int rows = definition.guiLayout().size() / 9;
-        return items.configuredButton("machine.menu.size", Material.CHEST,
+        return items.configuredButton("machine.menu.size", GuiDesign.SIZE,
                 "&x&4&2&9&F&9&1Размер меню", List.of(
-                        "", "&7Текущий размер: &f" + definition.guiLayout().size() + " слотов",
-                        "&7Рядов: &f" + rows, "",
-                        "&7ЛКМ &8— &f+1 ряд", "&7ПКМ &8— &f-1 ряд",
-                        "&7Shift &8— &fшаг 2 ряда"), definition,
+                        "", "&#65D1FC «Сейчас»",
+                        " &7- &fРазмер: &#FCA865" + definition.guiLayout().size() + " слотов",
+                        " &7- &fРядов: &#FCA865" + rows,
+                        "", "&#FCA965 «Управление»",
+                        " &7- &fЛКМ — добавить ряд",
+                        " &7- &fПКМ — убрать ряд",
+                        " &7- &fShift — изменить сразу на два ряда", ""), definition,
                 "value", String.valueOf(definition.guiLayout().size()),
                 "rows", String.valueOf(rows));
     }
 
     private ItemStack title(CaseDefinition definition) {
-        return items.configuredButton("machine.menu.title", Material.NAME_TAG,
+        return items.configuredButton("machine.menu.title", GuiDesign.TITLE,
                 "&x&4&2&9&F&9&1Название меню", List.of(
-                        "", "&7Сейчас:", "&f" + definition.guiTitle(), "",
-                        "&7ЛКМ &8— &fнаписать новое название в чат"), definition,
+                        "", "&#65D1FC «Сейчас»",
+                        " &7- &fНазвание: " + definition.guiTitle(),
+                        "", "&#FCA965 «Управление»",
+                        " &7- &fЛКМ — изменить через чат", ""), definition,
                 "value", definition.guiTitle());
+    }
+
+    private ItemStack contentToggle(CaseDefinition definition) {
+        boolean enabled = definition.guiLayout().previewEnabled();
+        return items.configuredButton("machine.menu.content-toggle", GuiDesign.CONTENT,
+                "&x&4&2&9&F&9&1Содержимое кейса", List.of(
+                        "", "&#65D1FC «Сейчас»",
+                        " &7- &fСтатус: " + (enabled ? "&aвключено" : "&cвыключено"),
+                        "", "&#9EFC65 «Результат»",
+                        enabled
+                                ? " &7- &fЛКМ открывает список наград."
+                                : " &7- &fЛКМ и ПКМ сразу открывают кейс.",
+                        "", "&#FCA965 «Управление»",
+                        " &7- &fЛКМ — " + (enabled ? "выключить" : "включить"), ""), definition,
+                "status", enabled ? "&aвключено" : "&cвыключено",
+                "action", enabled ? "выключить" : "включить");
     }
 
 }

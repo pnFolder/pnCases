@@ -7,7 +7,8 @@ import org.bukkit.inventory.ItemStack;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
 import ru.privatenull.PnCasesPlugin;
-import ru.privatenull.storage.OpenHistoryStorage;
+import static ru.privatenull.cases.animation.CaseAnimation.playSound;
+import ru.privatenull.storage.CasesDatabase;
 import ru.privatenull.pnlibrary.text.ColorUtil;
 
 import java.util.List;
@@ -17,13 +18,13 @@ import java.util.logging.Level;
 public final class RewardDeliveryService {
 
     private final PnCasesPlugin plugin;
-    private final OpenHistoryStorage history;
+    private final CasesDatabase database;
     private final RewardPresentationService presentation;
 
-    public RewardDeliveryService(PnCasesPlugin plugin, OpenHistoryStorage history,
+    public RewardDeliveryService(PnCasesPlugin plugin, CasesDatabase database,
                                  RewardPresentationService presentation) {
         this.plugin = plugin;
-        this.history = history;
+        this.database = database;
         this.presentation = presentation;
     }
 
@@ -39,16 +40,23 @@ public final class RewardDeliveryService {
             case PERSONAL -> deliverPersonal(player, reward, rewardLabel);
         };
         if (!delivered) return false;
-
         try {
             if (definition != null) {
-                history.add(definition.name(), player.getName(), rewardLabel);
+                database.addHistory(definition.name(), player.getName(), rewardLabel,
+                        java.time.Instant.now().getEpochSecond());
             }
-            List<String> broadcast = plugin.getMessages().getList("broadcast",
-                    "player", player.getName(),
-                    "case", caseDisplayName(definition),
-                    "reward", rewardLabel);
-            Bukkit.getOnlinePlayers().forEach(online -> broadcast.forEach(online::sendMessage));
+            if (definition != null && definition.broadcastEnabled()) {
+                List<String> broadcast = definition.broadcastLines().stream()
+                        .map(line -> formatBroadcast(
+                                line,
+                                player.getName(),
+                                caseDisplayName(definition),
+                                definition.name(),
+                                rewardLabel))
+                        .toList();
+                Bukkit.getOnlinePlayers().forEach(
+                        online -> broadcast.forEach(online::sendMessage));
+            }
         } catch (RuntimeException exception) {
             // The actual item/provider transaction already succeeded. Keeping
             // the pending row here would duplicate that reward after restart.
@@ -61,20 +69,20 @@ public final class RewardDeliveryService {
     private boolean deliverItem(Player player, Reward reward, String rewardLabel) {
         ItemStack item = reward.item();
         if (item == null) {
-            player.sendMessage(plugin.getMessages().getOr("reward.invalid", "reward-invalid"));
+            player.sendMessage(plugin.getUi().get("reward.invalid"));
             plugin.getLogger().warning("Не удалось выдать ITEM-награду игроку " + player.getName()
                     + ": предмет отсутствует.");
             return false;
         }
         giveToInventoryOrDrop(player, item.clone());
-        sendRewardMessage(player, reward, rewardLabel, "", "", "reward-default");
-        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.28f, 1.6f);
+        sendRewardMessage(player, reward, rewardLabel, "", "");
+        playSound(player, player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.18f, 1.6f);
         return true;
     }
 
     private boolean deliverLuckPerms(Player player, Reward reward, String rewardLabel) {
         if (!Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) {
-            player.sendMessage(plugin.getMessages().getOr("reward.provider-missing", "reward-provider-missing",
+            player.sendMessage(plugin.getUi().get("reward.provider-missing",
                     "provider", "LuckPerms"));
             plugin.getLogger().warning("Не удалось выдать LuckPerms-награду игроку " + player.getName()
                     + ": плагин LuckPerms недоступен.");
@@ -100,13 +108,13 @@ public final class RewardDeliveryService {
             dispatched &= Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
         }
         if (!attempted || !dispatched) {
-            player.sendMessage(plugin.getMessages().getOr("reward.provider-missing", "reward-provider-missing",
+            player.sendMessage(plugin.getUi().get("reward.provider-missing",
                     "provider", "LuckPerms"));
             plugin.getLogger().warning("LuckPerms не подтвердил выдачу награды игроку " + player.getName() + ".");
             return false;
         }
-        sendRewardMessage(player, reward, rewardLabel, "", "", "reward-luckperms");
-        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.32f, 1.2f);
+        sendRewardMessage(player, reward, rewardLabel, "", "");
+        playSound(player, player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.20f, 1.2f);
         return true;
     }
 
@@ -114,14 +122,14 @@ public final class RewardDeliveryService {
         var economy = plugin.getVaultEconomy();
         String amount = presentation.formatVaultAmount(reward.vaultAmount());
         if (economy == null || !economy.isAvailable() || !economy.deposit(player, reward.vaultAmount())) {
-            player.sendMessage(plugin.getMessages().getOr("reward.provider-missing", "reward-provider-missing",
+            player.sendMessage(plugin.getUi().get("reward.provider-missing",
                     "provider", "Vault"));
             plugin.getLogger().warning("Не удалось выдать Vault-награду игроку " + player.getName()
                     + ": " + reward.vaultAmount());
             return false;
         }
-        sendRewardMessage(player, reward, rewardLabel, amount, "", "reward.vault", "reward-vault");
-        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.28f, 1.7f);
+        sendRewardMessage(player, reward, rewardLabel, amount, "");
+        playSound(player, player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.18f, 1.7f);
         return true;
     }
 
@@ -129,15 +137,14 @@ public final class RewardDeliveryService {
         var points = plugin.getPlayerPoints();
         String amount = presentation.formatPlayerPointsAmount(reward.playerPointsAmount());
         if (points == null || !points.isAvailable() || !points.give(player.getUniqueId(), reward.playerPointsAmount())) {
-            player.sendMessage(plugin.getMessages().getOr("reward.provider-missing", "reward-provider-missing",
+            player.sendMessage(plugin.getUi().get("reward.provider-missing",
                     "provider", "PlayerPoints"));
             plugin.getLogger().warning("Не удалось выдать PlayerPoints-награду игроку " + player.getName()
                     + ": " + reward.playerPointsAmount());
             return false;
         }
-        sendRewardMessage(player, reward, rewardLabel, "", amount,
-                "reward.playerpoints", "reward-playerpoints");
-        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.30f, 1.45f);
+        sendRewardMessage(player, reward, rewardLabel, "", amount);
+        playSound(player, player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.18f, 1.45f);
         return true;
     }
 
@@ -151,26 +158,16 @@ public final class RewardDeliveryService {
             plugin.getLogger().warning("Не удалось выполнить PERSONAL-награду для " + player.getName() + ": " + command);
             return false;
         }
-        sendRewardMessage(player, reward, rewardLabel, "", "", "reward-default");
-        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.30f, 1.3f);
+        sendRewardMessage(player, reward, rewardLabel, "", "");
+        playSound(player, player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.20f, 1.3f);
         return true;
     }
 
     private void sendRewardMessage(Player player, Reward reward, String rewardLabel,
-                                   String moneyAmount, String pointsAmount, String... defaultPaths) {
+                                   String moneyAmount, String pointsAmount) {
         String configured = reward.message();
-        if (configured != null && !configured.isBlank()) {
-            player.sendMessage(formatMessage(configured, rewardLabel, moneyAmount, pointsAmount));
-            return;
-        }
-
-        if (defaultPaths.length == 1) {
-            player.sendMessage(plugin.getMessages().get(defaultPaths[0], "reward", rewardLabel));
-        } else {
-            player.sendMessage(plugin.getMessages().getOr(defaultPaths[0], defaultPaths[1],
-                    "reward", rewardLabel,
-                    "amount", !moneyAmount.isBlank() ? moneyAmount : pointsAmount));
-        }
+        if (configured == null || configured.isBlank()) return;
+        player.sendMessage(formatMessage(configured, rewardLabel, moneyAmount, pointsAmount));
     }
 
     private String formatMessage(String raw, String rewardLabel, String moneyAmount, String pointsAmount) {
@@ -180,6 +177,20 @@ public final class RewardDeliveryService {
                 .replace("{amount}", amount)
                 .replace("{money}", moneyAmount)
                 .replace("{points}", pointsAmount));
+    }
+
+    private String formatBroadcast(
+            String raw,
+            String player,
+            String caseName,
+            String caseId,
+            String reward
+    ) {
+        return color((raw == null ? "" : raw)
+                .replace("{player}", player)
+                .replace("{case}", caseName)
+                .replace("{case_id}", caseId)
+                .replace("{reward}", reward));
     }
 
     private void giveToInventoryOrDrop(Player player, ItemStack item) {

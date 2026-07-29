@@ -5,25 +5,12 @@ import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import ru.privatenull.cases.model.AnimationType;
-import ru.privatenull.cases.model.CaseDefinition;
-import ru.privatenull.cases.model.CaseGuiLayout;
-import ru.privatenull.cases.model.IdleParticleSettings;
-import ru.privatenull.cases.model.Reward;
+import ru.privatenull.cases.model.*;
 import ru.privatenull.cases.reward.RewardPresentationService;
 import ru.privatenull.pnlibrary.text.ColorUtil;
 import ru.privatenull.util.ItemFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-
-import static ru.privatenull.config.ConfigValues.bool;
-import static ru.privatenull.config.ConfigValues.decimal;
-import static ru.privatenull.config.ConfigValues.integer;
-import static ru.privatenull.config.ConfigValues.string;
+import java.util.*;
 
 public final class CaseDefinitionLoader {
 
@@ -37,24 +24,29 @@ public final class CaseDefinitionLoader {
     }
 
     public CaseDefinition load(String caseName, ConfigurationSection section) {
-        String displayName = section.getString(
-                "display-name",
-                section.getString("display_name", humanizeCaseName(caseName))
-        );
+        String displayName = section.getString("display-name", humanizeCaseName(caseName));
         List<Location> blocks = blockCodec.readLoadedLocations(section);
 
         ConfigurationSection gui = section.getConfigurationSection("gui");
         String title = resolveGuiTitle(displayName, gui == null ? null : gui.getString("title"));
-        ConfigurationSection openItemSection = gui == null ? null : gui.getConfigurationSection("open-item");
+        ConfigurationSection openItemSection = gui == null ? null : gui.getConfigurationSection("button");
         ItemStack openButton = ItemFactory.fromSection(openItemSection);
         if (openButton == null) openButton = new ItemStack(Material.CHEST);
         applyDisplayNameToken(openButton, openItemSection, displayName);
         CaseGuiLayout layout = viewParser.parseLayout(gui);
         IdleParticleSettings idleParticles = viewParser.parseIdleParticles(section.getConfigurationSection("idle-particles"));
 
-        Cost cost = parseCost(section.getConfigurationSection("cost"));
+        int buyXpLevels = parseBuyXpLevels(section.getConfigurationSection("cost"));
         Animation animation = parseAnimation(section.getConfigurationSection("animation"));
+        ConfigurationSection broadcast = section.getConfigurationSection("broadcast");
+        boolean broadcastEnabled = broadcast == null || broadcast.getBoolean("enabled", true);
+        List<String> broadcastLines = broadcast != null && broadcast.isList("lines")
+                ? broadcast.getStringList("lines")
+                : CaseDefinition.DEFAULT_BROADCAST_LINES;
         List<Reward> rewards = rewardParser.parse(section);
+        if (rewards.isEmpty()) {
+            throw new IllegalArgumentException("Кейс '" + caseName + "' не содержит ни одной корректной награды.");
+        }
 
         return new CaseDefinition(
                 caseName.toLowerCase(Locale.ROOT),
@@ -64,16 +56,15 @@ public final class CaseDefinitionLoader {
                 openButton,
                 layout,
                 idleParticles,
-                cost.type(),
-                cost.amount(),
-                cost.keyId(),
-                cost.buyXpLevels(),
+                buyXpLevels,
                 animation.durationTicks(),
                 animation.cycleEveryTicks(),
                 animation.riseBlocks(),
                 animation.spinDegreesPerTick(),
                 animation.fixed(),
                 animation.items(),
+                broadcastEnabled,
+                broadcastLines,
                 rewards
         );
     }
@@ -98,34 +89,22 @@ public final class CaseDefinitionLoader {
         item.setItemMeta(meta);
     }
 
-    private Cost parseCost(ConfigurationSection section) {
-        String rawType = section == null ? "NONE" : section.getString("type", "NONE");
-        if (rawType == null) rawType = "NONE";
-        CaseDefinition.CostType type;
-        try {
-            type = CaseDefinition.CostType.valueOf(rawType.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ignored) {
-            type = CaseDefinition.CostType.NONE;
-        }
-
-        int amount = section == null ? 0 : section.getInt("amount", 0);
-        String keyId = section == null ? null : section.getString("key");
-        if (keyId != null) keyId = keyId.toLowerCase(Locale.ROOT);
-
+    private int parseBuyXpLevels(ConfigurationSection section) {
         int buyXpLevels = 0;
-        if (section != null && bool(section, true,
-                "buy_xp_enabled", "buy-xp-enabled", "buy_key_with_xp", "buy-key-with-xp")) {
-            buyXpLevels = section.getInt("buy_xp_levels", 0);
-            if (buyXpLevels <= 0) buyXpLevels = section.getInt("buy-xp-levels", 0);
+        ConfigurationSection xpPurchase = section == null
+                ? null
+                : section.getConfigurationSection("xp-purchase");
+        if (xpPurchase != null && xpPurchase.getBoolean("enabled", false)) {
+            buyXpLevels = xpPurchase.getInt("levels", 0);
         }
-        return new Cost(type, amount, keyId, buyXpLevels);
+        return buyXpLevels;
     }
 
     private Animation parseAnimation(ConfigurationSection section) {
-        int duration = integer(section, 80, "duration_ticks", "duration-ticks");
-        int cycleEvery = integer(section, 2, "cycle_every_ticks", "cycle-every-ticks");
-        double rise = decimal(section, 1.2, "rise_blocks", "rise-blocks");
-        float spin = (float) decimal(section, 18.0, "spin_degrees_per_tick", "spin-degrees-per-tick");
+        int duration = section == null ? 80 : section.getInt("duration_ticks", 80);
+        int cycleEvery = section == null ? 2 : section.getInt("cycle_every_ticks", 2);
+        double rise = section == null ? 1.2 : section.getDouble("rise_blocks", 1.2);
+        float spin = section == null ? 18.0F : (float) section.getDouble("spin_degrees_per_tick", 18.0);
 
         List<ItemStack> items = new ArrayList<>();
         if (section != null && section.isList("items")) {
@@ -134,22 +113,16 @@ public final class CaseDefinitionLoader {
             }
         }
         items.removeIf(Objects::isNull);
-        if (items.isEmpty()) items.add(new ItemStack(Material.SLIME_BALL));
 
         return new Animation(duration, cycleEvery, rise, spin, fixedAnimation(section), items);
     }
 
     private AnimationType fixedAnimation(ConfigurationSection section) {
-        String raw = string(section, null,
-                "fixed", "fixed_animation", "fixed-animation", "case_animation", "case-animation", "type");
+        String raw = section == null ? null : section.getString("fixed");
         if (raw == null || raw.isBlank()) return null;
 
-        String normalized = raw.trim().toUpperCase(Locale.ROOT);
-        if (List.of("PLAYER", "PLAYERS", "CHOICE", "SELECT", "NONE", "FALSE", "OFF").contains(normalized)) {
-            return null;
-        }
         try {
-            return AnimationType.valueOf(normalized);
+            return AnimationType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
             return null;
         }
@@ -157,9 +130,6 @@ public final class CaseDefinitionLoader {
 
     private String humanizeCaseName(String caseName) {
         return caseName == null || caseName.isBlank() ? "&fКейс" : "&f" + caseName.replace('_', ' ');
-    }
-
-    private record Cost(CaseDefinition.CostType type, int amount, String keyId, int buyXpLevels) {
     }
 
     private record Animation(

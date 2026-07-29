@@ -1,9 +1,9 @@
 package ru.privatenull.gui.caseview;
 
-import org.bukkit.ChatColor;
+import ru.privatenull.gui.GuiSession;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -14,11 +14,10 @@ import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.CaseGuiLayout;
 import ru.privatenull.cases.reward.RewardPresentationService;
-import ru.privatenull.cases.view.CaseView;
-import ru.privatenull.storage.OpenHistoryStorage;
+import ru.privatenull.storage.CasesDatabase.HistoryEntry;
 import ru.privatenull.pnlibrary.text.ColorUtil;
+import ru.privatenull.gui.GuiDesign;
 import ru.privatenull.util.ServerCompatibility;
-import ru.privatenull.util.GuiItemFlags;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -28,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public final class CaseMenuService implements CaseView {
+public final class CaseMenuService implements CaseManager.View {
 
     private static final DateTimeFormatter HISTORY_TIME_FORMAT = DateTimeFormatter.ofPattern("dd.MM HH:mm");
 
@@ -52,79 +51,68 @@ public final class CaseMenuService implements CaseView {
         if (meta == null) return item;
 
         int buyExp = Math.max(0, definition.buyKeyWithXpLevels());
-        List<String> lore = meta.hasLore()
-                ? new ArrayList<>(Objects.requireNonNull(meta.getLore()))
-                : new ArrayList<>();
-        int need = Math.max(1, definition.costAmount());
-        String keyId = definition.costKeyId();
-        int have = definition.costType() == CaseDefinition.CostType.KEY && keyId != null
-                ? plugin.getKeyStorage().get(player.getUniqueId(), keyId)
-                : 0;
+        int need = 1;
+        String keyId = definition.name();
+        int have = plugin.getDatabase().getKeys(player.getUniqueId(), keyId);
 
-        lore.addAll(extraLore(definition, have, need, buyExp));
-        meta.setLore(lore);
-        GuiItemFlags.hideAttributes(meta);
+        String keyName = color(definition.displayName());
+        String buyHint = "&fЛКМ — купить ключ за &#FCA865" + buyExp + " уровней";
+        String previewHint = "&fЛКМ — посмотреть содержимое";
+        String openLeftHint = "&fЛКМ — открыть кейс";
+        boolean previewEnabled = definition.guiLayout().previewEnabled();
+        String[] replacements = {
+                "case", color(definition.displayName()), "case_id", definition.name(),
+                "display-name", color(definition.displayName()), "title", definition.guiTitle(),
+                "key", keyId == null ? "" : keyId, "key_name", keyName,
+                "have", String.valueOf(have), "need", String.valueOf(need), "levels", String.valueOf(buyExp),
+                "left-click", previewEnabled ? (buyExp > 0 ? buyHint : previewHint) : openLeftHint,
+                "right-click", "&fПКМ — открыть кейс"
+        };
+        meta.setDisplayName(formatText(meta.getDisplayName(), replacements));
+        List<String> configured = meta.hasLore() && meta.getLore() != null
+                ? meta.getLore()
+                : List.of(
+                "", "&#9EFC65 «Текущие параметры»",
+                " &7- &fКлючи: &#FCA865{have} &7/ &#FCA865{need}",
+                " &7- &fТип ключа: {key_name}",
+                "", "&#65D1FC «Действия»",
+                " &7- {left-click}", " &7- {right-click}", ""
+        );
+        meta.setLore(formatLore(configured, replacements));
+        GuiDesign.hideAttributes(meta);
         item.setItemMeta(meta);
         return item;
     }
 
-    @Override
     public ItemStack buildAnimationButton(Player player, CaseDefinition definition) {
-        AnimationType current = caseManager.getPlayerAnimation(player.getUniqueId());
-        ItemStack item = definition != null && definition.guiLayout().animationItem() != null
-                ? definition.guiLayout().animationItem().clone()
-                : new ItemStack(AnimationType.FORTUNE_RING.icon());
+        AnimationType current = caseManager.getPlayerAnimation(
+                player.getUniqueId(), definition == null ? "" : definition.name());
+        ItemStack item = GuiDesign.animation(current);
         item.setAmount(1);
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
         String[] replacements = {
-                "animation", current.displayName(),
+                "animation", GuiDesign.animationName(current),
                 "case", definition == null ? "" : color(definition.displayName()),
-                "case_id", definition == null ? "" : definition.name(),
-                "case-id", definition == null ? "" : definition.name()
+                "case_id", definition == null ? "" : definition.name()
         };
-        meta.setDisplayName(plugin.getGuiConfig().text("case.animation-button.name",
+        meta.setDisplayName(plugin.getUi().text("case.animation-button.name",
                 "&fАнимация: {animation}", replacements));
-        meta.setLore(plugin.getGuiConfig().list("case.animation-button.lore", List.of(
+        meta.setLore(plugin.getUi().list("case.animation-button.lore", List.of(
                 "",
-                "&7Текущая: {animation}",
-                "&7Нажмите, чтобы выбрать другую",
+                "&#9EFC65 «Текущие параметры»",
+                " &7- &fАнимация: {animation}",
+                "",
+                "&#65D1FC «Действие»",
+                " &7- &fЛКМ — открыть выбор",
                 ""
         ), replacements));
-        GuiItemFlags.hideAttributes(meta);
+        GuiDesign.hideAttributes(meta);
         item.setItemMeta(meta);
         return item;
     }
 
-    @Override
-    public ItemStack buildPreviewButton(CaseDefinition definition) {
-        ItemStack item = new ItemStack(Material.ENDER_EYE);
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) return item;
-        String[] replacements = {
-                "case", color(definition.displayName()),
-                "case_id", definition.name(),
-                "case-id", definition.name(),
-                "rewards", String.valueOf(definition.rewards().size())
-        };
-        meta.setDisplayName(plugin.getGuiConfig().text("case.preview-button.name",
-                "&#429F91▸ &fСодержимое кейса", replacements));
-        meta.setLore(plugin.getGuiConfig().list("case.preview-button.lore", List.of(
-                "",
-                "&#A0EFA1 «Предпросмотр»",
-                " &7- &fКейс: &#429F91{case}",
-                " &7- &fНаград: &#429F91{rewards}",
-                " &7- &fПоказаны шансы и редкость",
-                "",
-                "&#429F91▸ &fНажмите, чтобы открыть"
-        ), replacements));
-        GuiItemFlags.hideAttributes(meta);
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    @Override
     public void fill(Inventory inventory, Player player, CaseDefinition definition) {
         inventory.clear();
         CaseGuiLayout layout = definition.guiLayout();
@@ -143,7 +131,7 @@ public final class CaseMenuService implements CaseView {
     @Override
     public void open(Player player, CaseDefinition definition) {
         Inventory inventory = Bukkit.createInventory(
-                CaseGuiHolder.caseGui(definition.name()),
+                GuiSession.caseMenu(definition.name()),
                 definition.guiLayout().size(),
                 color(definition.guiTitle())
         );
@@ -151,57 +139,9 @@ public final class CaseMenuService implements CaseView {
         plugin.getGuiOpenAnimations().open(player, inventory);
     }
 
-    private List<String> extraLore(CaseDefinition definition, int have, int need, int buyExp) {
-        String keyId = definition.costKeyId() == null ? "" : definition.costKeyId();
-        String keyName = keyId.isBlank()
-                ? ""
-                : keyId.equals(definition.name())
-                ? color(definition.displayName())
-                : caseManager.getKeyDisplayName(keyId);
-        String keysBalance = definition.costType() == CaseDefinition.CostType.KEY
-                ? plugin.getGuiConfig().text("case.button.keys-balance",
-                plugin.getGuiConfig().text("gui.case-button.keys-balance", "&7Ключи: &f{have}&7/&f{need}",
-                        "have", String.valueOf(have), "need", String.valueOf(need),
-                        "key", keyId, "key_name", keyName, "key-name", keyName),
-                "have", String.valueOf(have), "need", String.valueOf(need),
-                "key", keyId, "key_name", keyName, "key-name", keyName)
-                : "";
-        String buyHint = plugin.getGuiConfig().text("case.button.buy-xp-hint",
-                plugin.getGuiConfig().text("gui.case-button.buy-xp-hint", "&7ЛКМ &8— &fкупить ключ за опыт: &8({levels} lvl)",
-                        "levels", String.valueOf(buyExp)),
-                "levels", String.valueOf(buyExp));
-        String openHint = plugin.getGuiConfig().text("case.button.open-hint",
-                plugin.getGuiConfig().text("gui.case-button.open-hint", "&7ПКМ &8— &aоткрыть кейс"));
-        String previewLeftHint = plugin.getGuiConfig().text("case.button.preview-left-hint",
-                plugin.getGuiConfig().text("gui.case-button.preview-left-hint", "&7ЛКМ &8— &bпосмотреть содержимое"))
-                ;
-        String previewHint = "";
-
-        String[] replacements = {
-                "case", color(definition.displayName()), "case_id", definition.name(), "case-id", definition.name(),
-                "title", definition.guiTitle(), "material", definition.openButton().getType().getKey().toString(),
-                "key", keyId, "key_name", keyName, "key-name", keyName,
-                "have", String.valueOf(have), "need", String.valueOf(need), "levels", String.valueOf(buyExp),
-                "keys-balance", keysBalance, "buy-xp-hint", buyHint, "preview-left-hint", previewLeftHint,
-                "left-click", buyExp > 0 ? buyHint : previewLeftHint, "open-hint", openHint,
-                "right-click", openHint, "preview-hint", previewHint, "middle-click", previewHint
-        };
-        List<String> fallback = plugin.getGuiConfig().list("gui.case-button.extra-lore", List.of(
-                "", "{keys-balance}", "", "{left-click}", "{right-click}", "{middle-click}"), replacements);
-        List<String> lines = caseExtraLore(definition, fallback, replacements);
-        trimTrailingEmptyLines(lines);
-        return lines;
-    }
-
-    private List<String> caseExtraLore(CaseDefinition definition, List<String> fallback, String[] replacements) {
-        ConfigurationSection caseSection = caseManager.getCaseSection(definition.name());
-        ConfigurationSection openItem = caseSection == null ? null : caseSection.getConfigurationSection("gui.open-item");
-        if (openItem == null || !openItem.isList("extra-lore")) {
-            return plugin.getGuiConfig().list("case.button.extra-lore", fallback, replacements);
-        }
-
+    private List<String> formatLore(List<String> source, String[] replacements) {
         List<String> lines = new ArrayList<>();
-        for (String raw : openItem.getStringList("extra-lore")) {
+        for (String raw : source) {
             String formatted = raw == null ? "" : raw;
             for (int i = 0; i < replacements.length; i += 2) {
                 formatted = formatted.replace("{" + replacements[i] + "}", replacements[i + 1]);
@@ -211,6 +151,15 @@ public final class CaseMenuService implements CaseView {
             }
         }
         return lines;
+    }
+
+    private String formatText(String source, String[] replacements) {
+        String formatted = source == null ? "" : source;
+        for (int index = 0; index < replacements.length; index += 2) {
+            formatted = formatted.replace(
+                    "{" + replacements[index] + "}", replacements[index + 1]);
+        }
+        return color(formatted);
     }
 
     private void fillDecor(Inventory inventory, CaseGuiLayout layout) {
@@ -224,8 +173,18 @@ public final class CaseMenuService implements CaseView {
     }
 
     private void fillHistory(Inventory inventory, CaseDefinition definition) {
-        List<OpenHistoryStorage.Entry> history = caseManager.getOpenHistory(definition.name());
-        List<Integer> slots = definition.guiLayout().historySlots();
+        List<HistoryEntry> history = caseManager.getOpenHistory(definition.name());
+        List<Integer> slots = new ArrayList<>(definition.guiLayout().historySlots());
+        int animationSlot = definition.guiLayout().animationSlot();
+        boolean animationSelectionHidden = definition.fixedAnimation() != null
+                || ServerCompatibility.useMinecraft1165AnimationMode();
+        if (animationSelectionHidden
+                && animationSlot >= 0
+                && animationSlot < inventory.getSize()
+                && !slots.contains(animationSlot)) {
+            slots.add(animationSlot);
+            slots.sort(Integer::compareTo);
+        }
         for (int index = 0; index < slots.size(); index++) {
             int slot = slots.get(index);
             if (slot < 0 || slot >= inventory.getSize()) continue;
@@ -235,20 +194,20 @@ public final class CaseMenuService implements CaseView {
         }
     }
 
-    private ItemStack historyItem(CaseDefinition definition, OpenHistoryStorage.Entry entry) {
+    private ItemStack historyItem(CaseDefinition definition, HistoryEntry entry) {
         ItemStack item = historyRewardItem(definition, entry.rewardName());
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
         String[] replacements = {
-                "case", color(definition.displayName()), "case_id", definition.name(), "case-id", definition.name(),
+                "case", color(definition.displayName()), "case_id", definition.name(),
                 "player", entry.playerName(), "reward", color(entry.rewardName()), "time", formatTime(entry.openedAt())
         };
-        meta.setDisplayName(plugin.getGuiConfig().text("case.history.item.name", "&#A0EFA1◆ {reward}", replacements));
-        meta.setLore(plugin.getGuiConfig().list("case.history.item.lore", List.of(
-                "", "&#A0EFA1 «Детали открытия»", " &7- &fИгрок: &#FBCA08{player}",
-                " &7- &fНаграда: {reward}", "", "&#C096AB «Время»", " &7- &f{time}", ""
+        meta.setDisplayName(plugin.getUi().text("case.history.item.name", "&#A0EFA1◆ {reward}", replacements));
+        meta.setLore(plugin.getUi().list("case.history.item.lore", List.of(
+                "", "&#9EFC65 «Основная информация»", " &7- &fИгрок: &#FBCA08{player}",
+                " &7- &fНаграда: {reward}", "", "&#65D1FC «Время открытия»", " &7- &f{time}", ""
         ), replacements));
-        GuiItemFlags.hideAttributes(meta);
+        GuiDesign.hideAttributes(meta);
         item.setItemMeta(meta);
         return item;
     }
@@ -268,20 +227,23 @@ public final class CaseMenuService implements CaseView {
 
     private ItemStack emptyHistoryItem(CaseDefinition definition) {
         ItemStack configured = definition.guiLayout().emptyHistoryItem();
-        ItemStack item = configured == null ? new ItemStack(Material.BARRIER) : configured.clone();
+        ItemStack item = configured == null || configured.getType().isAir()
+                ? new ItemStack(Material.BARRIER)
+                : configured.clone();
+        item.setAmount(1);
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
         String[] replacements = {
-                "case", color(definition.displayName()), "case_id", definition.name(), "case-id", definition.name()
+                "case", color(definition.displayName()), "case_id", definition.name()
         };
-        if (plugin.getGuiConfig().contains("case.history.empty.name") || !meta.hasDisplayName()) {
-            meta.setDisplayName(plugin.getGuiConfig().text("case.history.empty.name", "&8История пуста", replacements));
+        if (!meta.hasDisplayName()) {
+            meta.setDisplayName(plugin.getUi().text("case.history.empty.name", "&8История пуста", replacements));
         }
-        if (plugin.getGuiConfig().contains("case.history.empty.lore") || !meta.hasLore()) {
-            meta.setLore(plugin.getGuiConfig().list("case.history.empty.lore", List.of(
-                    "", "&#A0EFA1 «История кейса»", " &7- &fПоследние открытия",
-                    " &7- &fбудут отображаться здесь", ""
+        if (!meta.hasLore()) {
+            meta.setLore(plugin.getUi().list("case.history.empty.lore", List.of(
+                    "", "&#9EFC65 «Основная информация»", " &7- &fПоследние открытия кейса",
+                    " &7- &fбудут отображаться здесь.", ""
             ), replacements));
         }
         item.setItemMeta(meta);
@@ -293,7 +255,7 @@ public final class CaseMenuService implements CaseView {
         if (item == null) return;
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return;
-        GuiItemFlags.hideAttributes(meta);
+        GuiDesign.hideAttributes(meta);
         item.setItemMeta(meta);
     }
 
@@ -321,14 +283,6 @@ public final class CaseMenuService implements CaseView {
         if (normalized > 10 && normalized < 20) return many;
         if (last > 1 && last < 5) return few;
         return last == 1 ? one : many;
-    }
-
-    private void trimTrailingEmptyLines(List<String> lines) {
-        while (!lines.isEmpty()) {
-            String last = ChatColor.stripColor(lines.get(lines.size() - 1));
-            if (last != null && !last.isBlank()) return;
-            lines.remove(lines.size() - 1);
-        }
     }
 
     private String color(String value) {

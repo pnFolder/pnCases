@@ -1,40 +1,33 @@
+# pnCases — тексты и стили интерфейса игроков
+#
+# Плейсхолдеры выбора анимации:
+# {animation} — название выбранной анимации.
+# {case}, {case_id} — название и ID редактируемого кейса.
+#
+# Плейсхолдеры истории:
+# {player} — игрок, открывший кейс.
+# {reward} — название выпавшей награды.
+# {time} — время открытия.
+#
+# Плейсхолдеры содержимого кейса:
+# {reward}, {case}, {case_id} — награда и данные кейса.
+# {rarity_name}, {rarity_id} — оформленное название и ID редкости.
+# {chance} — вероятность выпадения.
+# {amount}, {item_amount}, {duration} — параметры награды.
+#
+# В rarities можно свободно менять оформленное name и glow.
+# Слоты, навигация, системные иконки и Machine GUI находятся в коде.
+
 case:
-  button:
-    keys-balance: "&7Ключи: &f{have}&7/&f{need} &8({key_name}&8)"
-    buy-xp-hint: "&7ЛКМ &8— &fкупить ключ за опыт: &8({levels} lvl)"
-    preview-left-hint: "&7ЛКМ &8— &bпосмотреть содержимое"
-    open-left-hint: "&7ЛКМ &8— &aоткрыть кейс"
-    open-hint: "&7ПКМ &8— &aоткрыть кейс"
-    preview-hint: "&7СКМ &8— &bпосмотреть содержимое"
-    extra-lore:
-      - ""
-      - "{keys-balance}"
-      - "{left-click}"
-      - "{right-click}"
-
-  preview-button:
-    name: "&x&4&2&9&F&9&1▸ &fСодержимое кейса"
-    lore:
-      - ""
-      - "&x&A&0&E&F&A&1 «Предпросмотр»"
-      - " &7- &fКейс: &x&4&2&9&F&9&1{case}"
-      - " &7- &fНаград: &x&4&2&9&F&9&1{rewards}"
-      - " &7- &fПоказаны шансы и редкость"
-      - ""
-      - "&x&4&2&9&F&9&1▸ &fНажмите, чтобы открыть"
-
   animation-button:
-    name: "&x&A&F&9&2&F&FКруг фортуны"
+    name: "&x&A&F&9&2&F&FВыбор анимации"
     lore:
       - ""
-      - "&x&A&F&9&2&F&F «Выбор анимации»"
-      - " &7- &fТекущая: {animation}"
+      - "&#9EFC65 «Текущие параметры»"
+      - " &7- &fАнимация: {animation}"
       - ""
-      - "&x&6&E&A&8&F&F «Действие»"
-      - " &7- &fОткройте меню и выберите"
-      - " &7- &fанимацию для открытия кейса."
-      - ""
-      - "&7ЛКМ &8— &fвыбрать анимацию"
+      - "&#65D1FC «Действие»"
+      - " &7- &fЛКМ — открыть выбор"
       - ""
 
   history:
@@ -42,353 +35,76 @@ case:
       name: "&x&A&0&E&F&A&1◆ {reward}"
       lore:
         - ""
-        - "&x&A&0&E&F&A&1 «Детали открытия»"
-        - " §7- §fИгрок: &x&F&B&C&A&0&8{player}"
-        - " §7- §fНаграда: {reward}"
+        - "&#9EFC65 «Основная информация»"
+        - " &7- &fИгрок: &x&F&B&C&A&0&8{player}"
+        - " &7- &fНаграда: {reward}"
         - ""
-        - "&x&C&0&9&6&A&B «Время»"
-        - " §7- §f{time}"
+        - "&#65D1FC «Время открытия»"
+        - " &7- &f{time}"
         - ""
     empty:
       name: "&8История пуста"
       lore:
         - ""
-        - "&x&A&0&E&F&A&1 «История кейса»"
-        - " §7- §fПоследние открытия"
-        - " §7- §fбудут отображаться здесь"
+        - "&#9EFC65 «Основная информация»"
+        - " &7- &fПоследние открытия кейса"
+        - " &7- &fбудут отображаться здесь."
         - ""
 
 preview:
-  title: "&7Содержимое кейса"
-  layout:
-    # Размер: количество строк 1-6 либо количество слотов 9-54.
-    size: 54
-    info-slot: 4
-    previous-slot: 45
-    back-slot: 49
-    next-slot: 53
-    reward-slots:
-      - 10
-      - 11
-      - 12
-      - 13
-      - 14
-      - 15
-      - 16
-      - 19
-      - 20
-      - 21
-      - 22
-      - 23
-      - 24
-      - 25
-      - 28
-      - 29
-      - 30
-      - 31
-      - 32
-      - 33
-      - 34
-      - 37
-      - 38
-      - 39
-      - 40
-      - 41
-      - 42
-      - 43
-  sounds:
-    open:
-      name: BLOCK_BARREL_OPEN
-      volume: 0.22
-      pitch: 1.25
-    page:
-      name: UI_BUTTON_CLICK
-      volume: 0.18
-      pitch: 1.20
-    close:
-      name: BLOCK_BARREL_CLOSE
-      volume: 0.20
-      pitch: 0.95
-  decor:
-    # true заполняет декором все свободные слоты. При false используются slots.
-    fill-empty: true
-    slots: []
-    material: GRAY_STAINED_GLASS_PANE
-    amount: 1
-    custom-model-data: 0
-    glow: false
-    hide-attributes: true
-    name: " "
-    lore: []
-  info:
-    material: COMPASS
-    amount: 1
-    custom-model-data: 0
-    glow: false
-    hide-attributes: true
-    name: "&eСодержимое кейса"
-    lore:
-      - ""
-      - "&6 «Основное»"
-      - "&f- Кейс: &e{case}"
-      - "&f- Наград: &e{rewards}"
-      - "&f- Страница: &e{page}&7/&e{pages}"
-      - ""
+  title: "&0Содержимое кейса"
+
   reward:
-    # ORIGINAL/KEEP в material редкости сохраняет предмет самой награды.
-    # Доступно: {reward}, {case}, {case_id}, {rarity_name}, {rarity_id},
-    # {rarity_color}, {rarity_symbol}, {rarity_description}, {type_name},
-    # {type_id}, {type_color}, {type_symbol}, {type_description}, {chance},
-    # {weight}, {amount}, {duration}, {item_amount}.
-    name: "{rarity_color}{rarity_symbol} &f{reward}"
-    keep-original-lore: true
-    original-lore-position: BEFORE
-    original-lore-separator: true
-    hide-empty-lines: true
-    hide-attributes: true
-    glow: false
-    custom-model-data: 0
+    name: "{rarity_name} &f{reward}"
     lore:
       - ""
-      - "&6 «Основное»"
-      - "&f- Тип: {type_color}{type_name}"
-      - "&f- Редкость: {rarity_color}{rarity_name}"
+      - "&#9EFC65 «Основная информация»"
+      - " &7- &fРедкость: {rarity_name}"
       - ""
-      - "&6 «Шанс»"
-      - "&f- Выпадение: &e{chance}"
-      - "&f- Вес: &e{weight}"
+      - "&#65D1FC «Вероятность»"
+      - " &7- &fВыпадение: &#FCA865{chance}"
     type-lore:
       item:
         - ""
-        - "&6 «Награда»"
-        - "&f- Количество: &e{item_amount}"
+        - "&#FCA965 «Награда»"
+        - " &7- &fКоличество: &#FCA865{item_amount}"
         - ""
       vault:
         - ""
-        - "&6 «Награда»"
-        - "&f- Монеты: &a{amount}"
+        - "&#FCA965 «Награда»"
+        - " &7- &fМонеты: &a{amount}"
         - ""
       playerpoints:
         - ""
-        - "&6 «Награда»"
-        - "&f- Поинты: &b{amount}"
+        - "&#FCA965 «Награда»"
+        - " &7- &fПоинты: &b{amount}"
         - ""
       luckperms:
         - ""
-        - "&6 «Награда»"
-        - "&f- Срок: &d{duration}"
+        - "&#FCA965 «Награда»"
+        - " &7- &fСрок: &d{duration}"
         - ""
-  # Можно добавить свою секцию, например donate, и указать rarity: DONATE в награде.
+      personal: []
+
   rarities:
     default:
-      name: "{rarity_id}"
-      color: "&f"
-      symbol: "◆"
-      description: ""
-      material: "ORIGINAL"
+      name: "&f◆ {rarity_id}"
       glow: false
-      custom-model-data: 0
     common:
-      name: "Обычная"
-      color: "&7"
-      symbol: "◇"
-      description: "Частая награда"
-      material: "ORIGINAL"
+      name: "&7◇ Обычная"
       glow: false
-      custom-model-data: 0
     uncommon:
-      name: "Необычная"
-      color: "&a"
-      symbol: "◆"
-      description: "Необычная награда"
-      material: "ORIGINAL"
+      name: "&a◆ Необычная"
       glow: false
-      custom-model-data: 0
     rare:
-      name: "Редкая"
-      color: "&9"
-      symbol: "◆"
-      description: "Редкая награда"
-      material: "ORIGINAL"
+      name: "&9◆ Редкая"
       glow: false
-      custom-model-data: 0
     epic:
-      name: "Эпическая"
-      color: "&5"
-      symbol: "✦"
-      description: "Очень ценная награда"
-      material: "ORIGINAL"
+      name: "&5✦ Эпическая"
       glow: true
-      custom-model-data: 0
     legendary:
-      name: "Легендарная"
-      color: "&6"
-      symbol: "★"
-      description: "Исключительно ценная награда"
-      material: "ORIGINAL"
+      name: "&6★ Легендарная"
       glow: true
-      custom-model-data: 0
     mythic:
-      name: "Мифическая"
-      color: "&d"
-      symbol: "✹"
-      description: "Самая редкая награда"
-      material: "ORIGINAL"
+      name: "&d✹ Мифическая"
       glow: true
-      custom-model-data: 0
-  types:
-    item:
-      name: "Предмет"
-      color: "&f"
-      symbol: "◆"
-      description: "Предмет будет выдан в инвентарь"
-      material: CHEST
-    vault:
-      name: "Монеты"
-      color: "&a"
-      symbol: "●"
-      description: "Деньги на баланс Vault"
-      material: EMERALD
-    playerpoints:
-      name: "Поинты"
-      color: "&b"
-      symbol: "✦"
-      description: "Поинты PlayerPoints"
-      material: AMETHYST_SHARD
-    luckperms:
-      name: "Привилегия"
-      color: "&d"
-      symbol: "★"
-      description: "Группа или право LuckPerms"
-      material: NETHER_STAR
-
-animation-select:
-  title: "&8Выбор анимации"
-  back:
-    name: "&x&A&0&E&F&A&1← &fНазад"
-    lore:
-      - ""
-      - "&x&A&0&E&F&A&1 «Навигация»"
-      - " &7- &fВернуться к кейсу"
-      - ""
-  item:
-    name: "{prefix}{animation}"
-    lore:
-      - ""
-      - "&x&A&0&E&F&A&1 «Анимация»"
-      - " &7- &fНазвание: {animation}"
-      - ""
-      - "&x&C&0&9&6&A&B «Описание»"
-      - " &7- &f{description}"
-      - ""
-      - "&x&A&0&E&F&A&1 «Статус»"
-      - " &7- {status}"
-      - ""
-  selection-card:
-    name: "{prefix}{animation}"
-    lore:
-      - ""
-      - "&#A0EFA1 «Анимация»"
-      - " &7- &f{animation}"
-      - ""
-      - "&#C096AB «Как выглядит»"
-      - " &7- &f{description}"
-      - ""
-      - "&#A0EFA1 «Статус»"
-      - " &7- {status}"
-      - ""
-  selection-card-v2:
-    name: "{prefix}{animation}"
-    lore:
-      - ""
-      - "&#C096AB «Как выглядит»"
-      - " &7- &f{description}"
-      - ""
-      - "&#A0EFA1 «Статус»"
-      - " &7- {status}"
-      - ""
-  animations:
-    anvil:
-      name: "{prefix}{animation}"
-      lore:
-        - ""
-        - "&x&A&0&E&F&A&1 «Анимация»"
-        - " &7- &fНазвание: {animation}"
-        - ""
-        - "&x&C&0&9&6&A&B «Как выглядит»"
-        - " &7- &fС неба падает наковальня"
-        - " &7- &fи выбивает награду из кейса."
-        - ""
-        - "&x&A&0&E&F&A&1 «Статус»"
-        - " &7- {status}"
-        - ""
-    dynamite:
-      name: "{prefix}{animation}"
-      lore:
-        - ""
-        - "&x&A&0&E&F&A&1 «Анимация»"
-        - " &7- &fНазвание: {animation}"
-        - ""
-        - "&x&C&0&9&6&A&B «Как выглядит»"
-        - " &7- &fДинамит летит к кейсу,"
-        - " &7- &fвзрывается и выпускает награду."
-        - ""
-        - "&x&A&0&E&F&A&1 «Статус»"
-        - " &7- {status}"
-        - ""
-    portal:
-      name: "{prefix}{animation}"
-      lore:
-        - ""
-        - "&x&A&0&E&F&A&1 «Анимация»"
-        - " &7- &fНазвание: {animation}"
-        - ""
-        - "&x&C&0&9&6&A&B «Как выглядит»"
-        - " &7- &fОсколки уходят в чёрную дыру,"
-        - " &7- &fа награда выходит из портала."
-        - ""
-        - "&x&A&0&E&F&A&1 «Статус»"
-        - " &7- {status}"
-        - ""
-    poison:
-      name: "{prefix}{animation}"
-      lore:
-        - ""
-        - "&x&A&0&E&F&A&1 «Анимация»"
-        - " &7- &fНазвание: {animation}"
-        - ""
-        - "&x&C&0&9&6&A&B «Как выглядит»"
-        - " &7- &fКейс окутывает ядовитый туман,"
-        - " &7- &fпосле чего появляется награда."
-        - ""
-        - "&x&A&0&E&F&A&1 «Статус»"
-        - " &7- {status}"
-        - ""
-    cauldron:
-      name: "{prefix}{animation}"
-      lore:
-        - ""
-        - "&x&A&0&E&F&A&1 «Анимация»"
-        - " &7- &fНазвание: {animation}"
-        - ""
-        - "&x&C&0&9&6&A&B «Как выглядит»"
-        - " &7- &fВокруг кейса открывается разлом,"
-        - " &7- &fиз которого вырывается награда."
-        - ""
-        - "&x&A&0&E&F&A&1 «Статус»"
-        - " &7- {status}"
-        - ""
-    fortune-ring:
-      name: "{prefix}{animation}"
-      lore:
-        - ""
-        - "&x&A&0&E&F&A&1 «Колесо фортуны»"
-        - " &7- &fНазвание: {animation}"
-        - ""
-        - "&x&C&0&9&6&A&B «Как выглядит»"
-        - " &7- &fПредметы крутятся по кругу над кейсом,"
-        - " &7- &fзамедляются, и выходит награда."
-        - ""
-        - "&x&A&0&E&F&A&1 «Статус»"
-        - " &7- {status}"
-        - ""

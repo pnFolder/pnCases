@@ -7,7 +7,14 @@ import java.util.List;
 
 public class CaseDefinition {
 
-    public enum CostType { NONE, XP_LEVELS, KEY }
+    public static final List<String> DEFAULT_BROADCAST_LINES = List.of(
+            "",
+            "&#EFF7B9К§x§6§8§A§F§9§4Е§x§8§D§B§F§9§7Й§x§B§3§C§F§9§AС&#EFF7B9Ы",
+            "",
+            "&#EFF7B9▸ &fИгрок &#EFF7B9{player} &fоткрыл кейс &#EFF7B9{case}",
+            "&#EFF7B9▸ &fНаграда: &f{reward}",
+            ""
+    );
 
     private final String name;
     private final String displayName;
@@ -19,10 +26,6 @@ public class CaseDefinition {
     private final CaseGuiLayout guiLayout;
     private final IdleParticleSettings idleParticles;
 
-    private final CostType costType;
-    private final int costAmount;
-    private final String costKeyId;
-
     private final int buyKeyWithXpLevels;
     private final int durationTicks;
     private final int cycleEveryTicks;
@@ -30,6 +33,8 @@ public class CaseDefinition {
     private final float spinDegreesPerTick;
     private final AnimationType fixedAnimation;
     private final List<ItemStack> animationItems;
+    private final boolean broadcastEnabled;
+    private final List<String> broadcastLines;
 
     private final List<Reward> rewards;
 
@@ -41,9 +46,6 @@ public class CaseDefinition {
             ItemStack openButton,
             CaseGuiLayout guiLayout,
             IdleParticleSettings idleParticles,
-            CostType costType,
-            int costAmount,
-            String costKeyId,
             int buyKeyWithXpLevels,
             int durationTicks,
             int cycleEveryTicks,
@@ -51,6 +53,8 @@ public class CaseDefinition {
             float spinDegreesPerTick,
             AnimationType fixedAnimation,
             List<ItemStack> animationItems,
+            boolean broadcastEnabled,
+            List<String> broadcastLines,
             List<Reward> rewards
     ) {
         this.name = name;
@@ -63,9 +67,6 @@ public class CaseDefinition {
         this.openButton = openButton;
         this.guiLayout = guiLayout == null ? CaseGuiLayout.defaults() : guiLayout;
         this.idleParticles = idleParticles == null ? IdleParticleSettings.defaults() : idleParticles;
-        this.costType = costType;
-        this.costAmount = costAmount;
-        this.costKeyId = costKeyId;
         this.buyKeyWithXpLevels = buyKeyWithXpLevels;
         this.durationTicks = durationTicks;
         this.cycleEveryTicks = cycleEveryTicks;
@@ -73,6 +74,10 @@ public class CaseDefinition {
         this.spinDegreesPerTick = spinDegreesPerTick;
         this.fixedAnimation = fixedAnimation;
         this.animationItems = animationItems;
+        this.broadcastEnabled = broadcastEnabled;
+        this.broadcastLines = broadcastLines == null
+                ? DEFAULT_BROADCAST_LINES
+                : List.copyOf(broadcastLines);
         this.rewards = rewards;
     }
 
@@ -85,10 +90,6 @@ public class CaseDefinition {
     public CaseGuiLayout guiLayout() { return guiLayout; }
     public IdleParticleSettings idleParticles() { return idleParticles; }
 
-    public CostType costType() { return costType; }
-    public int costAmount() { return costAmount; }
-    public String costKeyId() { return costKeyId; }
-
     public int buyKeyWithXpLevels() { return buyKeyWithXpLevels; }
 
     public int durationTicks() { return durationTicks; }
@@ -97,6 +98,8 @@ public class CaseDefinition {
     public float spinDegreesPerTick() { return spinDegreesPerTick; }
     public AnimationType fixedAnimation() { return fixedAnimation; }
     public List<ItemStack> animationItems() { return animationItems; }
+    public boolean broadcastEnabled() { return broadcastEnabled; }
+    public List<String> broadcastLines() { return broadcastLines; }
 
     public List<Reward> rewards() { return rewards; }
 }

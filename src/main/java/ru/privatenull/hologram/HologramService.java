@@ -1,32 +1,39 @@
 package ru.privatenull.hologram;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Entity;
-import ru.privatenull.cases.model.CaseDefinition;
+import org.bukkit.inventory.ItemStack;
 import ru.privatenull.PnCasesPlugin;
+import ru.privatenull.cases.model.CaseDefinition;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class HologramService {
 
     private final PnCasesPlugin plugin;
     private final Set<String> externalNames = new HashSet<>();
-    private final HologramProviderResolver providerResolver;
+    private final ProviderResolver providerResolver;
     private final HologramSpecFactory specFactory;
 
-    private HologramProvider provider;
+    private Provider provider;
     private boolean missingProviderWarningLogged;
 
     public HologramService(PnCasesPlugin plugin) {
         this.plugin = plugin;
-        this.providerResolver = new HologramProviderResolver(plugin);
+        this.providerResolver = new ProviderResolver(plugin);
         this.specFactory = new HologramSpecFactory();
         reloadProvider();
     }
@@ -39,7 +46,7 @@ public final class HologramService {
     public void clearManaged() {
         clearNativeDisplays();
 
-        HologramProvider currentProvider = provider;
+        Provider currentProvider = provider;
         for (String name : new ArrayList<>(externalNames)) {
             removeExternal(name, currentProvider);
         }
@@ -85,13 +92,11 @@ public final class HologramService {
 
         String prefix = specFactory.prefix(def);
         for (String name : new ArrayList<>(externalNames)) {
-            if (name.equals(specFactory.legacyName(def)) || name.startsWith(prefix + "_")) {
+            if (name.startsWith(prefix + "_")) {
                 removeExternal(name, provider);
                 externalNames.remove(name);
             }
         }
-        removeExternal(specFactory.legacyName(def), provider);
-        clearNativeDisplays(def.name());
     }
 
     public void hideCase(CaseDefinition def, Location blockLocation) {
@@ -101,7 +106,6 @@ public final class HologramService {
         String name = specFactory.name(def, blockLocation);
         removeExternal(name, provider);
         externalNames.remove(name);
-        clearNativeDisplays(def, blockLocation);
     }
 
     public void showCase(CaseDefinition def) {
@@ -137,11 +141,11 @@ public final class HologramService {
     }
 
     private void createCaseHologram(CaseDefinition def, ConfigurationSection config, Location blockLocation) {
-        HologramSpec spec = specFactory.build(def, config, blockLocation);
+        Spec spec = specFactory.build(def, config, blockLocation);
         removeExternal(spec.name(), provider);
         externalNames.remove(spec.name());
 
-        HologramProvider currentProvider = provider;
+        Provider currentProvider = provider;
         if (currentProvider == null) {
             logMissingProviderOnce();
             return;
@@ -160,7 +164,7 @@ public final class HologramService {
         }
     }
 
-    private void removeExternal(String name, HologramProvider currentProvider) {
+    private void removeExternal(String name, Provider currentProvider) {
         if (name == null || name.isBlank()) {
             return;
         }
@@ -174,7 +178,7 @@ public final class HologramService {
         }
 
         if (Bukkit.getPluginManager().isPluginEnabled("FancyHolograms")) {
-            HologramProvider fancy = providerResolver.fancy();
+            Provider fancy = providerResolver.fancy();
             if (fancy != null && fancy != currentProvider) {
                 try {
                     fancy.remove(name);
@@ -185,7 +189,7 @@ public final class HologramService {
         }
 
         if (Bukkit.getPluginManager().isPluginEnabled("DecentHolograms")) {
-            HologramProvider decent = providerResolver.decent();
+            Provider decent = providerResolver.decent();
             if (decent != null && decent != currentProvider) {
                 try {
                     decent.remove(name);
@@ -204,67 +208,6 @@ public final class HologramService {
                 }
             }
         }
-    }
-
-    private void clearNativeDisplays(String caseName) {
-        if (caseName == null || caseName.isBlank()) {
-            return;
-        }
-
-        String caseTag = "pncases_" + caseName;
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                Set<String> tags = entity.getScoreboardTags();
-                if (tags.contains("pncases_hologram") && tags.contains(caseTag)) {
-                    entity.remove();
-                }
-            }
-        }
-    }
-
-    /**
-     * Removes only the legacy native display belonging to one physical case
-     * block. Older builds tagged native displays by case id only, so the
-     * configured hologram position is used to distinguish multiple bindings.
-     */
-    private void clearNativeDisplays(CaseDefinition definition, Location blockLocation) {
-        if (definition == null || blockLocation == null || blockLocation.getWorld() == null) return;
-
-        Location expected = blockLocation.clone().add(0.5, 1.8, 0.5);
-        try {
-            ConfigurationSection config = getHologramSection(definition);
-            if (config != null) {
-                expected = specFactory.build(definition, config, blockLocation).location();
-            }
-        } catch (RuntimeException ignored) {
-            // The default legacy position remains safe for cleanup.
-        }
-
-        String caseTag = "pncases_" + definition.name();
-        World world = blockLocation.getWorld();
-        for (Entity entity : new ArrayList<>(world.getEntities())) {
-            Set<String> tags = entity.getScoreboardTags();
-            if (!tags.contains("pncases_hologram") || !tags.contains(caseTag)) continue;
-            Location location = entity.getLocation();
-            if (sameHologramPosition(
-                    location.getX(), location.getY(), location.getZ(),
-                    expected.getX(), expected.getY(), expected.getZ())) {
-                entity.remove();
-            }
-        }
-    }
-
-    static boolean sameHologramPosition(
-            double x,
-            double y,
-            double z,
-            double expectedX,
-            double expectedY,
-            double expectedZ
-    ) {
-        return Math.abs(x - expectedX) <= 0.25
-                && Math.abs(y - expectedY) <= 0.25
-                && Math.abs(z - expectedZ) <= 0.25;
     }
 
     private void reloadProvider() {
@@ -307,4 +250,123 @@ public final class HologramService {
         plugin.getLogger().log(Level.FINE, "Holograms: failed to " + action, failure);
     }
 
+    public interface Provider {
+        boolean isAvailable();
+
+        void create(Spec spec);
+
+        void remove(String name);
+    }
+
+    public record Spec(
+            String name,
+            String caseName,
+            Type type,
+            Location location,
+            List<String> lines,
+            ItemStack item,
+            Material block,
+            String billboard,
+            String textAlignment,
+            Boolean textShadow,
+            Boolean seeThrough,
+            Color background,
+            Integer textUpdateInterval,
+            Float shadowRadius,
+            Float shadowStrength,
+            Integer visibilityDistance,
+            Integer interpolationDuration,
+            Vector scale,
+            Vector translation,
+            Brightness brightness
+    ) {
+        public enum Type {
+            TEXT,
+            ITEM,
+            BLOCK
+        }
+
+        public record Vector(float x, float y, float z) {
+        }
+
+        public record Brightness(int block, int sky) {
+        }
+    }
+
+    private static final class ProviderResolver {
+        private static final Pattern SERVER_VERSION = Pattern.compile("(\\d+)\\.(\\d+)(?:\\.(\\d+))?");
+        private static final int FANCY_MIN_MINOR_VERSION = 20;
+
+        private final PnCasesPlugin plugin;
+
+        private ProviderResolver(PnCasesPlugin plugin) {
+            this.plugin = plugin;
+        }
+
+        private Provider select() {
+            ProviderMode mode = readMode();
+            if (mode == ProviderMode.TEXT) return null;
+
+            boolean fancyAvailable = Bukkit.getPluginManager().isPluginEnabled("FancyHolograms");
+            boolean decentAvailable = Bukkit.getPluginManager().isPluginEnabled("DecentHolograms");
+            if (mode == ProviderMode.FANCY) return fancyAvailable ? fancy() : null;
+            if (mode == ProviderMode.DECENT) return decentAvailable ? decent() : null;
+
+            if (preferDecent()) {
+                Provider decent = decentAvailable ? decent() : null;
+                return decent != null ? decent : fancyAvailable ? fancy() : null;
+            }
+            Provider fancy = fancyAvailable ? fancy() : null;
+            return fancy != null ? fancy : decentAvailable ? decent() : null;
+        }
+
+        private Provider fancy() {
+            try {
+                return new FancyHologramsProvider();
+            } catch (LinkageError | RuntimeException ignored) {
+                return null;
+            }
+        }
+
+        private Provider decent() {
+            try {
+                return new DecentHologramsProvider();
+            } catch (LinkageError | RuntimeException ignored) {
+                return null;
+            }
+        }
+
+        private ProviderMode readMode() {
+            String raw = plugin.getConfig().getString("holograms.provider", "AUTO");
+            try {
+                return ProviderMode.valueOf(raw == null ? "AUTO" : raw.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+                return ProviderMode.AUTO;
+            }
+        }
+
+        private boolean preferDecent() {
+            Matcher matcher = SERVER_VERSION.matcher(Bukkit.getBukkitVersion());
+            if (!matcher.find()) return false;
+            int major = integer(matcher.group(1), 1);
+            int minor = integer(matcher.group(2), 21);
+            return major == 1 && minor < FANCY_MIN_MINOR_VERSION;
+        }
+
+        private int integer(String raw, int fallback) {
+            if (raw == null || raw.isBlank()) return fallback;
+            try {
+                return Integer.parseInt(raw);
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+
+        private enum ProviderMode {
+            AUTO,
+            FANCY,
+            DECENT,
+            TEXT
+        }
+    }
 }

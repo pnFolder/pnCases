@@ -5,19 +5,19 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import ru.privatenull.PnCasesPlugin;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
-import ru.privatenull.PnCasesPlugin;
 import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.util.EnchantmentCompat;
-import ru.privatenull.util.GuiItemFlags;
-import ru.privatenull.util.MaterialCompat;
+import ru.privatenull.util.BukkitCompat.EnchantmentCompat;
+import ru.privatenull.util.BukkitCompat.MaterialCompat;
+import ru.privatenull.gui.GuiDesign;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import static ru.privatenull.util.ItemNames.readableItemName;
+import static ru.privatenull.util.ItemFactory.readableItemName;
 
 public final class RewardPresentationService {
 
@@ -31,9 +31,6 @@ public final class RewardPresentationService {
         ItemStack item = buildDisplayItem(definition, reward);
         PreviewRarityStyle rarity = resolveRarity(reward);
         PreviewTypeStyle type = resolveType(reward.type());
-        if (rarity.material() != null) {
-            item.setType(rarity.material());
-        }
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
@@ -47,59 +44,34 @@ public final class RewardPresentationService {
         String[] replacements = {
                 "case", definition == null ? "" : color(definition.displayName()),
                 "case_id", definition == null ? "" : definition.name(),
-                "case-id", definition == null ? "" : definition.name(),
                 "reward", rewardName,
-                "rarity", rarity.color() + rarity.name(),
                 "rarity_name", rarity.name(),
-                "rarity-name", rarity.name(),
                 "rarity_id", rarity.id(),
-                "rarity-id", rarity.id(),
-                "rarity_color", rarity.color(),
-                "rarity-color", rarity.color(),
-                "rarity_symbol", rarity.symbol(),
-                "rarity-symbol", rarity.symbol(),
-                "rarity_description", rarity.description(),
-                "rarity-description", rarity.description(),
                 "type", type.color() + type.name(),
                 "type_name", type.name(),
-                "type-name", type.name(),
                 "type_id", type.id(),
-                "type-id", type.id(),
                 "type_color", type.color(),
-                "type-color", type.color(),
                 "type_symbol", type.symbol(),
-                "type-symbol", type.symbol(),
                 "type_description", type.description(),
-                "type-description", type.description(),
                 "chance", formatChancePercent(reward.chance(), totalChance),
-                "weight", String.valueOf(reward.chance()),
                 "amount", amount,
                 "duration", duration,
-                "item_amount", String.valueOf(itemAmount),
-                "item-amount", String.valueOf(itemAmount)
+                "item_amount", String.valueOf(itemAmount)
         };
-        meta.setDisplayName(plugin.getGuiConfig().text(
-                "preview.reward.name", "{rarity_color}{rarity_symbol} &f{reward}", replacements));
+        meta.setDisplayName(plugin.getUi().text(
+                "preview.reward.name", "{rarity_name} &f{reward}", replacements));
 
         List<String> originalLore = meta.hasLore() && meta.getLore() != null
                 ? new ArrayList<>(meta.getLore()) : List.of();
-        List<String> configuredLore = new ArrayList<>(plugin.getGuiConfig().list(
+        List<String> configuredLore = new ArrayList<>(plugin.getUi().list(
                 "preview.reward.lore", defaultPreviewLore(), replacements));
-        configuredLore.addAll(plugin.getGuiConfig().list(
+        configuredLore.addAll(plugin.getUi().list(
                 "preview.reward.type-lore." + type.id(), defaultTypeLore(reward.type()), replacements));
-        if (plugin.getGuiConfig().bool("preview.reward.hide-empty-lines", true)) {
-            configuredLore.removeIf(this::isEmptyValueLine);
-        }
+        configuredLore.removeIf(this::isEmptyValueLine);
 
         meta.setLore(mergeLore(originalLore, configuredLore));
-        GuiItemFlags.hideAttributes(meta);
-        int customModelData = rarity.customModelData() > 0
-                ? rarity.customModelData()
-                : plugin.getGuiConfig().integer("preview.reward.custom-model-data", 0);
-        if (customModelData > 0) {
-            meta.setCustomModelData(customModelData);
-        }
-        if (rarity.glow() || plugin.getGuiConfig().bool("preview.reward.glow", false)) {
+        GuiDesign.hideAttributes(meta);
+        if (rarity.glow()) {
             var enchantment = EnchantmentCompat.unbreaking();
             if (enchantment != null) {
                 meta.addEnchant(enchantment, 1, true);
@@ -127,10 +99,7 @@ public final class RewardPresentationService {
             case ITEM -> Material.CHEST;
             case PERSONAL -> Material.COMMAND_BLOCK;
         };
-        String typePath = "preview.types." + reward.type().name().toLowerCase(Locale.ROOT) + ".material";
-        Material material = configuredMaterial(plugin.getGuiConfig().raw(typePath, ""), fallbackMaterial);
-
-        ItemStack item = new ItemStack(material);
+        ItemStack item = new ItemStack(fallbackMaterial);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             String name = reward.displayName();
@@ -216,72 +185,66 @@ public final class RewardPresentationService {
     private PreviewRarityStyle resolveRarity(Reward reward) {
         String id = reward.rarityId();
         Reward.Rarity known = Reward.Rarity.parseKnown(id);
-        String fallbackName = known == null ? humanizeId(id) : known.displayName();
-        String fallbackColor = known == null ? "&f" : known.color();
+        String fallbackName = known == null
+                ? "&f◆ " + humanizeId(id)
+                : switch (known) {
+                    case COMMON -> "&7◇ Обычная";
+                    case UNCOMMON -> "&a◆ Необычная";
+                    case RARE -> "&9◆ Редкая";
+                    case EPIC -> "&5✦ Эпическая";
+                    case LEGENDARY -> "&6★ Легендарная";
+                    case MYTHIC -> "&d✹ Мифическая";
+                };
         String path = "preview.rarities." + id;
         String humanized = humanizeId(id);
         String name = styleValue(path + ".name", "preview.rarities.default.name", fallbackName)
-                .replace("{rarity_id}", humanized).replace("{rarity-id}", humanized);
-        String color = styleValue(path + ".color", "preview.rarities.default.color", fallbackColor);
-        String symbol = styleValue(path + ".symbol", "preview.rarities.default.symbol", "◆");
-        String description = styleValue(path + ".description", "preview.rarities.default.description", "");
-        Material material = configuredMaterial(
-                styleValue(path + ".material", "preview.rarities.default.material", ""), null);
+                .replace("{rarity_id}", humanized);
         boolean glow = styleBoolean(path + ".glow", "preview.rarities.default.glow", false);
-        int customModelData = styleInteger(path + ".custom-model-data",
-                "preview.rarities.default.custom-model-data", 0);
-        return new PreviewRarityStyle(id, name, color, symbol, description, material, glow, customModelData);
+        return new PreviewRarityStyle(id, name, glow);
     }
 
     private PreviewTypeStyle resolveType(Reward.Type rewardType) {
         String id = rewardType.name().toLowerCase(Locale.ROOT);
-        String path = "preview.types." + id;
-        return new PreviewTypeStyle(
-                id,
-                plugin.getGuiConfig().raw(path + ".name", formatRewardType(rewardType)),
-                plugin.getGuiConfig().raw(path + ".color", "&f"),
-                plugin.getGuiConfig().raw(path + ".symbol", "◆"),
-                plugin.getGuiConfig().raw(path + ".description", "")
-        );
+        return switch (rewardType) {
+            case ITEM -> new PreviewTypeStyle(id, "Предмет", "&f", "◆", "");
+            case VAULT -> new PreviewTypeStyle(id, "Монеты", "&a", "●", "");
+            case PLAYERPOINTS -> new PreviewTypeStyle(id, "Поинты", "&b", "✦", "");
+            case LUCKPERMS -> new PreviewTypeStyle(id, "Привилегия", "&d", "★", "");
+            case PERSONAL -> new PreviewTypeStyle(id, "Личная награда", "&e", "✦", "");
+        };
     }
 
     private List<String> defaultPreviewLore() {
         return List.of(
-                "", "&6 «Основное»",
-                "&f- Тип: {type_color}{type_name}",
-                "&f- Редкость: {rarity_color}{rarity_name}",
-                "", "&6 «Шанс»",
-                "&f- Выпадение: &e{chance}",
-                "&f- Вес: &e{weight}"
+                "", "&#9EFC65 «Основная информация»",
+                " &7- &fРедкость: {rarity_name}",
+                "", "&#65D1FC «Вероятность»",
+                " &7- &fВыпадение: &#FCA865{chance}"
         );
     }
 
     private List<String> defaultTypeLore(Reward.Type type) {
         return switch (type) {
-            case ITEM -> List.of("", "&6 «Награда»", "&f- Количество: &e{item_amount}", "");
-            case VAULT -> List.of("", "&6 «Награда»", "&f- Монеты: &a{amount}", "");
-            case PLAYERPOINTS -> List.of("", "&6 «Награда»", "&f- Поинты: &b{amount}", "");
-            case LUCKPERMS -> List.of("", "&6 «Награда»", "&f- Срок: &d{duration}", "");
-            case PERSONAL -> List.of("", "&6 «Награда»", "&f- Команда будет выполнена для игрока", "");
+            case ITEM -> List.of("", "&#FCA965 «Награда»",
+                    " &7- &fКоличество: &#FCA865{item_amount}", "");
+            case VAULT -> List.of("", "&#FCA965 «Награда»",
+                    " &7- &fМонеты: &a{amount}", "");
+            case PLAYERPOINTS -> List.of("", "&#FCA965 «Награда»",
+                    " &7- &fПоинты: &b{amount}", "");
+            case LUCKPERMS -> List.of("", "&#FCA965 «Награда»",
+                    " &7- &fСрок: &d{duration}", "");
+            case PERSONAL -> List.of();
         };
     }
 
     private List<String> mergeLore(List<String> original, List<String> configured) {
-        if (!plugin.getGuiConfig().bool("preview.reward.keep-original-lore", true) || original.isEmpty()) {
+        if (original.isEmpty()) {
             return configured;
         }
-        boolean separator = plugin.getGuiConfig().bool("preview.reward.original-lore-separator", true);
-        String position = plugin.getGuiConfig().raw("preview.reward.original-lore-position", "BEFORE");
         List<String> result = new ArrayList<>(original.size() + configured.size() + 1);
-        if ("AFTER".equalsIgnoreCase(position)) {
-            result.addAll(configured);
-            addSeparator(result, separator);
-            result.addAll(original);
-        } else {
-            result.addAll(original);
-            addSeparator(result, separator);
-            result.addAll(configured);
-        }
+        result.addAll(original);
+        addSeparator(result, true);
+        result.addAll(configured);
         return result;
     }
 
@@ -300,21 +263,21 @@ public final class RewardPresentationService {
     }
 
     private String styleValue(String path, String defaultPath, String fallback) {
-        return plugin.getGuiConfig().contains(path)
-                ? plugin.getGuiConfig().raw(path, fallback)
-                : plugin.getGuiConfig().raw(defaultPath, fallback);
+        return plugin.getUi().contains(path)
+                ? plugin.getUi().raw(path, fallback)
+                : plugin.getUi().raw(defaultPath, fallback);
     }
 
     private boolean styleBoolean(String path, String defaultPath, boolean fallback) {
-        return plugin.getGuiConfig().contains(path)
-                ? plugin.getGuiConfig().bool(path, fallback)
-                : plugin.getGuiConfig().bool(defaultPath, fallback);
+        return plugin.getUi().contains(path)
+                ? plugin.getUi().bool(path, fallback)
+                : plugin.getUi().bool(defaultPath, fallback);
     }
 
     private int styleInteger(String path, String defaultPath, int fallback) {
-        return plugin.getGuiConfig().contains(path)
-                ? plugin.getGuiConfig().integer(path, fallback)
-                : plugin.getGuiConfig().integer(defaultPath, fallback);
+        return plugin.getUi().contains(path)
+                ? plugin.getUi().integer(path, fallback)
+                : plugin.getUi().integer(defaultPath, fallback);
     }
 
     private Material configuredMaterial(String raw, Material fallback) {
@@ -395,8 +358,7 @@ public final class RewardPresentationService {
         return ColorUtil.colorize(value);
     }
 
-    private record PreviewRarityStyle(String id, String name, String color, String symbol, String description,
-                                      Material material, boolean glow, int customModelData) {
+    private record PreviewRarityStyle(String id, String name, boolean glow) {
     }
 
     private record PreviewTypeStyle(String id, String name, String color, String symbol, String description) {

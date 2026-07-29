@@ -2,6 +2,9 @@ package ru.privatenull.cases.animation;
 
 import org.bukkit.World;
 import ru.privatenull.PnCasesPlugin;
+import ru.privatenull.cases.animation.legacy.LegacyCaseAnimation;
+import ru.privatenull.cases.animation.legacy.LegacyFortuneRingAnimation;
+import ru.privatenull.cases.animation.main.MobHuntAnimation;
 import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.util.ServerCompatibility;
 
@@ -27,35 +30,20 @@ public class AnimationRegistry {
         }
 
         boolean modern = ServerCompatibility.useModernAnimations();
-        animations.put(AnimationType.ANVIL, modern
-                ? createModern(plugin, "ru.privatenull.cases.animation.AnvilAnimation", AnimationType.ANVIL)
-                : new LegacyCaseAnimation(plugin, AnimationType.ANVIL));
-        animations.put(AnimationType.DYNAMITE, modern
-                ? createModern(plugin, "ru.privatenull.cases.animation.DynamiteAnimation", AnimationType.DYNAMITE)
-                : new LegacyCaseAnimation(plugin, AnimationType.DYNAMITE));
-        animations.put(AnimationType.PORTAL, modern
-                ? createModern(plugin, "ru.privatenull.cases.animation.PortalAnimation", AnimationType.PORTAL)
-                : new LegacyCaseAnimation(plugin, AnimationType.PORTAL));
-        animations.put(AnimationType.POISON, modern
-                ? createModern(plugin, "ru.privatenull.cases.animation.PoisonAnimation", AnimationType.POISON)
-                : new LegacyCaseAnimation(plugin, AnimationType.POISON));
-        animations.put(AnimationType.CAULDRON, modern
-                ? createModern(plugin, "ru.privatenull.cases.animation.CauldronRouletteAnimation", AnimationType.CAULDRON)
-                : new LegacyCaseAnimation(plugin, AnimationType.CAULDRON));
-        animations.put(AnimationType.FORTUNE_RING, modern
-                ? createModern(plugin, "ru.privatenull.cases.animation.FortuneRingAnimation", AnimationType.FORTUNE_RING)
-                : new LegacyCaseAnimation(plugin, AnimationType.FORTUNE_RING));
-        animations.put(AnimationType.PILLAGER_RAID, modern
-                ? createModern(plugin, "ru.privatenull.cases.animation.PillagerRaidAnimation", AnimationType.PILLAGER_RAID)
-                : new LegacyCaseAnimation(plugin, AnimationType.PILLAGER_RAID));
-        animations.put(AnimationType.AQUARIUM, modern
-                ? createModern(plugin, "ru.privatenull.cases.animation.AquariumAnimation", AnimationType.AQUARIUM)
-                : new LegacyCaseAnimation(plugin, AnimationType.AQUARIUM));
+        register(AnimationType.ANVIL, modern, "AnvilAnimation");
+        register(AnimationType.DYNAMITE, modern, "DynamiteAnimation");
+        register(AnimationType.PORTAL, modern, "PortalAnimation");
+        register(AnimationType.POISON, modern, "PoisonAnimation");
+        register(AnimationType.FORTUNE_RING, modern, "FortuneRingAnimation");
+        register(AnimationType.PILLAGER_RAID, modern, "PillagerRaidAnimation");
+        register(AnimationType.AQUARIUM, modern, "AquariumAnimation");
+        register(AnimationType.DRAGON, modern, "DragonAnimation");
+        register(AnimationType.MIMIC, modern, "MimicAnimation");
         animations.put(AnimationType.MOB_HUNT, new MobHuntAnimation(plugin));
     }
 
     public CaseAnimation get(AnimationType type) {
-        return animations.getOrDefault(type, animations.get(AnimationType.ANVIL));
+        return animations.get(type);
     }
 
     public void shutdownAll() {
@@ -64,25 +52,6 @@ public class AnimationRegistry {
                 animation.shutdown();
             } catch (RuntimeException exception) {
                 plugin.getLogger().log(Level.SEVERE, "Could not shut down case animation", exception);
-            }
-        }
-    }
-
-    public void cancel(CaseAnimation animation) {
-        if (animation != null && animations.containsValue(animation)) {
-            animation.cancelAll();
-        }
-    }
-
-    public void onWorldUnload(World world) {
-        if (world == null) return;
-        for (CaseAnimation animation : new HashSet<>(animations.values())) {
-            try {
-                animation.onWorldUnload(world);
-            } catch (RuntimeException exception) {
-                plugin.getLogger().log(Level.SEVERE,
-                        "Could not restore case animation state before world unload: " + world.getName(),
-                        exception);
             }
         }
     }
@@ -100,17 +69,13 @@ public class AnimationRegistry {
         }
     }
 
-    public void cancelWorld(CaseAnimation animation, World world) {
-        if (animation == null || world == null || !animations.containsValue(animation)) return;
-        animation.cancelWorld(world);
+    private void register(AnimationType type, boolean modern, String className) {
+        animations.put(type, modern
+                ? loadModern("ru.privatenull.cases.animation.main." + className)
+                : new LegacyCaseAnimation(plugin, type));
     }
 
-    public void cancelRun(CaseAnimation animation, Runnable owner) {
-        if (animation == null || owner == null || !animations.containsValue(animation)) return;
-        animation.cancelRun(owner);
-    }
-
-    private static CaseAnimation createModern(PnCasesPlugin plugin, String className, AnimationType fallbackType) {
+    private CaseAnimation loadModern(String className) {
         try {
             Class<?> rawClass = Class.forName(className);
             Constructor<?> constructor = rawClass.getConstructor(PnCasesPlugin.class);
@@ -118,10 +83,9 @@ public class AnimationRegistry {
             if (instance instanceof CaseAnimation animation) {
                 return animation;
             }
-        } catch (Throwable t) {
-            plugin.getLogger().warning("Анимация " + fallbackType.name()
-                    + " недоступна в полном режиме, включаю совместимый вариант: " + t.getMessage());
+            throw new IllegalStateException(className + " is not a CaseAnimation");
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            throw new IllegalStateException("Не удалось загрузить современную анимацию " + className, exception);
         }
-        return new LegacyCaseAnimation(plugin, fallbackType);
     }
 }

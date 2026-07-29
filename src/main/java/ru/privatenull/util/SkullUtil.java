@@ -1,15 +1,14 @@
 package ru.privatenull.util;
 
-import ru.privatenull.pnlibrary.text.ColorUtil;
-
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.Property;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.profile.PlayerProfile;
 import org.bukkit.profile.PlayerTextures;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
+import ru.privatenull.pnlibrary.text.ColorUtil;
 
 import java.lang.reflect.Field;
 import java.net.URL;
@@ -54,7 +53,7 @@ public class SkullUtil {
         }
 
         try {
-            UUID uuid = UUID.randomUUID();
+            UUID uuid = profileId(skinUrl);
             PlayerProfile profile = Bukkit.createPlayerProfile(uuid, shortProfileName(uuid));
             PlayerTextures textures = profile.getTextures();
             textures.setSkin(skinUrl);
@@ -67,7 +66,7 @@ public class SkullUtil {
     }
 
     private static void applyGameProfile(SkullMeta meta, URL skinUrl) throws ReflectiveOperationException {
-        UUID uuid = UUID.randomUUID();
+        UUID uuid = profileId(skinUrl);
         GameProfile profile = new GameProfile(uuid, shortProfileName(uuid));
         String textureJson = "{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}";
         String encoded = Base64.getEncoder().encodeToString(textureJson.getBytes(StandardCharsets.UTF_8));
@@ -92,6 +91,12 @@ public class SkullUtil {
 
     private static String shortProfileName(UUID uuid) {
         return "pn" + uuid.toString().replace("-", "").substring(0, 14);
+    }
+
+    private static UUID profileId(URL skinUrl) {
+        return UUID.nameUUIDFromBytes(
+                ("pnCases:" + skinUrl.toExternalForm()).getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     private static URL extractSkinUrl(String input) {

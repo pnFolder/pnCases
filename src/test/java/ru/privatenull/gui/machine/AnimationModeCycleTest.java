@@ -16,21 +16,21 @@ class AnimationModeCycleTest {
 
     @Test
     void cyclesForwardThroughPlayerChoiceAndFixedAnimations() {
-        assertEquals(AnimationType.ANVIL, AnimationModeCycle.next(null, MODES, false));
-        assertEquals(AnimationType.DYNAMITE, AnimationModeCycle.next(AnimationType.ANVIL, MODES, false));
-        assertNull(AnimationModeCycle.next(AnimationType.PORTAL, MODES, false));
+        assertEquals(AnimationType.ANVIL, MachineAnimationScreen.nextMode(null, MODES, false));
+        assertEquals(AnimationType.DYNAMITE, MachineAnimationScreen.nextMode(AnimationType.ANVIL, MODES, false));
+        assertNull(MachineAnimationScreen.nextMode(AnimationType.PORTAL, MODES, false));
     }
 
     @Test
     void cyclesBackwardsInReverseOrder() {
-        assertEquals(AnimationType.PORTAL, AnimationModeCycle.next(null, MODES, true));
-        assertEquals(AnimationType.ANVIL, AnimationModeCycle.next(AnimationType.DYNAMITE, MODES, true));
-        assertNull(AnimationModeCycle.next(AnimationType.ANVIL, MODES, true));
+        assertEquals(AnimationType.PORTAL, MachineAnimationScreen.nextMode(null, MODES, true));
+        assertEquals(AnimationType.ANVIL, MachineAnimationScreen.nextMode(AnimationType.DYNAMITE, MODES, true));
+        assertNull(MachineAnimationScreen.nextMode(AnimationType.ANVIL, MODES, true));
     }
 
     @Test
     void unknownCurrentModeReturnsToAvailableSequence() {
         assertEquals(AnimationType.ANVIL,
-                AnimationModeCycle.next(AnimationType.PILLAGER_RAID, MODES, false));
+                MachineAnimationScreen.nextMode(AnimationType.PILLAGER_RAID, MODES, false));
     }
 }

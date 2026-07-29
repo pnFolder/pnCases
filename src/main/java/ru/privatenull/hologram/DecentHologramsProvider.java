@@ -9,7 +9,7 @@ import org.bukkit.inventory.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class DecentHologramsProvider implements HologramProvider {
+public final class DecentHologramsProvider implements HologramService.Provider {
 
     @Override
     public boolean isAvailable() {
@@ -17,7 +17,7 @@ public final class DecentHologramsProvider implements HologramProvider {
     }
 
     @Override
-    public void create(HologramSpec spec) {
+    public void create(HologramService.Spec spec) {
         if (!isAvailable()) {
             throw new IllegalStateException("DecentHolograms API недоступен");
         }
@@ -43,18 +43,18 @@ public final class DecentHologramsProvider implements HologramProvider {
         DHAPI.removeHologram(name);
     }
 
-    private static Hologram createTextHologram(HologramSpec spec) {
+    private static Hologram createTextHologram(HologramService.Spec spec) {
         return DHAPI.createHologram(spec.name(), spec.location(), false, colorLines(spec.lines()));
     }
 
-    private static Hologram createItemHologram(HologramSpec spec) {
+    private static Hologram createItemHologram(HologramService.Spec spec) {
         Hologram hologram = DHAPI.createHologram(spec.name(), spec.location(), false);
         ItemStack item = spec.item() == null ? new ItemStack(Material.CHEST) : spec.item().clone();
         DHAPI.addHologramLine(hologram, item);
         return hologram;
     }
 
-    private static Hologram createBlockHologram(HologramSpec spec) {
+    private static Hologram createBlockHologram(HologramService.Spec spec) {
         Hologram hologram = DHAPI.createHologram(spec.name(), spec.location(), false);
         DHAPI.addHologramLine(hologram, spec.block() == null ? Material.CHEST : spec.block());
         return hologram;

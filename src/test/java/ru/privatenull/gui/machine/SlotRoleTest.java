@@ -1,6 +1,7 @@
 package ru.privatenull.gui.machine;
 
 import org.junit.jupiter.api.Test;
+import ru.privatenull.gui.machine.MachineGuiSupport.SlotRole;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

@@ -1,10 +1,6 @@
 package ru.privatenull.hologram;
 
-import org.bukkit.ChatColor;
-import org.bukkit.Color;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import ru.privatenull.cases.model.CaseDefinition;
@@ -17,8 +13,8 @@ import java.util.Locale;
 
 final class HologramSpecFactory {
 
-    HologramSpec build(CaseDefinition definition, ConfigurationSection config, Location blockLocation) {
-        return new HologramSpec(
+    HologramService.Spec build(CaseDefinition definition, ConfigurationSection config, Location blockLocation) {
+        return new HologramService.Spec(
                 name(definition, blockLocation),
                 definition.name(),
                 type(config),
@@ -62,16 +58,12 @@ final class HologramSpecFactory {
         return "pncases_" + sanitize(definition.name());
     }
 
-    String legacyName(CaseDefinition definition) {
-        return "pncases_" + definition.name();
-    }
-
-    private HologramType type(ConfigurationSection config) {
+    private HologramService.Spec.Type type(ConfigurationSection config) {
         String raw = config.getString("type", "TEXT");
         try {
-            return HologramType.valueOf(raw == null ? "TEXT" : raw.toUpperCase(Locale.ROOT));
+            return HologramService.Spec.Type.valueOf(raw == null ? "TEXT" : raw.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
-            return HologramType.TEXT;
+            return HologramService.Spec.Type.TEXT;
         }
     }
 
@@ -107,20 +99,20 @@ final class HologramSpecFactory {
                 : new ItemStack(material(config.getString("material", "CHEST"), Material.CHEST));
     }
 
-    private HologramSpec.HologramBrightness brightness(ConfigurationSection config) {
+    private HologramService.Spec.Brightness brightness(ConfigurationSection config) {
         ConfigurationSection section = config.getConfigurationSection("brightness");
         if (section == null || (!section.contains("block") && !section.contains("sky"))) return null;
-        return new HologramSpec.HologramBrightness(
+        return new HologramService.Spec.Brightness(
                 clamp(section.getInt("block", 15), 0, 15),
                 clamp(section.getInt("sky", 15), 0, 15)
         );
     }
 
-    private HologramSpec.HologramVector vector(ConfigurationSection root, String key) {
+    private HologramService.Spec.Vector vector(ConfigurationSection root, String key) {
         ConfigurationSection section = root.getConfigurationSection(key);
         if (section != null) {
             if (!section.contains("x") && !section.contains("y") && !section.contains("z")) return null;
-            return new HologramSpec.HologramVector(
+            return new HologramService.Spec.Vector(
                     (float) section.getDouble("x", 0.0),
                     (float) section.getDouble("y", 0.0),
                     (float) section.getDouble("z", 0.0)
@@ -129,7 +121,7 @@ final class HologramSpecFactory {
         List<?> values = root.getList(key);
         if (values == null || values.size() < 3) return null;
         try {
-            return new HologramSpec.HologramVector(
+            return new HologramService.Spec.Vector(
                     Float.parseFloat(String.valueOf(values.get(0))),
                     Float.parseFloat(String.valueOf(values.get(1))),
                     Float.parseFloat(String.valueOf(values.get(2)))
@@ -145,7 +137,9 @@ final class HologramSpecFactory {
         String guiPlain = ChatColor.stripColor(ColorUtil.colorize(guiRaw));
         World world = block.getWorld();
         return value
-                .replace("{case}", definition.name())
+                .replace("{display-name}", definition.displayName())
+                .replace("{case_id}", definition.name())
+                .replace("{case}", definition.displayName())
                 .replace("{gui_title}", guiRaw)
                 .replace("{gui_title_plain}", guiPlain == null ? "" : guiPlain)
                 .replace("{world}", world == null ? "world" : world.getName())

@@ -1,5 +1,7 @@
 package ru.privatenull.gui.machine;
 
+import ru.privatenull.gui.GuiSession;
+
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -22,26 +24,22 @@ public final class MachineGuiListener implements Listener {
     public MachineGuiListener(CaseManager caseManager) {
         this.caseManager = caseManager;
 
-        MachineCaseState state = new MachineCaseState(caseManager);
-        MachineItemFactory itemFactory = new MachineItemFactory(caseManager, state);
-        MachineConfigEditor configEditor = new MachineConfigEditor(caseManager);
-        MachineLayoutEditor layoutEditor = new MachineLayoutEditor(caseManager, state, itemFactory, configEditor);
+        MachineGuiSupport support = new MachineGuiSupport(caseManager);
+        MachineItemFactory itemFactory = new MachineItemFactory(caseManager, support);
+        MachineLayoutEditor layoutEditor = new MachineLayoutEditor(caseManager, support, itemFactory);
 
-        this.mainScreen = new MachineMainScreen(caseManager, state, itemFactory);
-        MachineTogglesScreen togglesScreen = new MachineTogglesScreen(caseManager, state, itemFactory);
-        MachineHologramScreen hologramScreen = new MachineHologramScreen(caseManager, state, itemFactory);
-        MachinePurchaseScreen purchaseScreen = new MachinePurchaseScreen(caseManager, state, itemFactory);
+        this.mainScreen = new MachineMainScreen(caseManager, support, itemFactory);
+        MachineHologramScreen hologramScreen = new MachineHologramScreen(caseManager, support, itemFactory);
+        MachinePurchaseScreen purchaseScreen = new MachinePurchaseScreen(caseManager, support, itemFactory);
         MachineMenuScreen menuScreen = new MachineMenuScreen(caseManager, itemFactory);
         MachineAnimationScreen animationScreen = new MachineAnimationScreen(caseManager, itemFactory);
         MachineShowcaseScreen showcaseScreen = new MachineShowcaseScreen(caseManager, itemFactory);
-        this.textEditor = new MachineTextEditor(caseManager, state, configEditor, mainScreen);
+        this.textEditor = new MachineTextEditor(caseManager, support, mainScreen);
         this.actions = new MachineActionController(
                 caseManager,
-                state,
-                configEditor,
+                support,
                 layoutEditor,
                 mainScreen,
-                togglesScreen,
                 hologramScreen,
                 purchaseScreen,
                 menuScreen,
@@ -58,7 +56,7 @@ public final class MachineGuiListener implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (!(event.getInventory().getHolder() instanceof MachineGuiHolder holder)) return;
+        if (!(event.getInventory().getHolder() instanceof GuiSession holder) || !holder.machine()) return;
 
         int slot = event.getRawSlot();
         if (slot >= event.getInventory().getSize()) {
@@ -72,16 +70,16 @@ public final class MachineGuiListener implements Listener {
         CaseDefinition definition = caseManager.getCaseByName(holder.caseName());
         if (definition == null) {
             player.closeInventory();
-            player.sendMessage(caseManager.getPlugin().getMessages().get(
+            player.sendMessage(caseManager.getPlugin().getUi().get(
                     "machine-case-unloaded", "case", holder.caseName()));
             return;
         }
-        actions.handle(holder.type(), player, event, definition, slot);
+        actions.handle(holder, player, event, definition, slot);
     }
 
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (!(event.getInventory().getHolder() instanceof MachineGuiHolder)) return;
+        if (!(event.getInventory().getHolder() instanceof GuiSession holder) || !holder.machine()) return;
         int topSize = event.getView().getTopInventory().getSize();
         if (event.getRawSlots().stream().anyMatch(slot -> slot >= 0 && slot < topSize)) {
             event.setCancelled(true);
@@ -97,7 +95,6 @@ public final class MachineGuiListener implements Listener {
         InventoryAction action = event.getAction();
         return action == InventoryAction.MOVE_TO_OTHER_INVENTORY
                 || action == InventoryAction.HOTBAR_SWAP
-                || action == InventoryAction.HOTBAR_MOVE_AND_READD
                 || action == InventoryAction.COLLECT_TO_CURSOR;
     }
 

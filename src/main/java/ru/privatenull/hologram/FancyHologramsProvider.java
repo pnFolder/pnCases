@@ -2,11 +2,7 @@ package ru.privatenull.hologram;
 
 import de.oliver.fancyholograms.api.FancyHologramsPlugin;
 import de.oliver.fancyholograms.api.HologramManager;
-import de.oliver.fancyholograms.api.data.BlockHologramData;
-import de.oliver.fancyholograms.api.data.DisplayHologramData;
-import de.oliver.fancyholograms.api.data.HologramData;
-import de.oliver.fancyholograms.api.data.ItemHologramData;
-import de.oliver.fancyholograms.api.data.TextHologramData;
+import de.oliver.fancyholograms.api.data.*;
 import de.oliver.fancyholograms.api.hologram.Hologram;
 import org.bukkit.Material;
 import org.bukkit.entity.Display;
@@ -16,7 +12,7 @@ import org.joml.Vector3f;
 
 import java.util.Locale;
 
-public final class FancyHologramsProvider implements HologramProvider {
+public final class FancyHologramsProvider implements HologramService.Provider {
 
     private final HologramManager manager;
 
@@ -30,7 +26,7 @@ public final class FancyHologramsProvider implements HologramProvider {
     }
 
     @Override
-    public void create(HologramSpec spec) {
+    public void create(HologramService.Spec spec) {
         if (!isAvailable()) {
             throw new IllegalStateException("FancyHolograms API недоступен");
         }
@@ -58,7 +54,7 @@ public final class FancyHologramsProvider implements HologramProvider {
         manager.getHologram(name).ifPresent(manager::removeHologram);
     }
 
-    private static HologramData buildData(HologramSpec spec) {
+    private static HologramData buildData(HologramService.Spec spec) {
         return switch (spec.type()) {
             case ITEM -> buildItemData(spec);
             case BLOCK -> buildBlockData(spec);
@@ -66,7 +62,7 @@ public final class FancyHologramsProvider implements HologramProvider {
         };
     }
 
-    private static TextHologramData buildTextData(HologramSpec spec) {
+    private static TextHologramData buildTextData(HologramService.Spec spec) {
         TextHologramData data = new TextHologramData(spec.name(), spec.location());
         data.setText(spec.lines());
 
@@ -90,20 +86,20 @@ public final class FancyHologramsProvider implements HologramProvider {
         return data;
     }
 
-    private static ItemHologramData buildItemData(HologramSpec spec) {
+    private static ItemHologramData buildItemData(HologramService.Spec spec) {
         ItemHologramData data = new ItemHologramData(spec.name(), spec.location());
         ItemStack item = spec.item() == null ? new ItemStack(Material.CHEST) : spec.item().clone();
         data.setItemStack(item);
         return data;
     }
 
-    private static BlockHologramData buildBlockData(HologramSpec spec) {
+    private static BlockHologramData buildBlockData(HologramService.Spec spec) {
         BlockHologramData data = new BlockHologramData(spec.name(), spec.location());
         data.setBlock(spec.block() == null ? Material.CHEST : spec.block());
         return data;
     }
 
-    private static void applyDisplayStyles(HologramData data, HologramSpec spec) {
+    private static void applyDisplayStyles(HologramData data, HologramService.Spec spec) {
         if (!(data instanceof DisplayHologramData displayData)) {
             return;
         }
@@ -154,7 +150,7 @@ public final class FancyHologramsProvider implements HologramProvider {
         }
     }
 
-    private static Vector3f toVector(HologramSpec.HologramVector vector) {
+    private static Vector3f toVector(HologramService.Spec.Vector vector) {
         return new Vector3f(vector.x(), vector.y(), vector.z());
     }
 }

@@ -1,5 +1,7 @@
 package ru.privatenull.gui.machine;
 
+import ru.privatenull.gui.GuiSession;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -9,46 +11,46 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import ru.privatenull.cases.CaseManager;
+import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.model.CaseDefinition;
+import ru.privatenull.gui.GuiDesign;
+import ru.privatenull.gui.machine.MachineGuiSupport.SlotRole;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-import static ru.privatenull.config.ConfigSections.section;
+import static ru.privatenull.gui.machine.MachineGuiSupport.section;
 import static ru.privatenull.util.ItemFactory.isRealItem;
 import static ru.privatenull.util.ItemFactory.writeExactItem;
-import static ru.privatenull.util.ItemNames.readableItemName;
+import static ru.privatenull.util.ItemFactory.readableItemName;
 
 final class MachineLayoutEditor {
 
     private final CaseManager caseManager;
-    private final MachineCaseState state;
+    private final MachineGuiSupport support;
     private final MachineItemFactory items;
-    private final MachineConfigEditor configEditor;
 
-    MachineLayoutEditor(CaseManager caseManager, MachineCaseState state, MachineItemFactory items,
-                        MachineConfigEditor configEditor) {
+    MachineLayoutEditor(CaseManager caseManager, MachineGuiSupport support, MachineItemFactory items) {
         this.caseManager = caseManager;
-        this.state = state;
+        this.support = support;
         this.items = items;
-        this.configEditor = configEditor;
     }
 
     void open(Player player, String caseName) {
         CaseDefinition definition = caseManager.getCaseByName(caseName);
         if (definition == null) return;
-        if (MachineScreenRefresh.refreshIfOpen(
-                caseManager, player, MachineGuiHolder.Type.LAYOUT, definition.name(),
+        if (MachineGuiSupport.refreshIfOpen(
+                caseManager, player, GuiSession.Screen.MACHINE_LAYOUT, definition.name(),
                 inventory -> fill(inventory, definition))) {
             return;
         }
         Inventory inventory = Bukkit.createInventory(
-                MachineGuiHolder.layout(caseName),
+                GuiSession.machine(GuiSession.Screen.MACHINE_LAYOUT, caseName),
                 54,
-                caseManager.getPlugin().getGuiConfig().text(
-                        "machine.titles.layout", "&8Разметка меню кейса", items.replacements(definition))
+                caseManager.getPlugin().getUi().text(
+                        "machine.titles.layout", "&0Разметка меню кейса", items.replacements(definition))
         );
         fill(inventory, definition);
         caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
@@ -56,26 +58,26 @@ final class MachineLayoutEditor {
     }
 
     void handleClick(Player player, InventoryClickEvent event, CaseDefinition definition, int slot) {
-        SlotRole current = state.roleAt(definition, slot);
+        SlotRole current = support.roleAt(definition, slot);
         ItemStack cursor = event.getCursor();
         if (isRealItem(cursor)) {
             applyCursorItem(player, definition, slot, current, cursor);
             return;
         }
 
-        SlotRole next = state.stepRole(current, event.isRightClick());
+        SlotRole next = support.stepRole(current, event.isRightClick());
         if (isRequired(current) && isRequired(next)) {
             swapRequiredRoles(player, definition, slot, current, next);
             return;
         }
         if (isRequired(current) && next != current) {
-            player.sendMessage(caseManager.getPlugin().getMessages().get(
+            player.sendMessage(caseManager.getPlugin().getUi().get(
                     "machine-layout-required-slot", "slot", current.displayName));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.18f, 1.0f);
             return;
         }
         if (current == SlotRole.ANIMATION && next != current) {
-            configEditor.update(player, definition.name(), root -> {
+            support.update(player, definition.name(), root -> {
                 ConfigurationSection gui = section(root, "gui");
                 gui.set("animation_slot", -1);
                 setRole(gui, definition, slot, next);
@@ -98,8 +100,8 @@ final class MachineLayoutEditor {
             player.closeInventory();
             return;
         }
-        if (!MachineScreenRefresh.refreshIfOpen(
-                caseManager, player, MachineGuiHolder.Type.LAYOUT, caseName,
+        if (!MachineGuiSupport.refreshIfOpen(
+                caseManager, player, GuiSession.Screen.MACHINE_LAYOUT, caseName,
                 inventory -> fill(inventory, updated))) {
             open(player, caseName);
         }
@@ -108,23 +110,20 @@ final class MachineLayoutEditor {
     private void applyCursorItem(Player player, CaseDefinition definition, int slot,
                                  SlotRole role, ItemStack cursor) {
         if (role == SlotRole.EMPTY) {
-            configEditor.update(player, definition.name(), root -> {
+            support.update(player, definition.name(), root -> {
                 ConfigurationSection gui = section(root, "gui");
                 writeExactItem(section(gui, "decor"), "item", cursor);
                 setRole(gui, definition, slot, SlotRole.DECOR);
             });
         } else if (role == SlotRole.DECOR) {
-            configEditor.update(player, definition.name(), root ->
+            support.update(player, definition.name(), root ->
                     writeExactItem(section(section(root, "gui"), "decor"), "item", cursor));
         } else if (role == SlotRole.OPEN) {
-            configEditor.update(player, definition.name(), root ->
-                    writeExactItem(section(root, "gui"), "open-item", cursor));
-        } else if (role == SlotRole.ANIMATION) {
-            configEditor.update(player, definition.name(), root ->
-                    writeExactItem(section(root, "gui"), "animation-item", cursor));
+            support.update(player, definition.name(), root ->
+                    writeExactItem(section(root, "gui"), "button", cursor));
         } else if (role == SlotRole.HISTORY) {
-            configEditor.update(player, definition.name(), root ->
-                    writeExactItem(section(section(root, "gui"), "history"), "empty-item", cursor));
+            support.update(player, definition.name(), root -> writeExactItem(
+                    section(section(root, "gui"), "history"), "empty", cursor));
         }
         refresh(player, definition.name());
     }
@@ -132,7 +131,7 @@ final class MachineLayoutEditor {
     private void swapRequiredRoles(Player player, CaseDefinition definition, int clickedSlot,
                                    SlotRole current, SlotRole next) {
         int nextSlot = requiredSlot(definition, next);
-        configEditor.update(player, definition.name(), root -> {
+        support.update(player, definition.name(), root -> {
             ConfigurationSection gui = section(root, "gui");
             Set<Integer> decor = readSlots(gui.getConfigurationSection("decor"), definition.guiLayout().decorSlots());
             Set<Integer> history = readSlots(gui.getConfigurationSection("history"), definition.guiLayout().historySlots());
@@ -149,7 +148,7 @@ final class MachineLayoutEditor {
     }
 
     private void applyRole(Player player, CaseDefinition definition, int slot, SlotRole role) {
-        configEditor.update(player, definition.name(), root ->
+        support.update(player, definition.name(), root ->
                 setRole(section(root, "gui"), definition, slot, role));
         refresh(player, definition.name());
     }
@@ -210,30 +209,39 @@ final class MachineLayoutEditor {
     }
 
     private ItemStack slotItem(CaseDefinition definition, int slot) {
-        SlotRole role = state.roleAt(definition, slot);
+        SlotRole role = support.roleAt(definition, slot);
         ItemStack item = roleItem(definition, role);
         String roleName = roleName(role);
         String itemName = role == SlotRole.EMPTY ? "" : readableItemName(item);
 
         List<String> lore = new ArrayList<>();
         lore.add("");
-        lore.add("&7Слот: &f" + slot);
-        lore.add("&7Роль: &f" + roleName);
-        if (role != SlotRole.EMPTY) lore.add("&7Предмет: &f" + itemName);
+        lore.add("&#65D1FC «Сейчас»");
+        lore.add(" &7- &fСлот: &#FCA865" + slot);
+        lore.add(" &7- &fРоль: " + role.color + roleName);
+        if (role != SlotRole.EMPTY) lore.add(" &7- &fПредмет: &#FCA865" + itemName);
         if (slot >= definition.guiLayout().size()) {
-            lore.add("&eЭтот слот сохранится, но появится только");
-            lore.add("&eкогда размер меню будет больше.");
+            lore.add("");
+            lore.add("&#FC7165 «Ограничение»");
+            lore.add(" &7- &fСлот появится после увеличения меню.");
         }
         if (role == SlotRole.ANIMATION && definition.fixedAnimation() != null) {
-            lore.add("&cКнопка скрыта, потому что анимация кейса зафиксирована.");
+            lore.add("");
+            lore.add("&#FC7165 «Ограничение»");
+            lore.add(" &7- &fАнимация кейса зафиксирована.");
         }
         if (role == SlotRole.ANIMATION) {
-            lore.add("&eПереключите роль слота, чтобы убрать кнопку.");
+            lore.add(" &7- &fСмените роль, чтобы убрать кнопку.");
         }
         lore.add("");
-        lore.add("&7ЛКМ &8— &fследующая роль");
-        lore.add("&7ПКМ &8— &fпредыдущая роль");
-        lore.add("&7Предмет на курсоре &8— &fзаменить предмет роли");
+        lore.add("&#FCA965 «Управление»");
+        lore.add(" &7- &fЛКМ — следующая роль");
+        lore.add(" &7- &fПКМ — предыдущая роль");
+        if (role == SlotRole.EMPTY || role == SlotRole.DECOR
+                || role == SlotRole.OPEN || role == SlotRole.HISTORY) {
+            lore.add(" &7- &fПредмет на курсоре — заменить иконку");
+        }
+        lore.add("");
         return items.configuredButton("machine.layout.slot", item, role.color + roleName, lore, definition,
                 "slot", String.valueOf(slot),
                 "role", roleName,
@@ -245,15 +253,14 @@ final class MachineLayoutEditor {
 
     private String roleName(SlotRole role) {
         String key = role.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
-        return caseManager.getPlugin().getGuiConfig().text(
+        return caseManager.getPlugin().getUi().text(
                 "machine.layout.roles." + key + ".name", role.displayName);
     }
 
     private ItemStack roleItem(CaseDefinition definition, SlotRole role) {
         ItemStack item = switch (role) {
             case OPEN -> definition.openButton();
-            case ANIMATION -> definition.guiLayout().animationItem() == null
-                    ? new ItemStack(Material.CLOCK) : definition.guiLayout().animationItem();
+            case ANIMATION -> GuiDesign.animation(AnimationType.FORTUNE_RING);
             case HISTORY -> definition.guiLayout().emptyHistoryItem();
             case DECOR -> definition.guiLayout().decorItem();
             case EMPTY -> new ItemStack(Material.BLACK_STAINED_GLASS_PANE);

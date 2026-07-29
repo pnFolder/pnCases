@@ -1,6 +1,8 @@
 package ru.privatenull.gui.machine;
 
 import org.bukkit.Material;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -8,23 +10,20 @@ import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.util.EnchantmentCompat;
-import ru.privatenull.util.GuiItemFlags;
-import ru.privatenull.util.SkullUtil;
+import ru.privatenull.util.BukkitCompat.EnchantmentCompat;
+import ru.privatenull.gui.GuiDesign;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static ru.privatenull.util.ItemNames.readableItemName;
+import static ru.privatenull.util.ItemFactory.readableItemName;
 
 final class MachineItemFactory {
 
-    private static final String BACK_TEXTURE = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNjllYTFkODYyNDdmNGFmMzUxZWQxODY2YmNhNmEzMDQwYTA2YzY4MTc3Yzc4ZTQyMzE2YTEwOThlNjBmYjdkMyJ9fX0=";
-
     private final CaseManager caseManager;
-    private final MachineCaseState state;
+    private final MachineGuiSupport state;
 
-    MachineItemFactory(CaseManager caseManager, MachineCaseState state) {
+    MachineItemFactory(CaseManager caseManager, MachineGuiSupport state) {
         this.caseManager = caseManager;
         this.state = state;
     }
@@ -35,19 +34,17 @@ final class MachineItemFactory {
         List<String> replacements = new ArrayList<>(List.of(
                 "prefix", prefix,
                 "selected_prefix", prefix,
-                "selected-prefix", prefix,
                 "selected", selected ? "&aда" : "&7нет",
                 "name", name,
                 "display", name,
-                "display_name", name,
-                "display-name", name));
+                "display_name", name));
         append(replacements, extra);
         String[] values = definition == null
                 ? replacements.toArray(String[]::new)
                 : replacements(definition, replacements.toArray(String[]::new));
         ItemStack item = button(material,
-                caseManager.getPlugin().getGuiConfig().text(path + ".name", prefix + name, values),
-                caseManager.getPlugin().getGuiConfig().list(path + ".lore", lore, values));
+                caseManager.getPlugin().getUi().text(path + ".name", prefix + name, values),
+                caseManager.getPlugin().getUi().list(path + ".lore", lore, values));
         if (selected) addGlow(item);
         return item;
     }
@@ -61,50 +58,66 @@ final class MachineItemFactory {
 
         List<String> lore = List.of(
                 "",
-                "&7" + hint,
-                "&7Чтобы заменить, возьми новый предмет на курсор",
-                "&7и нажми им по этой кнопке.",
+                "&#9EFC65 «Назначение»",
+                " &7- &f" + hint,
                 "",
-                "&7Сейчас: &f" + readableItemName(item)
+                "&#65D1FC «Сейчас»",
+                " &7- &fПредмет: &#FCA865" + readableItemName(item),
+                "",
+                "&#FCA965 «Управление»",
+                " &7- &fВозьмите новый предмет на курсор",
+                " &7- &fи нажмите по кнопке для замены.",
+                ""
         );
         String[] replacements = replacements(definition,
                 "hint", hint,
                 "item", readableItemName(item));
-        meta.setDisplayName(caseManager.getPlugin().getGuiConfig().text(path + ".name", title, replacements));
-        meta.setLore(caseManager.getPlugin().getGuiConfig().list(path + ".lore", lore, replacements));
-        GuiItemFlags.hideAttributes(meta);
+        meta.setDisplayName(caseManager.getPlugin().getUi().text(path + ".name", title, replacements));
+        meta.setLore(caseManager.getPlugin().getUi().list(path + ".lore", lore, replacements));
+        GuiDesign.hideAttributes(meta);
         item.setItemMeta(meta);
         return item;
     }
 
     ItemStack sectionButton(String path, Material material, String name, List<String> lore,
                             CaseDefinition definition, String... extra) {
+        return sectionButton(path, new ItemStack(material), name, lore, definition, extra);
+    }
+
+    ItemStack sectionButton(String path, String texture, String name, List<String> lore,
+                            CaseDefinition definition, String... extra) {
+        return sectionButton(path, GuiDesign.head(texture, name), name, lore, definition, extra);
+    }
+
+    private ItemStack sectionButton(String path, ItemStack source, String name, List<String> lore,
+                                    CaseDefinition definition, String... extra) {
         List<String> formatted = new ArrayList<>(lore.size() + 2);
         formatted.add("");
         formatted.addAll(lore);
         formatted.add("");
-        return button(material,
-                caseManager.getPlugin().getGuiConfig().text(path + ".name", name,
+        return button(source,
+                caseManager.getPlugin().getUi().text(path + ".name", name,
                         replacements(definition, extra)),
-                caseManager.getPlugin().getGuiConfig().list(path + ".lore", formatted,
+                caseManager.getPlugin().getUi().list(path + ".lore", formatted,
                         replacements(definition, extra)));
     }
 
     ItemStack configuredButton(String path, Material material, String name, List<String> lore,
                                CaseDefinition definition, String... extra) {
-        return button(material,
-                caseManager.getPlugin().getGuiConfig().text(path + ".name", name,
-                        replacements(definition, extra)),
-                caseManager.getPlugin().getGuiConfig().list(path + ".lore", lore,
-                        replacements(definition, extra)));
+        return configuredButton(path, new ItemStack(material), name, lore, definition, extra);
+    }
+
+    ItemStack configuredButton(String path, String texture, String name, List<String> lore,
+                               CaseDefinition definition, String... extra) {
+        return configuredButton(path, GuiDesign.head(texture, name), name, lore, definition, extra);
     }
 
     ItemStack configuredButton(String path, ItemStack source, String name, List<String> lore,
                                CaseDefinition definition, String... extra) {
         return button(source,
-                caseManager.getPlugin().getGuiConfig().text(path + ".name", name,
+                caseManager.getPlugin().getUi().text(path + ".name", name,
                         replacements(definition, extra)),
-                caseManager.getPlugin().getGuiConfig().list(path + ".lore", lore,
+                caseManager.getPlugin().getUi().list(path + ".lore", lore,
                         replacements(definition, extra)));
     }
 
@@ -112,40 +125,63 @@ final class MachineItemFactory {
         return button(material, name, lore);
     }
 
+    ItemStack builtInButton(ItemStack source, String name, List<String> lore) {
+        return button(source, name, lore);
+    }
+
+    ItemStack builtInButton(String texture, String name, List<String> lore) {
+        return button(GuiDesign.head(texture, name), name, lore);
+    }
+
     ItemStack backButton(CaseDefinition definition) {
-        return button(SkullUtil.fromBase64(BACK_TEXTURE, "&#429F91← &fНазад"),
-                "&#429F91← &fНазад", List.of("", "&8Вернуться в главное меню настройки", "", "&#429F91▸ &fЛКМ &8— &7вернуться"));
+        return button(GuiDesign.head(GuiDesign.BACK, "&#FC7165Вернуться"),
+                "&#FC7165Вернуться", List.of());
+    }
+
+    ItemStack closeButton(CaseDefinition definition) {
+        return button(GuiDesign.head(GuiDesign.BACK, "&#FC7165Выйти"),
+                "&#FC7165Выйти", List.of());
     }
 
     String[] replacements(CaseDefinition definition, String... extra) {
         List<String> replacements = new ArrayList<>();
         add(replacements, "case", color(definition.displayName()));
+        add(replacements, "display-name", color(definition.displayName()));
         add(replacements, "case_id", definition.name());
-        add(replacements, "case-id", definition.name());
         add(replacements, "title", definition.guiTitle());
+        add(replacements, "gui_title", definition.guiTitle());
+        String plainTitle = ChatColor.stripColor(color(definition.guiTitle()));
+        add(replacements, "gui_title_plain", plainTitle == null ? "" : plainTitle);
+        Location block = definition.blockLocation();
+        add(replacements, "world", block == null || block.getWorld() == null
+                ? "world" : block.getWorld().getName());
+        add(replacements, "x", block == null ? "0" : String.valueOf(block.getBlockX()));
+        add(replacements, "y", block == null ? "0" : String.valueOf(block.getBlockY()));
+        add(replacements, "z", block == null ? "0" : String.valueOf(block.getBlockZ()));
         add(replacements, "size", String.valueOf(definition.guiLayout().size()));
         add(replacements, "rows", String.valueOf(definition.guiLayout().size() / 9));
         String hologram = state.hologramEnabled(definition) ? "&aвключена" : "&cвыключена";
         add(replacements, "hologram_status", hologram);
-        add(replacements, "hologram-status", hologram);
         add(replacements, "hologram_height", String.valueOf(state.hologramHeight(definition)));
-        add(replacements, "hologram-height", String.valueOf(state.hologramHeight(definition)));
         String showcase = definition.idleParticles().enabled() ? "&aвключена" : "&cвыключена";
         add(replacements, "showcase_status", showcase);
-        add(replacements, "showcase-status", showcase);
-        String effects = definition.idleParticles().effectsEnabled() ? "&aвключены" : "&cвыключены";
-        add(replacements, "effects_status", effects);
-        add(replacements, "effects-status", effects);
-        add(replacements, "style", definition.idleParticles().style().displayName());
         add(replacements, "theme", definition.idleParticles().theme().displayName());
         String xp = state.xpBuyEnabled(definition) ? "&aвключена" : "&cвыключена";
         add(replacements, "xp_status", xp);
-        add(replacements, "xp-status", xp);
         add(replacements, "xp_levels", String.valueOf(Math.max(0, definition.buyKeyWithXpLevels())));
-        add(replacements, "xp-levels", String.valueOf(Math.max(0, definition.buyKeyWithXpLevels())));
         add(replacements, "animation", state.currentAnimationLabel(definition));
         append(replacements, extra);
         return replacements.toArray(String[]::new);
+    }
+
+    String format(CaseDefinition definition, String value) {
+        String formatted = value == null ? "" : value;
+        String[] replacements = replacements(definition);
+        for (int index = 0; index < replacements.length; index += 2) {
+            formatted = formatted.replace(
+                    "{" + replacements[index] + "}", replacements[index + 1]);
+        }
+        return color(formatted);
     }
 
     ItemStack pane(Material material, String name, List<String> lore) {
@@ -170,7 +206,7 @@ final class MachineItemFactory {
         if (meta == null) return item;
         meta.setDisplayName(color(name));
         meta.setLore(lore.stream().map(MachineItemFactory::color).toList());
-        GuiItemFlags.hideAttributes(meta);
+        GuiDesign.hideAttributes(meta);
         item.setItemMeta(meta);
         return item;
     }

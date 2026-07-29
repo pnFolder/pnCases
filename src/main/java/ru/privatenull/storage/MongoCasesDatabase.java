@@ -12,37 +12,24 @@ import ru.privatenull.cases.model.Reward;
 import ru.privatenull.pnlibrary.database.DatabaseType;
 import ru.privatenull.pnlibrary.database.MongoDatabaseManager;
 import ru.privatenull.pnlibrary.database.MongoSettings;
+import ru.privatenull.storage.CasesDatabase.HistoryEntry;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
-import static com.mongodb.client.model.Filters.and;
-import static com.mongodb.client.model.Filters.eq;
-import static com.mongodb.client.model.Filters.gte;
-import static com.mongodb.client.model.Indexes.ascending;
-import static com.mongodb.client.model.Indexes.compoundIndex;
-import static com.mongodb.client.model.Indexes.descending;
+import static com.mongodb.client.model.Filters.*;
+import static com.mongodb.client.model.Indexes.*;
 import static com.mongodb.client.model.Sorts.orderBy;
-import static com.mongodb.client.model.Updates.combine;
-import static com.mongodb.client.model.Updates.inc;
-import static com.mongodb.client.model.Updates.set;
-import static com.mongodb.client.model.Updates.setOnInsert;
+import static com.mongodb.client.model.Updates.*;
 
 public final class MongoCasesDatabase implements CasesDatabase {
     private final MongoDatabaseManager manager;
     private final String prefix;
     private MongoCollection<Document> keys;
     private MongoCollection<Document> preferences;
+    private MongoCollection<Document> casePreferences;
     private MongoCollection<Document> history;
     private MongoCollection<Document> pending;
-    private MongoCollection<Document> migrations;
 
     public MongoCasesDatabase(MongoSettings settings) {
         manager = new MongoDatabaseManager(settings);
@@ -60,15 +47,17 @@ public final class MongoCasesDatabase implements CasesDatabase {
         var database = manager.database();
         keys = database.getCollection(prefix + "_keys");
         preferences = database.getCollection(prefix + "_preferences");
+        casePreferences = database.getCollection(prefix + "_case_preferences");
         history = database.getCollection(prefix + "_history");
         pending = database.getCollection(prefix + "_pending_rewards");
-        migrations = database.getCollection(prefix + "_migrations");
         keys.createIndex(compoundIndex(ascending("player_uuid"), ascending("key_id")), new IndexOptions().unique(true));
         preferences.createIndex(ascending("player_uuid"), new IndexOptions().unique(true));
+        casePreferences.createIndex(
+                compoundIndex(ascending("player_uuid"), ascending("case_id")),
+                new IndexOptions().unique(true)
+        );
         history.createIndex(compoundIndex(ascending("case_name"), descending("opened_at")));
         pending.createIndex(ascending("player_uuid"), new IndexOptions().unique(true));
-        migrations.createIndex(ascending("key"), new IndexOptions().unique(true));
-        new LegacyYamlMigrator(dataFolder, this).migrate();
     }
 
     @Override
@@ -116,15 +105,27 @@ public final class MongoCasesDatabase implements CasesDatabase {
     }
 
     @Override
-    public synchronized AnimationType getAnimation(UUID uuid) {
-        Document document = preferences.find(eq("player_uuid", uuid.toString())).first();
+    public synchronized AnimationType getAnimation(UUID uuid, String caseId) {
+        Document document = casePreferences.find(and(
+                eq("player_uuid", uuid.toString()),
+                eq("case_id", normalize(caseId))
+        )).first();
+        if (document == null) {
+            document = preferences.find(eq("player_uuid", uuid.toString())).first();
+        }
         return parseAnimation(document == null ? null : document.getString("animation"));
     }
 
     @Override
-    public synchronized void setAnimation(UUID uuid, AnimationType type) {
-        preferences.updateOne(eq("player_uuid", uuid.toString()), combine(
-                setOnInsert("player_uuid", uuid.toString()), set("animation", type.name())
+    public synchronized void setAnimation(UUID uuid, String caseId, AnimationType type) {
+        Bson filter = and(
+                eq("player_uuid", uuid.toString()),
+                eq("case_id", normalize(caseId))
+        );
+        casePreferences.updateOne(filter, combine(
+                setOnInsert("player_uuid", uuid.toString()),
+                setOnInsert("case_id", normalize(caseId)),
+                set("animation", type.name())
         ), new UpdateOptions().upsert(true));
     }
 
@@ -142,11 +143,11 @@ public final class MongoCasesDatabase implements CasesDatabase {
     }
 
     @Override
-    public synchronized List<OpenHistoryStorage.Entry> getHistory(String caseName, int limit) {
-        List<OpenHistoryStorage.Entry> result = new ArrayList<>();
+    public synchronized List<HistoryEntry> getHistory(String caseName, int limit) {
+        List<HistoryEntry> result = new ArrayList<>();
         for (Document document : history.find(eq("case_name", normalize(caseName)))
                 .sort(orderBy(descending("opened_at"), descending("_id"))).limit(limit)) {
-            result.add(new OpenHistoryStorage.Entry(document.getString("player_name"),
+            result.add(new HistoryEntry(document.getString("player_name"),
                     document.getString("reward_name"), longValue(document, "opened_at")));
         }
         return result;
@@ -156,11 +157,11 @@ public final class MongoCasesDatabase implements CasesDatabase {
     public synchronized void savePending(UUID uuid, Reward reward) {
         Document value = new Document("player_uuid", uuid.toString())
                 .append("type", reward.type().name()).append("chance", reward.chance())
-                .append("rarity", reward.rarityId()).append("item_base64", ItemCodec.serialize(reward.item()))
+                .append("rarity", reward.rarityId()).append("item_base64", CasesDatabase.encodeItem(reward.item()))
                 .append("lp_group", reward.lpGroup()).append("lp_node", reward.lpNode())
                 .append("lp_duration", reward.lpDuration()).append("vault_amount", reward.vaultAmount())
                 .append("player_points_amount", reward.playerPointsAmount()).append("message", reward.message())
-                .append("display_name", reward.displayName());
+                .append("display_name", reward.displayName()).append("command", reward.command());
         pending.replaceOne(eq("player_uuid", uuid.toString()), value, new com.mongodb.client.model.ReplaceOptions().upsert(true));
     }
 
@@ -169,10 +170,11 @@ public final class MongoCasesDatabase implements CasesDatabase {
         Document value = pending.find(eq("player_uuid", uuid.toString())).first();
         if (value == null) return null;
         int chance = value.getInteger("chance", 100);
-        return new Reward(chance, parseType(value.getString("type")), ItemCodec.deserialize(value.getString("item_base64")),
+        return new Reward(chance, parseType(value.getString("type")), CasesDatabase.decodeItem(value.getString("item_base64")),
                 value.getString("lp_group"), value.getString("lp_node"), value.getString("lp_duration"),
                 doubleValue(value, "vault_amount"), value.getInteger("player_points_amount", 0),
-                value.getString("message"), value.getString("display_name"), value.getString("rarity"));
+                value.getString("message"), value.getString("display_name"), value.getString("rarity"),
+                null, value.getString("command"));
     }
 
     @Override
@@ -190,16 +192,6 @@ public final class MongoCasesDatabase implements CasesDatabase {
             }
         }
         return result;
-    }
-
-    @Override
-    public synchronized boolean isMigrationApplied(String key) {
-        return migrations.find(eq("key", key)).first() != null;
-    }
-
-    @Override
-    public synchronized void markMigrationApplied(String key) {
-        migrations.updateOne(eq("key", key), setOnInsert("key", key), new UpdateOptions().upsert(true));
     }
 
     @Override

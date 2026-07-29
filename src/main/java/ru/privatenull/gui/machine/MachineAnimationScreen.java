@@ -1,5 +1,7 @@
 package ru.privatenull.gui.machine;
 
+import ru.privatenull.gui.GuiSession;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -8,19 +10,24 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.AnimationType;
+import ru.privatenull.cases.model.AnimationType.Category;
 import ru.privatenull.cases.model.CaseDefinition;
+import ru.privatenull.util.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.gui.GuiDesign;
 import ru.privatenull.util.ServerCompatibility;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static ru.privatenull.gui.machine.MachineSlots.SLOT_ANIMATION_MODE;
-import static ru.privatenull.gui.machine.MachineSlots.SLOT_BACK;
+import static ru.privatenull.gui.machine.MachineGuiSupport.SLOT_ANIMATION_MODE;
+import static ru.privatenull.gui.machine.MachineGuiSupport.SLOT_BACK;
 
 final class MachineAnimationScreen {
 
-    private static final String NEW_TAG = "&#EA3AD2&lɴ&#D744DC&lᴇ&#C34DE5&lᴡ";
+    private static final int STANDARD_CATEGORY_SLOT = 20;
+    private static final int MOBS_CATEGORY_SLOT = 24;
+    private static final int[] ANIMATION_SLOTS = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
 
     private final CaseManager caseManager;
     private final MachineItemFactory items;
@@ -31,39 +38,59 @@ final class MachineAnimationScreen {
     }
 
     void open(Player player, String caseName) {
+        open(player, caseName, null);
+    }
+
+    void openCategory(Player player, String caseName, Category category) {
+        open(player, caseName, category);
+    }
+
+    private void open(Player player, String caseName, Category category) {
         CaseDefinition definition = caseManager.getCaseByName(caseName);
         if (definition == null) return;
 
-        if (MachineScreenRefresh.refreshIfOpen(
-                caseManager, player, MachineGuiHolder.Type.ANIMATION, definition.name(),
-                inventory -> fill(inventory, definition))) {
+        Inventory current = InventoryViewCompat.topInventory(player);
+        if (current != null && current.getHolder() instanceof GuiSession holder
+                && holder.screen() == GuiSession.Screen.MACHINE_ANIMATION
+                && holder.caseName().equalsIgnoreCase(definition.name())) {
+            holder.animationCategory(category);
+        }
+        if (MachineGuiSupport.refreshIfOpen(
+                caseManager, player, GuiSession.Screen.MACHINE_ANIMATION, definition.name(),
+                inventory -> fill(inventory, definition, category))) {
             return;
         }
 
         Inventory inventory = Bukkit.createInventory(
-                MachineGuiHolder.animation(caseName),
+                GuiSession.machineAnimations(caseName, category),
                 54,
-                caseManager.getPlugin().getGuiConfig().text(
+                caseManager.getPlugin().getUi().text(
                         "machine.titles.animation",
-                        "&8Настройка анимации",
+                        "&0Настройка анимации",
                         items.replacements(definition)
                 )
         );
-        fill(inventory, definition);
+        fill(inventory, definition, category);
         caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.18f, 1.25f);
     }
 
-    private void fill(Inventory inventory, CaseDefinition definition) {
+    private void fill(Inventory inventory, CaseDefinition definition, Category category) {
         items.fill(inventory, items.pane(Material.BLACK_STAINED_GLASS_PANE, " ", List.of()));
         inventory.setItem(4, items.configuredButton(
                 "machine.animation.header",
-                machineIcon(Material.NETHER_STAR, Material.CLOCK),
+                GuiDesign.ANIMATION,
                 "&#82DCFF&lНастройка анимации",
                 headerLore(),
                 definition
         ));
         inventory.setItem(SLOT_ANIMATION_MODE, modeButton(definition));
+        if (category == null) {
+            inventory.setItem(STANDARD_CATEGORY_SLOT, categoryButton(Category.STANDARD));
+            inventory.setItem(MOBS_CATEGORY_SLOT, categoryButton(Category.MOBS));
+        } else {
+            renderCategory(inventory, definition, category, ANIMATION_SLOTS);
+        }
         inventory.setItem(SLOT_BACK, items.backButton(definition));
     }
 
@@ -73,27 +100,60 @@ final class MachineAnimationScreen {
         }
         if (!ServerCompatibility.useModernAnimations()) {
             return Arrays.stream(AnimationType.values())
-                    .filter(type -> type != AnimationType.PILLAGER_RAID)
+                    .filter(type -> type != AnimationType.PILLAGER_RAID
+                            && type != AnimationType.DRAGON
+                            && type != AnimationType.MIMIC)
                     .toArray(AnimationType[]::new);
         }
         return AnimationType.values();
     }
 
     AnimationType nextMode(AnimationType current, boolean backwards) {
-        return AnimationModeCycle.next(current, availableTypes(), backwards);
+        return nextMode(current, availableTypes(), backwards);
+    }
+
+    static AnimationType nextMode(AnimationType current, AnimationType[] available, boolean backwards) {
+        int optionCount = available.length + 1;
+        int currentIndex = 0;
+        if (current != null) {
+            for (int index = 0; index < available.length; index++) {
+                if (available[index] == current) {
+                    currentIndex = index + 1;
+                    break;
+                }
+            }
+        }
+        int nextIndex = backwards
+                ? (currentIndex - 1 + optionCount) % optionCount
+                : (currentIndex + 1) % optionCount;
+        return nextIndex == 0 ? null : available[nextIndex - 1];
+    }
+
+    Category categoryAtSlot(int slot) {
+        if (slot == STANDARD_CATEGORY_SLOT) return Category.STANDARD;
+        if (slot == MOBS_CATEGORY_SLOT) return Category.MOBS;
+        return null;
+    }
+
+    AnimationType typeAtSlot(int slot, Category category) {
+        return typeAtSlot(slot, category, ANIMATION_SLOTS);
     }
 
     private ItemStack modeButton(CaseDefinition definition) {
         boolean legacy = ServerCompatibility.useMinecraft1165AnimationMode();
         AnimationType fixed = legacy ? AnimationType.FORTUNE_RING : definition.fixedAnimation();
-        String mode = fixed == null ? "&aВыбор игрока" : fixed.displayName();
+        boolean selected = fixed == null;
         String state = legacy ? "&eОграничено версией 1.16.5"
-                : fixed == null ? "&aВыбирает игрок" : "&bЗафиксирована для кейса";
-        Material icon = fixed == null ? Material.COMPASS : animationIcon(fixed);
-        String newTag = fixed == AnimationType.MOB_HUNT || fixed == AnimationType.AQUARIUM
-                ? " &r" + NEW_TAG
-                : "";
-        return items.builtInButton(icon, "&#82DCFF&lРежим &8• &e" + mode + newTag, modeLore(fixed, state, legacy));
+                : selected ? "&aВыбрано сейчас" : "&7Нажмите, чтобы разрешить выбор игроку";
+        return items.builtInButton(GuiDesign.MENU,
+                "&#82DCFF&lВыбор игрока",
+                List.of("", "&#9EFC65 «Основная информация»",
+                        " &7- &fИгрок сам выбирает анимацию",
+                        " &7- &fперед открытием этого кейса.",
+                        "", "&#65D1FC «Текущее состояние»",
+                        " &7- &fСтатус: " + state,
+                        "", "&#FCA965 «Управление»",
+                        " &7- &fЛКМ — выбрать", ""));
     }
 
     void refreshMode(Inventory inventory, CaseDefinition definition) {
@@ -104,40 +164,79 @@ final class MachineAnimationScreen {
 
     void refreshMode(Player player, CaseDefinition definition) {
         if (definition != null) {
-            caseManager.getPlugin().getGuiUpdates().setTopSlot(player, SLOT_ANIMATION_MODE, modeButton(definition));
+            Inventory inventory = InventoryViewCompat.topInventory(player);
+            if (inventory != null) {
+                caseManager.getPlugin().getGuiUpdates().setTopSlot(
+                        player, inventory, SLOT_ANIMATION_MODE, modeButton(definition));
+            }
         }
     }
 
-    private List<String> modeLore(AnimationType fixed, String state, boolean legacy) {
+    private void renderCategory(Inventory inventory, CaseDefinition definition,
+                                Category category, int[] slots) {
+        AnimationType[] types = Arrays.stream(availableTypes())
+                .filter(type -> type.category() == category)
+                .toArray(AnimationType[]::new);
+        for (int index = 0; index < types.length && index < slots.length; index++) {
+            inventory.setItem(slots[index], animationButton(types[index], definition.fixedAnimation() == types[index]));
+        }
+    }
+
+    private AnimationType typeAtSlot(int slot, Category category, int[] slots) {
+        AnimationType[] types = Arrays.stream(availableTypes())
+                .filter(type -> type.category() == category)
+                .toArray(AnimationType[]::new);
+        for (int index = 0; index < types.length && index < slots.length; index++) {
+            if (slots[index] == slot) return types[index];
+        }
+        return null;
+    }
+
+    private ItemStack categoryButton(Category category) {
+        return items.builtInButton(
+                GuiDesign.head(GuiDesign.categoryTexture(category), GuiDesign.categoryName(category)),
+                GuiDesign.categoryName(category),
+                List.of(
+                "",
+                "&#9EFC65 «Что находится внутри»",
+                category == Category.MOBS
+                        ? " &7- &fСценарии с существами"
+                        : " &7- &fЭффектные визуальные сценарии",
+                category == Category.MOBS
+                        ? " &7- &fи интерактивным открытием."
+                        : " &7- &fвокруг самого кейса.",
+                "",
+                "&#FCA965 «Управление»",
+                " &7- &fЛКМ — открыть раздел",
+                ""
+        ));
+    }
+
+    private ItemStack animationButton(AnimationType type, boolean selected) {
         List<String> lore = new ArrayList<>();
-        lore.add("&8Настройка способа открытия кейса");
         lore.add("");
-        String animationName = fixed == null ? "&aВыбор игрока" : fixed.displayName();
-        lore.add("&b● &fАнимация: " + animationName);
-        if (fixed == null) {
-            lore.add("&7Игрок выбирает анимацию в меню кейса.");
-        } else {
-            for (String line : fixed.description().split("\\R")) {
-                lore.add(line);
-            }
+        lore.add("&#9EFC65 «Как выглядит»");
+        for (String line : GuiDesign.animationDescription(type)) {
+            lore.add(" &7- &f" + line);
         }
         lore.add("");
-        lore.add("&a● &fСтатус: " + state);
+        lore.add(selected ? "&#65FC83 «Текущее состояние»" : "&#FCA965 «Управление»");
+        lore.add(selected
+                ? " &7- &fАнимация закреплена за кейсом."
+                : " &7- &fЛКМ — закрепить за кейсом");
         lore.add("");
-        if (legacy) {
-            lore.add("&eТолько Круг фортуны доступен на 1.16.5.");
-        } else {
-            lore.add("&6ЛКМ &8• &fСледующий режим");
-            lore.add("&6ПКМ &8• &fПредыдущий режим");
-        }
-        return lore;
+        return items.builtInButton(
+                GuiDesign.animation(type),
+                GuiDesign.animationSelectionName(type),
+                lore
+        );
     }
 
     private List<String> headerLore() {
         if (ServerCompatibility.useMinecraft1165AnimationMode()) {
             return List.of(
                     "",
-                    "&#82DCFF «Совместимость»",
+                    "&#9EFC65 «Совместимость»",
                     " &7- &fДля Minecraft 1.16.5 доступен",
                     " &7- &fтолько Круг фортуны.",
                     ""
@@ -145,22 +244,11 @@ final class MachineAnimationScreen {
         }
         return List.of(
                 "",
-                "&#82DCFF «Основное»",
-                " &7- &fВыберите готовый режим открытия.",
-                " &7- &fВсе параметры подобраны автоматически.",
+                "&#9EFC65 «Основная информация»",
+                " &7- &fВыберите постоянную анимацию",
+                " &7- &fили разрешите выбор игроку.",
                 ""
         );
-    }
-
-    private static Material animationIcon(AnimationType type) {
-        if (ServerCompatibility.useMinecraft1165AnimationMode() && type == AnimationType.FORTUNE_RING) {
-            return Material.CLOCK;
-        }
-        return type.icon();
-    }
-
-    private static Material machineIcon(Material modern, Material legacy) {
-        return ServerCompatibility.useMinecraft1165AnimationMode() ? legacy : modern;
     }
 
 }

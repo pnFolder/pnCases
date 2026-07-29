@@ -6,14 +6,13 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
 import ru.privatenull.PnCasesPlugin;
 import ru.privatenull.cases.config.CaseConfigRepository;
 import ru.privatenull.cases.model.Reward;
 
-import static ru.privatenull.cases.config.RewardConfigValues.firstPresent;
-import static ru.privatenull.cases.config.RewardConfigValues.inferType;
-import static ru.privatenull.cases.config.RewardConfigValues.nestedMap;
+import static ru.privatenull.cases.config.RewardConfigParser.firstPresent;
+import static ru.privatenull.cases.config.RewardConfigParser.parseType;
+import static ru.privatenull.cases.config.RewardConfigParser.nestedMap;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,7 +31,7 @@ public final class ConfigValidator {
     private ConfigValidator() {
     }
 
-    public static Result validateAndPatch(JavaPlugin plugin) {
+    public static Result validateAndPatch(PnCasesPlugin plugin) {
         FileConfiguration config = plugin.getConfig();
         List<String> warnings = new ArrayList<>();
         List<String> errors = new ArrayList<>();
@@ -43,23 +42,20 @@ public final class ConfigValidator {
         changed |= patchMissing(config, patches, "database.sqlite.file", "data.db");
         changed |= patchMissing(config, patches, "database.sqlite.connection-timeout-ms", 10_000L);
         changed |= patchMissing(config, patches, "reward-symbols.playerpoints", "✦");
-        changed |= patchMissing(config, patches, "case-files.auto-export", true);
         changed |= patchMissing(config, patches, "holograms.provider", "AUTO");
 
         Set<String> knownKeys = validateKeys(config, warnings, errors);
-        validateCases(plugin, config, knownKeys, warnings, errors);
+        validateCases(plugin, knownKeys, warnings, errors);
 
         if (changed) {
-            boolean saved = plugin instanceof PnCasesPlugin pnCases
-                    ? new CaseConfigRepository(pnCases).saveMainConfig()
-                    : saveLegacy(plugin);
+            boolean saved = new CaseConfigRepository(plugin).saveMainConfig();
             if (!saved) {
                 errors.add("Не удалось безопасно сохранить добавленные поля config.yml.");
             }
         }
 
         if (!patches.isEmpty()) {
-            plugin.getLogger().info("Config validation: добавлены недостающие поля старого config.yml: " + String.join(", ", patches));
+            plugin.getLogger().info("Config validation: добавлены недостающие поля config.yml: " + String.join(", ", patches));
         }
         for (String warning : warnings) {
             plugin.getLogger().warning("Config warning: " + warning);
@@ -77,16 +73,6 @@ public final class ConfigValidator {
         return new Result(errors.size(), warnings.size(), patches.size());
     }
 
-    private static boolean saveLegacy(JavaPlugin plugin) {
-        try {
-            plugin.saveConfig();
-            return true;
-        } catch (RuntimeException exception) {
-            plugin.getLogger().severe("Не удалось сохранить config.yml: " + exception.getMessage());
-            return false;
-        }
-    }
-
     private static boolean patchMissing(FileConfiguration config, List<String> patches, String path, Object value) {
         if (config.contains(path)) {
             return false;
@@ -100,7 +86,7 @@ public final class ConfigValidator {
         Set<String> knownKeys = new HashSet<>();
         ConfigurationSection keys = config.getConfigurationSection("keys");
         if (keys == null) {
-            errors.add("Секция keys отсутствует. Кейсы с cost.type: KEY не смогут открываться.");
+            errors.add("Секция keys отсутствует. Виртуальные ключи кейсов не смогут работать.");
             return knownKeys;
         }
 
@@ -118,35 +104,20 @@ public final class ConfigValidator {
         return knownKeys;
     }
 
-    private static void validateCases(JavaPlugin plugin, FileConfiguration config, Set<String> knownKeys, List<String> warnings, List<String> errors) {
+    private static void validateCases(PnCasesPlugin plugin, Set<String> knownKeys,
+                                      List<String> warnings, List<String> errors) {
         Set<String> seenIds = new HashSet<>();
         Map<String, String> blockOwners = new HashMap<>();
-        boolean found = false;
-        ConfigurationSection cases = config.getConfigurationSection("cases");
-        boolean autoExport = config.getBoolean("case-files.auto-export", true);
-        Set<String> authoritativeEmbedded = new HashSet<>();
-        if (autoExport && cases != null) {
-            for (String caseName : cases.getKeys(false)) {
-                authoritativeEmbedded.add(CaseConfigRepository.normalizeName(caseName));
-            }
-        }
-
         File directory = new File(plugin.getDataFolder(), "cases");
         File[] files = directory.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml"));
         if (files != null) {
             Arrays.sort(files, Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER));
             for (File file : files) {
-                found = true;
                 String fileName = file.getName();
                 String caseId = CaseConfigRepository.normalizeName(fileName.substring(0, fileName.length() - 4));
                 String path = "cases/" + fileName;
                 if (!CaseConfigRepository.isValidId(caseId)) {
                     errors.add(path + " имеет недопустимое имя. Используйте только a-z, 0-9, _ и - (до 64 символов).");
-                    continue;
-                }
-                if (authoritativeEmbedded.contains(caseId)) {
-                    warnings.add(path + " временно игнорируется до завершения auto-export; используется cases."
-                            + caseId + " из config.yml.");
                     continue;
                 }
                 if (!seenIds.add(caseId)) {
@@ -161,32 +132,7 @@ public final class ConfigValidator {
                     errors.add(path + " не читается как YAML: " + ex.getMessage());
                     continue;
                 }
-                ConfigurationSection section = yaml.getConfigurationSection("case");
-                if (section == null) section = yaml;
-                warnIdMismatch(path, caseId, section, warnings);
-                validateCase(path, section, knownKeys, warnings, errors);
-                validateUniqueBlocks(path, caseId, section, blockOwners, errors);
-            }
-        }
-
-        if (cases != null) {
-            for (String caseName : cases.getKeys(false)) {
-                found = true;
-                String caseId = CaseConfigRepository.normalizeName(caseName);
-                String path = "cases." + caseName;
-                if (!CaseConfigRepository.isValidId(caseId)) {
-                    errors.add(path + " имеет недопустимый id. Используйте только a-z, 0-9, _ и - (до 64 символов).");
-                    continue;
-                }
-                if (!seenIds.add(caseId)) {
-                    errors.add(path + " дублирует cases/" + caseId + ".yml. Оставьте только один источник кейса.");
-                    continue;
-                }
-                ConfigurationSection section = cases.getConfigurationSection(caseName);
-                if (section == null) {
-                    errors.add(path + " должен быть секцией.");
-                    continue;
-                }
+                ConfigurationSection section = yaml;
                 warnIdMismatch(path, caseId, section, warnings);
                 validateCase(path, section, knownKeys, warnings, errors);
                 validateUniqueBlocks(path, caseId, section, blockOwners, errors);
@@ -198,11 +144,11 @@ public final class ConfigValidator {
     }
 
     private static void warnIdMismatch(String path, String canonicalId, ConfigurationSection section, List<String> warnings) {
-        String explicitId = section.getString("id", section.getString("case_id", section.getString("case-id")));
+        String explicitId = section.getString("id");
         if (explicitId != null && !explicitId.isBlank()
                 && !canonicalId.equals(CaseConfigRepository.normalizeName(explicitId))) {
             warnings.add(path + " содержит id='" + explicitId + "', но будет использован id '" + canonicalId
-                    + "' из имени файла/секции.");
+                    + "' из имени файла.");
         }
     }
 
@@ -215,7 +161,8 @@ public final class ConfigValidator {
     ) {
         validateBlock(path, section, warnings);
         validateGui(path, section, warnings);
-        validateCost(path, section, knownKeys, warnings, errors);
+        validateBroadcast(path, section, warnings);
+        validateCost(path, section, warnings);
         validateAnimation(path, section, warnings);
         validateRewards(path, section, warnings, errors);
     }
@@ -341,76 +288,55 @@ public final class ConfigValidator {
             return;
         }
 
-        ConfigurationSection item = gui.getConfigurationSection("open-item");
+        ConfigurationSection item = gui.getConfigurationSection("button");
         if (item == null) {
-            warnings.add(path + ".gui.open-item отсутствует. Будет использована стандартная кнопка CHEST.");
+            warnings.add(path + ".gui.button отсутствует. Будет использована стандартная кнопка CHEST.");
             return;
         }
 
-        validateMaterial(path + ".gui.open-item", item, warnings);
+        validateMaterial(path + ".gui.button", item, warnings);
     }
 
-    private static void validateCost(String path, ConfigurationSection section, Set<String> knownKeys, List<String> warnings, List<String> errors) {
+    private static void validateBroadcast(
+            String path,
+            ConfigurationSection section,
+            List<String> warnings
+    ) {
+        ConfigurationSection broadcast = section.getConfigurationSection("broadcast");
+        if (broadcast == null) return;
+        if (broadcast.contains("enabled", true) && !broadcast.isBoolean("enabled")) {
+            warnings.add(path + ".broadcast.enabled должен быть true или false.");
+        }
+        if (broadcast.getBoolean("enabled", true) && !broadcast.isList("lines")) {
+            warnings.add(path + ".broadcast.lines должен быть списком строк.");
+        }
+    }
+
+    private static void validateCost(String path, ConfigurationSection section, List<String> warnings) {
         ConfigurationSection cost = section.getConfigurationSection("cost");
         if (cost == null) {
             warnings.add(path + ".cost отсутствует. Кейс будет бесплатным.");
             return;
         }
 
-        String type = cost.getString("type", "NONE").toUpperCase(Locale.ROOT);
-        if (!type.equals("NONE") && !type.equals("KEY") && !type.equals("XP_LEVELS")) {
-            warnings.add(path + ".cost.type = '" + type + "' неизвестен. Будет использован NONE.");
-            return;
-        }
-
-        if (type.equals("KEY")) {
-            String key = cost.getString("key");
-            if (key == null || key.isBlank()) {
-                errors.add(path + ".cost.key отсутствует при cost.type: KEY.");
-            } else if (!knownKeys.contains(key.toLowerCase(Locale.ROOT))) {
-                errors.add(path + ".cost.key = '" + key + "' не найден в секции keys.");
+        ConfigurationSection xpPurchase = cost.getConfigurationSection("xp-purchase");
+        if (xpPurchase != null) {
+            if (xpPurchase.contains("enabled", true) && !xpPurchase.isBoolean("enabled")) {
+                warnings.add(path + ".cost.xp-purchase.enabled должен быть true или false.");
             }
-
-            int amount = cost.getInt("amount", 0);
-            if (amount <= 0) {
-                warnings.add(path + ".cost.amount <= 0. При открытии будет использовано 1.");
+            if (xpPurchase.getBoolean("enabled", false) && xpPurchase.getInt("levels", 0) <= 0) {
+                warnings.add(path + ".cost.xp-purchase.levels должен быть больше 0, когда покупка включена.");
             }
         }
 
-        if (type.equals("XP_LEVELS") && cost.getInt("amount", 0) <= 0) {
-            warnings.add(path + ".cost.amount должен быть больше 0 для XP_LEVELS.");
-        }
-
-        if (cost.contains("buy-xp-levels")) {
-            warnings.add(path + ".cost.buy-xp-levels - старое имя поля, оно поддерживается. Новое имя: buy_xp_levels.");
-        }
     }
 
     private static void validateAnimation(String path, ConfigurationSection section, List<String> warnings) {
         ConfigurationSection animation = section.getConfigurationSection("animation");
-        if (animation == null) {
-            warnings.add(path + ".animation отсутствует. Будут использованы стандартные параметры и SLIME_BALL.");
-            return;
-        }
-
-        if (animation.contains("duration-ticks")) {
-            warnings.add(path + ".animation.duration-ticks - старое имя поля, оно поддерживается. Новое имя: duration_ticks.");
-        }
-        if (animation.contains("cycle-every-ticks")) {
-            warnings.add(path + ".animation.cycle-every-ticks - старое имя поля, оно поддерживается. Новое имя: cycle_every_ticks.");
-        }
-        if (animation.contains("rise-blocks")) {
-            warnings.add(path + ".animation.rise-blocks - старое имя поля, оно поддерживается. Новое имя: rise_blocks.");
-        }
-        if (animation.contains("spin-degrees-per-tick")) {
-            warnings.add(path + ".animation.spin-degrees-per-tick - старое имя поля, оно поддерживается. Новое имя: spin_degrees_per_tick.");
-        }
+        if (animation == null) return;
 
         List<?> items = animation.getList("items");
-        if (items == null || items.isEmpty()) {
-            warnings.add(path + ".animation.items пустой. В анимации будет использован SLIME_BALL.");
-            return;
-        }
+        if (items == null || items.isEmpty()) return;
 
         for (int i = 0; i < items.size(); i++) {
             Object item = items.get(i);
@@ -427,7 +353,7 @@ public final class ConfigValidator {
     private static void validateRewards(String path, ConfigurationSection section, List<String> warnings, List<String> errors) {
         List<?> rewards = section.getList("rewards");
         if (rewards == null || rewards.isEmpty()) {
-            errors.add(path + ".rewards отсутствует или пустой. Будет использована fallback-награда DIAMOND.");
+            errors.add(path + ".rewards отсутствует или пустой. Кейс не будет загружен.");
             return;
         }
 
@@ -445,17 +371,13 @@ public final class ConfigValidator {
             }
 
             String rawType = String.valueOf(map.containsKey("type") ? map.get("type") : "ITEM");
-            Reward.Type rewardType = inferType(rawType, map);
+            Reward.Type rewardType = parseType(rawType);
             String type = rewardType == null ? null : rewardType.name();
             if (type == null) {
                 errors.add(rewardPath + ".type = '" + rawType + "' неизвестен. Доступно: ITEM, LUCKPERMS, VAULT, PLAYERPOINTS, PERSONAL.");
                 continue;
             }
-            if (!rawType.equalsIgnoreCase(type)) {
-                warnings.add(rewardPath + ".type = '" + rawType + "' - старый алиас, он поддерживается как " + type + ".");
-            }
-
-            Object rarity = firstPresent(map, "rarity", "rare");
+            Object rarity = map.get("rarity");
             if (rarity != null && !isKnownRarity(String.valueOf(rarity))) {
                 warnings.add(rewardPath + ".rarity = '" + rarity + "' unknown. Available: COMMON, UNCOMMON, RARE, EPIC, LEGENDARY, MYTHIC.");
             }
@@ -501,7 +423,7 @@ public final class ConfigValidator {
             warnings.add(path + ".item is an old visual alias for non-ITEM rewards. Use .visual instead.");
         }
 
-        Object visual = firstPresent(map, "visual", "visual_item", "visual-item", "display_item", "display-item", "item");
+        Object visual = firstPresent(map, "visual", "item");
         if (visual instanceof java.util.Map<?, ?> visualMap) {
             validateMaterial(path + ".visual", visualMap.get("material"), visualMap.get("base64"), warnings);
         }
@@ -524,24 +446,24 @@ public final class ConfigValidator {
     private static void validateVaultReward(String path, java.util.Map<?, ?> map, List<String> warnings, List<String> errors) {
         java.util.Map<?, ?> vault = nestedMap(map, "vault");
         warnIgnoredCurrencyDisplayName(path + ".vault", vault, warnings);
-        Object amount = firstPresent(vault, map, "amount", "money", "value");
+        Object amount = firstPresent(vault, "amount");
         if (asDouble(amount, 0.0) <= 0.0) {
             errors.add(path + ".vault.amount должен быть больше 0.");
         }
     }
 
     private static void validatePlayerPointsReward(String path, java.util.Map<?, ?> map, List<String> warnings, List<String> errors) {
-        java.util.Map<?, ?> points = nestedMap(map, "playerpoints", "player_points", "player-points", "points");
+        java.util.Map<?, ?> points = nestedMap(map, "playerpoints");
         warnIgnoredCurrencyDisplayName(path + ".playerpoints", points, warnings);
-        Object amount = firstPresent(points, map, "amount", "points", "value");
+        Object amount = firstPresent(points, "amount");
         if (asInt(amount, 0) <= 0) {
             errors.add(path + ".playerpoints.amount должен быть больше 0.");
         }
     }
 
     private static void warnIgnoredCurrencyDisplayName(String path, java.util.Map<?, ?> map, List<String> warnings) {
-        if (firstPresent(map, "display_name", "display-name", "displayName", "name") != null) {
-            warnings.add(path + ".display_name is ignored for virtual currency rewards. Use .visual.name for GUI and animation text.");
+        if (map.get("name") != null) {
+            warnings.add(path + ".name игнорируется для виртуальной валюты. Используйте .visual.name.");
         }
     }
 

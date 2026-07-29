@@ -6,6 +6,8 @@ authors: [privatenull]
 website: https://github.com/Dy6HiLa/pnCases
 description: pnCases - plugin for creating cases and keys
 softdepend: [LuckPerms, FancyHolograms, DecentHolograms, Vault, PlayerPoints, ProtocolLib]
+libraries:
+  - org.xerial:sqlite-jdbc:3.53.2.0
 commands:
   pncases:
     description: privatenull developer plugin

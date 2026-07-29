@@ -5,8 +5,8 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.cases.model.CaseGuiLayout;
-import ru.privatenull.cases.model.IdleParticleSettings;
 import ru.privatenull.cases.model.CaseGuiLayoutRules;
+import ru.privatenull.cases.model.IdleParticleSettings;
 import ru.privatenull.pnlibrary.text.ColorUtil;
 import ru.privatenull.util.ItemFactory;
 
@@ -14,9 +14,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-
-import static ru.privatenull.config.ConfigValues.decimal;
-import static ru.privatenull.config.ConfigValues.integer;
 
 final class CaseViewConfigParser {
 
@@ -26,8 +23,8 @@ final class CaseViewConfigParser {
 
         int size = resolveSize(gui);
 
-        int openSlot = integer(gui, defaults.openSlot(), "open_slot", "open-slot", "open_item_slot", "open-item-slot");
-        int animationSlot = integer(gui, defaults.animationSlot(), "animation_slot", "animation-slot");
+        int openSlot = gui.getInt("open_slot", defaults.openSlot());
+        int animationSlot = gui.getInt("animation_slot", defaults.animationSlot());
 
         ConfigurationSection decor = gui.getConfigurationSection("decor");
         ConfigurationSection history = gui.getConfigurationSection("history");
@@ -42,18 +39,21 @@ final class CaseViewConfigParser {
                 size,
                 slots.openSlot(),
                 slots.animationSlot(),
+                previewEnabled(gui),
                 slots.historySlots(),
+                readItem(history, "empty", defaults.emptyHistoryItem(), Material.BARRIER, "&8История пуста"),
                 slots.decorSlots(),
-                readItem(decor, "item", null, Material.GRAY_STAINED_GLASS_PANE, " "),
-                readItem(gui, "animation-item", null, null, null),
-                readItem(history, "empty-item", null, Material.BARRIER, "&8История пуста")
+                readItem(decor, "item", null, Material.GRAY_STAINED_GLASS_PANE, " ")
         );
     }
 
     static int resolveSize(ConfigurationSection gui) {
         if (gui == null) return CaseGuiLayout.DEFAULT_SIZE;
-        return CaseGuiLayoutRules.normalizeSize(integer(
-                gui, CaseGuiLayout.DEFAULT_SIZE, "size", "rows"));
+        return CaseGuiLayoutRules.normalizeSize(gui.getInt("size", CaseGuiLayout.DEFAULT_SIZE));
+    }
+
+    static boolean previewEnabled(ConfigurationSection gui) {
+        return gui == null || gui.getBoolean("preview_enabled", true);
     }
 
     IdleParticleSettings parseIdleParticles(ConfigurationSection section) {
@@ -62,15 +62,12 @@ final class CaseViewConfigParser {
 
         return new IdleParticleSettings(
                 section.getBoolean("enabled", defaults.enabled()),
-                section.getBoolean("effects", section.getBoolean("effects_enabled", defaults.effectsEnabled())),
-                enumValue(section.getString("style"), defaults.style()),
                 enumValue(section.getString("theme"), defaults.theme()),
-                Math.max(2, integer(section, defaults.intervalTicks(), "interval_ticks", "interval-ticks", "period_ticks", "period-ticks")),
-                clamp(decimal(section, defaults.radius(), "radius"), 0.25, 2.50),
-                clamp(decimal(section, defaults.height(), "height"), 0.30, 3.00),
-                clamp(decimal(section, defaults.speed(), "speed"), 0.02, 0.80),
-                clamp(decimal(section, defaults.viewDistance(), "view_distance", "view-distance"), 4.0, 64.0),
-                readItem(section, "item", defaults.displayItem(), null, null)
+                Math.max(2, section.getInt("interval_ticks", defaults.intervalTicks())),
+                clamp(section.getDouble("radius", defaults.radius()), 0.25, 2.50),
+                clamp(section.getDouble("height", defaults.height()), 0.30, 3.00),
+                clamp(section.getDouble("speed", defaults.speed()), 0.02, 0.80),
+                clamp(section.getDouble("view_distance", defaults.viewDistance()), 4.0, 64.0)
         );
     }
 
@@ -106,15 +103,6 @@ final class CaseViewConfigParser {
             }
         }
         return result;
-    }
-
-    private IdleParticleSettings.Style enumValue(String raw, IdleParticleSettings.Style fallback) {
-        if (raw == null || raw.isBlank()) return fallback;
-        try {
-            return IdleParticleSettings.Style.valueOf(normalizeEnum(raw));
-        } catch (IllegalArgumentException ignored) {
-            return fallback;
-        }
     }
 
     private IdleParticleSettings.Theme enumValue(String raw, IdleParticleSettings.Theme fallback) {

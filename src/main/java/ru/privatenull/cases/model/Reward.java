@@ -2,7 +2,9 @@ package ru.privatenull.cases.model;
 
 import org.bukkit.inventory.ItemStack;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Reward {
 
@@ -212,6 +214,24 @@ public class Reward {
                 .replaceAll("[^\\p{L}\\p{N}_-]", "_")
                 .replaceAll("_+", "_");
         return normalized.isBlank() ? Rarity.fromChance(chance).name().toLowerCase(Locale.ROOT) : normalized;
+    }
+
+    public static Reward select(List<Reward> rewards) {
+        if (rewards == null || rewards.isEmpty()) {
+            throw new IllegalArgumentException("Reward list must not be empty");
+        }
+        int totalWeight = rewards.stream().mapToInt(reward -> Math.max(0, reward.chance())).sum();
+        if (totalWeight <= 0) return rewards.get(0);
+        return selectByRoll(rewards, ThreadLocalRandom.current().nextInt(totalWeight) + 1);
+    }
+
+    static Reward selectByRoll(List<Reward> rewards, int roll) {
+        int current = 0;
+        for (Reward reward : rewards) {
+            current += Math.max(0, reward.chance());
+            if (roll <= current) return reward;
+        }
+        return rewards.get(rewards.size() - 1);
     }
 
     public int chance() { return chance; }

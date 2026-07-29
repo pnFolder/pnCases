@@ -1,6 +1,5 @@
 package ru.privatenull.cases.config;
 
-import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -11,15 +10,10 @@ import ru.privatenull.util.ItemFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
-import static ru.privatenull.config.ConfigValues.decimal;
-import static ru.privatenull.config.ConfigValues.integer;
-import static ru.privatenull.cases.config.RewardConfigValues.firstPresent;
-import static ru.privatenull.cases.config.RewardConfigValues.inferType;
-import static ru.privatenull.cases.config.RewardConfigValues.nestedMap;
-
-final class RewardConfigParser {
+public final class RewardConfigParser {
 
     private final RewardPresentationService presentation;
 
@@ -36,29 +30,16 @@ final class RewardConfigParser {
                 if (reward != null) rewards.add(reward);
             }
         }
-        if (rewards.isEmpty()) {
-            rewards.add(new Reward(
-                    100,
-                    Reward.Type.ITEM,
-                    new ItemStack(Material.DIAMOND),
-                    null,
-                    null,
-                    null,
-                    "&aТы получил алмаз!",
-                    "&bАлмаз",
-                    Reward.Rarity.COMMON
-            ));
-        }
         return rewards;
     }
 
     private Reward parseReward(Map<?, ?> map) {
         int chance = integer(map.get("chance"), 0);
         String rawType = String.valueOf(map.containsKey("type") ? map.get("type") : "ITEM");
-        Reward.Type type = inferType(rawType, map);
+        Reward.Type type = parseType(rawType);
         if (type == null) type = Reward.Type.ITEM;
         String message = value(map.get("message"));
-        Object rarity = firstPresent(map, "rarity", "rare");
+        Object rarity = map.get("rarity");
         String rarityId = Reward.normalizeRarityId(rarity == null ? null : String.valueOf(rarity), chance);
 
         ParsedReward parsed = switch (type) {
@@ -90,7 +71,7 @@ final class RewardConfigParser {
     private ParsedReward parseItem(Map<?, ?> map) {
         ItemStack item = null;
         String displayName = null;
-        Object itemObject = firstPresent(map, "item", "items");
+        Object itemObject = map.get("item");
         if (itemObject instanceof Map<?, ?> itemMap) {
             item = ItemFactory.fromMap(itemMap);
             displayName = value(itemMap.get("name"));
@@ -116,7 +97,7 @@ final class RewardConfigParser {
             group = value(luckPerms.get("group"));
             node = value(luckPerms.get("node"));
             duration = value(luckPerms.get("duration"));
-            displayName = value(firstPresent(luckPerms, map, "display_name", "display-name", "displayName", "name"));
+            displayName = value(firstPresent(luckPerms, map, "name"));
         }
         ItemStack visual = visualItem(map, displayName);
         displayName = visualName(visual, displayName == null ? "&dПривилегия" : displayName);
@@ -124,16 +105,16 @@ final class RewardConfigParser {
     }
 
     private ParsedReward parseVault(Map<?, ?> map) {
-        Map<?, ?> vault = nestedMap(map, "vault", "money", "economy", "eco");
-        double amount = decimal(firstPresent(vault, map, "amount", "money", "value"), 0.0);
+        Map<?, ?> vault = nestedMap(map, "vault");
+        double amount = decimal(firstPresent(vault, "amount"), 0.0);
         String displayName = "&a" + presentation.formatVaultAmount(amount);
         ItemStack visual = visualItem(map, displayName);
         return new ParsedReward(null, visual, null, null, null, amount, 0, visualName(visual, displayName), null);
     }
 
     private ParsedReward parsePlayerPoints(Map<?, ?> map) {
-        Map<?, ?> points = nestedMap(map, "playerpoints", "player_points", "player-points", "points");
-        int amount = Math.max(0, integer(firstPresent(points, map, "amount", "points", "value"), 0));
+        Map<?, ?> points = nestedMap(map, "playerpoints");
+        int amount = Math.max(0, integer(firstPresent(points, "amount"), 0));
         String displayName = "&b" + presentation.formatPlayerPointsAmount(amount);
         ItemStack visual = visualItem(map, displayName);
         return new ParsedReward(null, visual, null, null, null, 0.0, amount, visualName(visual, displayName), null);
@@ -141,15 +122,14 @@ final class RewardConfigParser {
 
     private ParsedReward parsePersonal(Map<?, ?> map) {
         String command = value(map.get("command"));
-        String displayName = value(firstPresent(map, "display_name", "display-name", "displayName", "name"));
+        String displayName = value(map.get("name"));
         ItemStack visual = visualItem(map, displayName);
         displayName = visualName(visual, displayName == null ? "&dЛичная награда" : displayName);
         return new ParsedReward(null, visual, null, null, null, 0.0, 0, displayName, command);
     }
 
     private ItemStack visualItem(Map<?, ?> reward, String displayName) {
-        Object raw = firstPresent(reward, "visual", "visual_item", "visual-item", "display_item", "display-item",
-                "icon", "icon_item", "icon-item", "item", "items");
+        Object raw = firstPresent(reward, "visual", "item");
         if (raw instanceof Map<?, ?> map) return ItemFactory.fromMap(map);
         if (raw instanceof String value && !value.isBlank()) {
             Map<String, Object> icon = new HashMap<>();
@@ -201,6 +181,57 @@ final class RewardConfigParser {
 
     private boolean notBlank(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private int integer(Object value, int fallback) {
+        if (value instanceof Number number) return number.intValue();
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private double decimal(Object value, double fallback) {
+        if (value instanceof Number number) return number.doubleValue();
+        try {
+            return Double.parseDouble(String.valueOf(value));
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    public static Reward.Type parseType(String rawType) {
+        if (rawType == null) return Reward.Type.ITEM;
+        return switch (rawType.trim().toUpperCase(Locale.ROOT)) {
+            case "ITEM" -> Reward.Type.ITEM;
+            case "LUCKPERMS" -> Reward.Type.LUCKPERMS;
+            case "VAULT" -> Reward.Type.VAULT;
+            case "PLAYERPOINTS" -> Reward.Type.PLAYERPOINTS;
+            case "PERSONAL" -> Reward.Type.PERSONAL;
+            default -> null;
+        };
+    }
+
+    public static Map<?, ?> nestedMap(Map<?, ?> map, String... keys) {
+        if (map == null) return null;
+        for (String key : keys) {
+            if (map.get(key) instanceof Map<?, ?> nested) return nested;
+        }
+        return null;
+    }
+
+    public static Object firstPresent(Map<?, ?> primary, Map<?, ?> fallback, String... keys) {
+        Object value = firstPresent(primary, keys);
+        return value != null ? value : firstPresent(fallback, keys);
+    }
+
+    public static Object firstPresent(Map<?, ?> map, String... keys) {
+        if (map == null) return null;
+        for (String key : keys) {
+            if (map.containsKey(key)) return map.get(key);
+        }
+        return null;
     }
 
     private record ParsedReward(

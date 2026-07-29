@@ -5,14 +5,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import static ru.privatenull.config.ConfigValues.integer;
+import java.util.*;
 
 public final class CaseBlockCodec {
 
@@ -24,9 +17,9 @@ public final class CaseBlockCodec {
 
             Location location = new Location(
                     world,
-                    integer(block.get("x"), 0),
-                    integer(block.get("y"), 0),
-                    integer(block.get("z"), 0)
+                    number(block.get("x"), 0),
+                    number(block.get("y"), 0),
+                    number(block.get("z"), 0)
             );
             if (locations.stream().noneMatch(existing -> key(existing).equals(key(location)))) {
                 locations.add(location);
@@ -106,9 +99,9 @@ public final class CaseBlockCodec {
 
     private String key(Map<String, Object> block) {
         return String.valueOf(block.get("world")).toLowerCase(Locale.ROOT)
-                + ':' + integer(block.get("x"), 0)
-                + ':' + integer(block.get("y"), 0)
-                + ':' + integer(block.get("z"), 0);
+                + ':' + number(block.get("x"), 0)
+                + ':' + number(block.get("y"), 0)
+                + ':' + number(block.get("z"), 0);
     }
 
     private String key(Location location) {
@@ -116,5 +109,10 @@ public final class CaseBlockCodec {
                 + ':' + location.getBlockX()
                 + ':' + location.getBlockY()
                 + ':' + location.getBlockZ();
+    }
+
+    private int number(Object value, int fallback) {
+        Integer result = coordinate(value);
+        return result == null ? fallback : result;
     }
 }

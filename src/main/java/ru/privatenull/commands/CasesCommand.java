@@ -7,9 +7,11 @@ import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.util.StringUtil;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.event.ClickEvent;
 import ru.privatenull.PnCasesPlugin;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.CaseDefinition;
@@ -17,13 +19,21 @@ import ru.privatenull.gui.machine.MachineGuiListener;
 import ru.privatenull.pnlibrary.update.UpdateChecker;
 import ru.privatenull.pnlibrary.text.ColorUtil;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
-public final class CasesCommand implements CommandExecutor {
+public final class CasesCommand implements CommandExecutor, TabCompleter {
 
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
+    private static final List<String> SUBCOMMANDS = List.of(
+            "createcase", "setcase", "delcase", "machine", "givekey", "takekey", "reload");
+    private static final List<String> CASE_SUBCOMMANDS = List.of("setcase", "delcase", "machine");
+    private static final List<String> AMOUNTS = List.of("1", "2", "3", "5", "10", "16", "32", "64");
+    private static final List<String> SILENT_FLAG = List.of("-s");
 
     private final PnCasesPlugin plugin;
     private final CaseManager caseManager;
@@ -38,7 +48,7 @@ public final class CasesCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("pncases.admin")) {
-            sender.sendMessage(plugin.getMessages().get("no-permission"));
+            sender.sendMessage(plugin.getUi().get("no-permission"));
             return true;
         }
         if (args.length == 0) {
@@ -57,26 +67,58 @@ public final class CasesCommand implements CommandExecutor {
             default -> false;
         };
         if (!known) {
-            sender.sendMessage(plugin.getMessages().get("unknown-command"));
+            sender.sendMessage(plugin.getUi().get("unknown-command"));
             sendCommandMenu(sender);
         }
         return true;
     }
 
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission("pncases.admin")) return new ArrayList<>();
+        if (args.length == 1) return filter(SUBCOMMANDS, args[0]);
+
+        String subcommand = args[0].toLowerCase(Locale.ROOT);
+        if (CASE_SUBCOMMANDS.contains(subcommand) && args.length == 2) {
+            return filter(caseManager.getConfiguredCaseNames(), args[1]);
+        }
+        if (subcommand.equals("givekey") || subcommand.equals("takekey")) {
+            if (args.length == 2) return filter(onlinePlayerNames(), args[1]);
+            if (args.length == 3) return filter(caseManager.getKeyNames(), args[2]);
+            if (args.length == 4) return filter(AMOUNTS, args[3]);
+            if (args.length == 5 && subcommand.equals("givekey")) {
+                return filter(SILENT_FLAG, args[4]);
+            }
+        }
+        return new ArrayList<>();
+    }
+
+    private static List<String> onlinePlayerNames() {
+        List<String> names = new ArrayList<>();
+        for (Player player : Bukkit.getOnlinePlayers()) names.add(player.getName());
+        return names;
+    }
+
+    private static List<String> filter(List<String> values, String prefix) {
+        List<String> matches = new ArrayList<>();
+        StringUtil.copyPartialMatches(prefix == null ? "" : prefix, values, matches);
+        Collections.sort(matches);
+        return matches;
+    }
+
     private boolean reload(CommandSender sender) {
         plugin.reloadConfig();
         var validation = plugin.validateCurrentConfig();
-        plugin.getMessages().load();
-        plugin.getGuiConfig().load();
+        plugin.getUi().load();
         boolean casesReloaded = caseManager.reloadFromConfig();
         plugin.reloadRuntimeConfig();
         if (casesReloaded) {
-            sender.sendMessage(plugin.getMessages().get("config-reloaded"));
+            sender.sendMessage(plugin.getUi().get("config-reloaded"));
         } else {
-            sender.sendMessage(plugin.getMessages().get("cases-reload-failed"));
+            sender.sendMessage(plugin.getUi().get("cases-reload-failed"));
         }
         if (validation.hasProblems()) {
-            sender.sendMessage(plugin.getMessages().get("config-validation-result",
+            sender.sendMessage(plugin.getUi().get("config-validation-result",
                     "errors", String.valueOf(validation.errors()),
                     "warnings", String.valueOf(validation.warnings()),
                     "patches", String.valueOf(validation.patches())));
@@ -86,40 +128,40 @@ public final class CasesCommand implements CommandExecutor {
 
     private boolean giveKey(CommandSender sender, String[] args) {
         if (args.length < 4) {
-            sender.sendMessage(plugin.getMessages().get("givekey-usage"));
+            sender.sendMessage(plugin.getUi().get("givekey-usage"));
             return true;
         }
         OfflinePlayer target = resolveOfflinePlayer(args[1]);
         if (target == null) {
-            sender.sendMessage(plugin.getMessages().get("givekey-player-not-found"));
+            sender.sendMessage(plugin.getUi().get("givekey-player-not-found"));
             return true;
         }
 
         String keyId = args[2].toLowerCase(Locale.ROOT);
         ParsedAmount parsed = parseAmount(args, 3, true);
         if (parsed.amount() <= 0) {
-            sender.sendMessage(plugin.getMessages().get("givekey-amount-nan"));
+            sender.sendMessage(plugin.getUi().get("givekey-amount-nan"));
             return true;
         }
         if (!caseManager.keyExists(keyId)) {
-            sender.sendMessage(plugin.getMessages().get("givekey-key-not-found", "key", keyId));
+            sender.sendMessage(plugin.getUi().get("givekey-key-not-found", "key", keyId));
             return true;
         }
 
-        plugin.getKeyStorage().add(target.getUniqueId(), keyId, parsed.amount());
+        plugin.getDatabase().addKeys(target.getUniqueId(), keyId, parsed.amount());
         String keyName = caseManager.getKeyDisplayName(keyId);
         Player online = target.getPlayer();
         if (online != null) {
-            int balance = plugin.getKeyStorage().get(online.getUniqueId(), keyId);
-            sender.sendMessage(plugin.getMessages().get("givekey-success-sender",
+            int balance = plugin.getDatabase().getKeys(online.getUniqueId(), keyId);
+            sender.sendMessage(plugin.getUi().get("givekey-success-sender",
                     "amount", String.valueOf(parsed.amount()), "key_name", keyName, "player", online.getName()));
             if (!parsed.silent()) {
-                online.sendMessage(plugin.getMessages().get("givekey-success-target",
+                online.sendMessage(plugin.getUi().get("givekey-success-target",
                         "amount", String.valueOf(parsed.amount()), "key_name", keyName,
                         "balance", String.valueOf(balance)));
             }
         } else {
-            sender.sendMessage(plugin.getMessages().get("givekey-offline",
+            sender.sendMessage(plugin.getUi().get("givekey-offline",
                     "amount", String.valueOf(parsed.amount()), "key_name", keyName,
                     "player", offlineName(target)));
         }
@@ -128,47 +170,47 @@ public final class CasesCommand implements CommandExecutor {
 
     private boolean takeKey(CommandSender sender, String[] args) {
         if (args.length < 4) {
-            sender.sendMessage(plugin.getMessages().get("takekey-usage"));
+            sender.sendMessage(plugin.getUi().get("takekey-usage"));
             return true;
         }
         OfflinePlayer target = resolveOfflinePlayer(args[1]);
         if (target == null) {
-            sender.sendMessage(plugin.getMessages().get("givekey-player-not-found"));
+            sender.sendMessage(plugin.getUi().get("givekey-player-not-found"));
             return true;
         }
 
         Integer amount = parseInteger(args[3]);
         if (amount == null) {
-            sender.sendMessage(plugin.getMessages().get("givekey-amount-nan"));
+            sender.sendMessage(plugin.getUi().get("givekey-amount-nan"));
             return true;
         }
         if (amount <= 0) {
-            sender.sendMessage(plugin.getMessages().get("givekey-amount-negative"));
+            sender.sendMessage(plugin.getUi().get("givekey-amount-negative"));
             return true;
         }
 
         String keyId = args[2].toLowerCase(Locale.ROOT);
         if (!caseManager.keyExists(keyId)) {
-            sender.sendMessage(plugin.getMessages().get("givekey-key-not-found", "key", keyId));
+            sender.sendMessage(plugin.getUi().get("givekey-key-not-found", "key", keyId));
             return true;
         }
 
         String keyName = caseManager.getKeyDisplayName(keyId);
         String playerName = offlineName(target);
-        if (!plugin.getKeyStorage().take(target.getUniqueId(), keyId, amount)) {
-            int have = plugin.getKeyStorage().get(target.getUniqueId(), keyId);
-            sender.sendMessage(plugin.getMessages().get("takekey-not-enough",
+        if (!plugin.getDatabase().takeKeys(target.getUniqueId(), keyId, amount)) {
+            int have = plugin.getDatabase().getKeys(target.getUniqueId(), keyId);
+            sender.sendMessage(plugin.getUi().get("takekey-not-enough",
                     "player", playerName, "key_name", keyName,
                     "have", String.valueOf(have), "amount", String.valueOf(amount)));
             return true;
         }
 
-        sender.sendMessage(plugin.getMessages().get("takekey-success-sender",
+        sender.sendMessage(plugin.getUi().get("takekey-success-sender",
                 "player", playerName, "amount", String.valueOf(amount), "key_name", keyName));
         Player online = target.getPlayer();
         if (online != null) {
-            int balance = plugin.getKeyStorage().get(online.getUniqueId(), keyId);
-            online.sendMessage(plugin.getMessages().get("takekey-success-target",
+            int balance = plugin.getDatabase().getKeys(online.getUniqueId(), keyId);
+            online.sendMessage(plugin.getUi().get("takekey-success-target",
                     "amount", String.valueOf(amount), "key_name", keyName,
                     "balance", String.valueOf(balance)));
         }
@@ -177,22 +219,22 @@ public final class CasesCommand implements CommandExecutor {
 
     private boolean deleteCase(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(plugin.getMessages().get("delcase-usage"));
+            sender.sendMessage(plugin.getUi().get("delcase-usage"));
             return true;
         }
         String caseName = normalize(args[1]);
         switch (caseManager.deleteCase(caseName)) {
-            case DELETED -> sender.sendMessage(plugin.getMessages().get("delcase-success", "case", caseName));
-            case NOT_FOUND -> sender.sendMessage(plugin.getMessages().get("delcase-not-found", "case", caseName));
-            case DELETE_FAILED -> sender.sendMessage(plugin.getMessages().get("delcase-save-failed", "case", caseName));
-            case RELOAD_FAILED -> sender.sendMessage(plugin.getMessages().get("delcase-refresh-failed", "case", caseName));
+            case DELETED -> sender.sendMessage(plugin.getUi().get("delcase-success", "case", caseName));
+            case NOT_FOUND -> sender.sendMessage(plugin.getUi().get("delcase-not-found", "case", caseName));
+            case DELETE_FAILED -> sender.sendMessage(plugin.getUi().get("delcase-save-failed", "case", caseName));
+            case RELOAD_FAILED -> sender.sendMessage(plugin.getUi().get("delcase-refresh-failed", "case", caseName));
         }
         return true;
     }
 
     private boolean createCase(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(plugin.getMessages().get("createcase-usage"));
+            sender.sendMessage(plugin.getUi().get("createcase-usage"));
             return true;
         }
         String caseName = normalize(args[1]);
@@ -202,14 +244,14 @@ public final class CasesCommand implements CommandExecutor {
 
     private boolean openMachine(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(plugin.getMessages().get("only-player"));
+            sender.sendMessage(plugin.getUi().get("only-player"));
             return true;
         }
         CaseDefinition definition = args.length >= 2
                 ? caseManager.getCaseByName(normalize(args[1]))
                 : caseAtTarget(player, 6);
         if (definition == null) {
-            player.sendMessage(plugin.getMessages().get("machine-look-at-case"));
+            player.sendMessage(plugin.getUi().get("machine-look-at-case"));
             return true;
         }
         machineGui.openMain(player, definition.name());
@@ -218,76 +260,83 @@ public final class CasesCommand implements CommandExecutor {
 
     private boolean setCase(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(plugin.getMessages().get("only-player"));
+            sender.sendMessage(plugin.getUi().get("only-player"));
             return true;
         }
         if (args.length < 2) {
-            player.sendMessage(plugin.getMessages().get("setcase-usage"));
+            player.sendMessage(plugin.getUi().get("setcase-usage"));
             return true;
         }
 
         String caseName = normalize(args[1]);
         Block target = player.getTargetBlockExact(5);
         if (target == null) {
-            player.sendMessage(plugin.getMessages().get("setcase-look-at-block"));
+            player.sendMessage(plugin.getUi().get("setcase-look-at-block"));
             return true;
         }
         if (!caseManager.caseExists(caseName)) {
-            player.sendMessage(plugin.getMessages().get("setcase-not-found", "case", caseName));
+            player.sendMessage(plugin.getUi().get("setcase-not-found", "case", caseName));
             return true;
         }
 
         switch (caseManager.bindCaseToBlock(caseName, target)) {
             case BOUND -> {
-                player.sendMessage(plugin.getMessages().get("setcase-success",
+                player.sendMessage(plugin.getUi().get("setcase-success",
                         "case", caseName, "world", target.getWorld().getName(),
                         "x", String.valueOf(target.getX()), "y", String.valueOf(target.getY()),
                         "z", String.valueOf(target.getZ())));
-                player.sendMessage(plugin.getMessages().get("setcase-machine-hint", "case", caseName));
+                player.sendMessage(plugin.getUi().get("setcase-machine-hint", "case", caseName));
             }
-            case ALREADY_BOUND -> player.sendMessage(plugin.getMessages().get("setcase-already-bound", "case", caseName));
-            case NOT_FOUND -> player.sendMessage(plugin.getMessages().get("setcase-not-found", "case", caseName));
-            case BLOCK_OCCUPIED -> player.sendMessage(plugin.getMessages().get("setcase-block-occupied"));
-            case SAVE_FAILED -> player.sendMessage(plugin.getMessages().get("setcase-save-failed", "case", caseName));
-            case REFRESH_FAILED -> player.sendMessage(plugin.getMessages().get("setcase-refresh-failed", "case", caseName));
+            case ALREADY_BOUND -> player.sendMessage(plugin.getUi().get("setcase-already-bound", "case", caseName));
+            case NOT_FOUND -> player.sendMessage(plugin.getUi().get("setcase-not-found", "case", caseName));
+            case BLOCK_OCCUPIED -> player.sendMessage(plugin.getUi().get("setcase-block-occupied"));
+            case SAVE_FAILED -> player.sendMessage(plugin.getUi().get("setcase-save-failed", "case", caseName));
+            case REFRESH_FAILED -> player.sendMessage(plugin.getUi().get("setcase-refresh-failed", "case", caseName));
         }
         return true;
     }
 
     private void sendCreateResult(CommandSender sender, String caseName, CaseManager.CreateCaseResult result) {
         switch (result) {
-            case CREATED -> sender.sendMessage(plugin.getMessages().get("createcase-success", "case", caseName));
-            case ALREADY_EXISTS -> sender.sendMessage(plugin.getMessages().get("createcase-exists", "case", caseName));
-            case INVALID_ID -> sender.sendMessage(plugin.getMessages().get("createcase-invalid", "case", caseName));
-            case SAVE_FAILED -> sender.sendMessage(plugin.getMessages().get("createcase-failed", "case", caseName));
-            case RELOAD_FAILED -> sender.sendMessage(plugin.getMessages().get("createcase-reload-failed", "case", caseName));
+            case CREATED -> sender.sendMessage(plugin.getUi().get("createcase-success", "case", caseName));
+            case ALREADY_EXISTS -> sender.sendMessage(plugin.getUi().get("createcase-exists", "case", caseName));
+            case INVALID_ID -> sender.sendMessage(plugin.getUi().get("createcase-invalid", "case", caseName));
+            case SAVE_FAILED -> sender.sendMessage(plugin.getUi().get("createcase-failed", "case", caseName));
+            case RELOAD_FAILED -> sender.sendMessage(plugin.getUi().get("createcase-reload-failed", "case", caseName));
         }
     }
 
     private void sendCommandMenu(CommandSender sender) {
         String current = plugin.getDescription().getVersion();
         MenuUpdateInfo update = menuUpdateInfo(current);
-        String prefix = plugin.getMessages().get("prefix");
-        String information = "&fПанель администратора\n\n"
-                + "&#429F91▸ &fВерсия: &#D8DF9D" + current + "\n"
-                + "&#429F91▸ &fСерверы: &#D8DF9D1.16.5 - 1.21.11\n"
-                + "&#429F91▸ &fОбновление: " + update.status() + "\n"
-                + "&#429F91▸ &fПоддержка: &#D8DF9D" + plugin.getSupportDiscord();
+        String prefix = plugin.getUi().get("prefix");
 
-        sender.sendMessage(menuComponent("&#429F91&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-        sender.sendMessage(menuComponent(prefix + " &8| &fПанель администратора &8(наведите для информации)")
-                .hoverEvent(HoverEvent.showText(menuComponent(information))));
+        sender.sendMessage(menuComponent(prefix + " &8| &fПанель администратора"));
         sender.sendMessage(menuComponent(""));
-        sender.sendMessage(menuComponent("&#429F91Команды"));
-        sender.sendMessage(menuComponent("&#429F91▸ &#D8DF9D/pncases &8— &7показать это меню"));
-        sender.sendMessage(menuComponent("&#429F91▸ &#D8DF9D/pncases reload &8— &7перезагрузить настройки"));
-        sender.sendMessage(menuComponent("&#429F91▸ &#D8DF9D/pncases machine <кейс> &8— &7настроить кейс через GUI"));
-        sender.sendMessage(menuComponent("&#429F91▸ &#D8DF9D/pncases createcase <id> &8— &7создать новый кейс"));
-        sender.sendMessage(menuComponent("&#429F91▸ &#D8DF9D/pncases setcase <кейс> &8— &7поставить кейс на блок"));
-        sender.sendMessage(menuComponent("&#429F91▸ &#D8DF9D/pncases delcase <кейс> &8— &7удалить кейс"));
-        sender.sendMessage(menuComponent("&#429F91▸ &#D8DF9D/pncases givekey <игрок> <ключ> <кол-во> &8— &7выдать ключи"));
-        sender.sendMessage(menuComponent("&#429F91▸ &#D8DF9D/pncases takekey <игрок> <ключ> <кол-во> &8— &7забрать ключи"));
-        sender.sendMessage(menuComponent("&#429F91&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+        sender.sendMessage(menuComponent("&#9EFC65 «Состояние плагина»"));
+        sender.sendMessage(menuComponent(" &7- &fВерсия: &#FCA865" + current));
+        sender.sendMessage(menuComponent(" &7- &fСерверы: &#FCA8651.16.5–1.21.11"));
+        sender.sendMessage(menuComponent(" &7- &fОбновление: " + update.status()));
+        sender.sendMessage(menuComponent(" &7- &fПоддержка: &#65D1FC" + plugin.getSupportDiscord()));
+        sender.sendMessage(menuComponent(""));
+        sender.sendMessage(menuComponent("&#65D1FC «Управление»"));
+        sender.sendMessage(menuComponent(" &7Нажмите на команду, чтобы вставить её в чат."));
+        sender.sendMessage(menuComponent(""));
+        sendCommandLine(sender, "/pncases reload", "перезагрузить настройки");
+        sendCommandLine(sender, "/pncases machine <кейс>", "открыть Machine");
+        sendCommandLine(sender, "/pncases createcase <id>", "создать кейс");
+        sendCommandLine(sender, "/pncases setcase <кейс>", "поставить кейс на блок");
+        sendCommandLine(sender, "/pncases delcase <кейс>", "удалить кейс");
+        sendCommandLine(sender, "/pncases givekey <игрок> <кейс> <кол-во>", "выдать ключи");
+        sendCommandLine(sender, "/pncases takekey <игрок> <кейс> <кол-во>", "забрать ключи");
+    }
+
+    private static void sendCommandLine(CommandSender sender, String command, String description) {
+        Component line = menuComponent(" &#EFF7B9▸ ")
+                .append(menuComponent("&#EFF7B9" + command)
+                        .clickEvent(ClickEvent.suggestCommand(command.replaceAll("<[^>]+>", ""))))
+                .append(menuComponent(" &8— &7" + description));
+        sender.sendMessage(line);
     }
 
     private static Component menuComponent(String text) {
