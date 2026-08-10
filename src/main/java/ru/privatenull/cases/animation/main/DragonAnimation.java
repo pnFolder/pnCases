@@ -40,6 +40,7 @@ public final class DragonAnimation extends CaseAnimation {
             new Particle.DustOptions(Color.fromRGB(116, 58, 214), 1.15f);
     private static final Particle.DustOptions EDGE =
             new Particle.DustOptions(Color.fromRGB(221, 102, 255), 0.82f);
+    private static final float DRAGON_BREATH_POWER = 1.0f;
 
     public DragonAnimation(PnCasesPlugin plugin) {
         super(plugin);
@@ -108,8 +109,11 @@ public final class DragonAnimation extends CaseAnimation {
                 } else if (tick <= REVEAL_END) {
                     reveal();
                 } else {
-                    finalBurst();
-                    finish();
+                    try {
+                        finalBurst();
+                    } finally {
+                        finish();
+                    }
                 }
             }
 
@@ -174,7 +178,7 @@ public final class DragonAnimation extends CaseAnimation {
 
                 if (tick % 3 == 0) {
                     world.spawnParticle(Particle.DRAGON_BREATH, rewardLocation,
-                            2, 0.22, 0.18, 0.22, 0.012);
+                            2, 0.22, 0.18, 0.22, 0.012, DRAGON_BREATH_POWER);
                     world.spawnParticle(Particle.END_ROD, rewardLocation,
                             1, 0.20, 0.18, 0.20, 0.01);
                 }
@@ -189,7 +193,7 @@ public final class DragonAnimation extends CaseAnimation {
             private void finalBurst() {
                 Location rewardLocation = rewardDisplay.getLocation();
                 world.spawnParticle(Particle.DRAGON_BREATH, rewardLocation,
-                        10, 0.42, 0.42, 0.42, 0.045);
+                        10, 0.42, 0.42, 0.42, 0.045, DRAGON_BREATH_POWER);
                 world.spawnParticle(Particle.END_ROD, rewardLocation,
                         7, 0.35, 0.35, 0.35, 0.03);
                 world.spawnParticle(Particle.FIREWORK, rewardLocation,
@@ -291,14 +295,14 @@ public final class DragonAnimation extends CaseAnimation {
             Location point = mouth.clone().add(ray.clone().multiply(progress));
             double spread = 0.015 + progress * 0.10;
             world.spawnParticle(Particle.DRAGON_BREATH, point, 2,
-                    spread, spread, spread, 0.01);
+                    spread, spread, spread, 0.01, DRAGON_BREATH_POWER);
             if ((step + tick) % 3 == 0) {
                 world.spawnParticle(Particle.SOUL_FIRE_FLAME, point, 1,
                         spread * 0.5, spread * 0.5, spread * 0.5, 0.005);
             }
         }
         world.spawnParticle(Particle.DRAGON_BREATH, impact,
-                8, 0.30, 0.22, 0.30, 0.04);
+                8, 0.30, 0.22, 0.30, 0.04, DRAGON_BREATH_POWER);
     }
 
     private static void drawImpactRune(World world, Location center, int tick) {
@@ -313,7 +317,7 @@ public final class DragonAnimation extends CaseAnimation {
 
     private static void trail(World world, Location location, int count) {
         world.spawnParticle(Particle.DRAGON_BREATH, location,
-                count, 0.14, 0.14, 0.14, 0.02);
+                count, 0.14, 0.14, 0.14, 0.02, DRAGON_BREATH_POWER);
     }
 
     private static Location orbitPosition(Location center, double angle) {
