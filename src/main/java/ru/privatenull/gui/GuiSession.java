@@ -11,8 +11,15 @@ public final class GuiSession implements InventoryHolder {
         REWARD_PREVIEW,
         PLAYER_ANIMATIONS,
         MACHINE_MAIN,
+        MACHINE_MODULES,
+        MACHINE_REWARDS,
+        MACHINE_REWARD,
+        MACHINE_REWARD_ICON,
+        MACHINE_REWARD_MOVE,
+        MACHINE_REWARD_DELETE,
         MACHINE_ANIMATION,
         MACHINE_LAYOUT,
+        MACHINE_LAYOUT_ROLE,
         MACHINE_HOLOGRAM,
         MACHINE_SHOWCASE,
         MACHINE_MENU,
@@ -22,6 +29,7 @@ public final class GuiSession implements InventoryHolder {
     private final Screen screen;
     private final String caseName;
     private int page;
+    private int selection = -1;
     private Category animationCategory;
 
     private GuiSession(Screen screen, String caseName, int page, Category animationCategory) {
@@ -54,6 +62,44 @@ public final class GuiSession implements InventoryHolder {
         return new GuiSession(Screen.MACHINE_ANIMATION, caseName, 0, category);
     }
 
+    public static GuiSession machineRewards(String caseName, int page) {
+        return new GuiSession(Screen.MACHINE_REWARDS, caseName, page, null);
+    }
+
+    public static GuiSession machineLayout(String caseName) {
+        return new GuiSession(Screen.MACHINE_LAYOUT, caseName, 0, null);
+    }
+
+    public static GuiSession machineLayoutRole(String caseName, int selection) {
+        GuiSession session = new GuiSession(Screen.MACHINE_LAYOUT_ROLE, caseName, 0, null);
+        session.selection = selection;
+        return session;
+    }
+
+    public static GuiSession machineReward(String caseName, int selection) {
+        GuiSession session = new GuiSession(Screen.MACHINE_REWARD, caseName, 0, null);
+        session.selection = selection;
+        return session;
+    }
+
+    public static GuiSession machineRewardIcon(String caseName, int selection) {
+        GuiSession session = new GuiSession(Screen.MACHINE_REWARD_ICON, caseName, 0, null);
+        session.selection = selection;
+        return session;
+    }
+
+    public static GuiSession machineRewardMove(String caseName, int selection, int page) {
+        GuiSession session = new GuiSession(Screen.MACHINE_REWARD_MOVE, caseName, page, null);
+        session.selection = selection;
+        return session;
+    }
+
+    public static GuiSession machineRewardDelete(String caseName, int selection) {
+        GuiSession session = new GuiSession(Screen.MACHINE_REWARD_DELETE, caseName, 0, null);
+        session.selection = selection;
+        return session;
+    }
+
     public Screen screen() {
         return screen;
     }
@@ -68,6 +114,10 @@ public final class GuiSession implements InventoryHolder {
 
     public void page(int page) {
         this.page = Math.max(0, page);
+    }
+
+    public int selection() {
+        return selection;
     }
 
     public Category animationCategory() {

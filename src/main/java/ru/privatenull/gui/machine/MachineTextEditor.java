@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.CaseDefinition;
+import ru.privatenull.gui.GuiDesign;
 
 import java.util.List;
 import java.util.Map;
@@ -20,20 +21,33 @@ final class MachineTextEditor {
     private final CaseManager caseManager;
     private final MachineGuiSupport support;
     private final MachineMainScreen mainScreen;
+    private final MachineMenuScreen menuScreen;
+    private final MachineAnvilInput anvil;
     private final Map<UUID, PendingEdit> pendingEdits = new ConcurrentHashMap<>();
 
     MachineTextEditor(
             CaseManager caseManager,
             MachineGuiSupport support,
-            MachineMainScreen mainScreen
+            MachineMainScreen mainScreen,
+            MachineMenuScreen menuScreen
     ) {
         this.caseManager = caseManager;
         this.support = support;
         this.mainScreen = mainScreen;
+        this.menuScreen = menuScreen;
+        this.anvil = new MachineAnvilInput(caseManager.getPlugin());
     }
 
     void startGuiTitle(Player player, CaseDefinition definition) {
-        start(player, definition, Field.GUI_TITLE);
+        anvil.open(player, "&0Название меню", definition.guiTitle(),
+                GuiDesign.head(GuiDesign.TITLE, "&fНазвание меню"),
+                value -> value == null || value.trim().isBlank() ? "Введите название" : null,
+                value -> {
+                    support.update(player, definition.name(),
+                            root -> section(root, "gui").set("title", value.trim()));
+                    menuScreen.open(player, definition.name());
+                },
+                () -> menuScreen.open(player, definition.name()));
     }
 
     void startHologramLines(Player player, CaseDefinition definition) {
@@ -45,10 +59,6 @@ final class MachineTextEditor {
         player.closeInventory();
 
         switch (field) {
-            case GUI_TITLE -> {
-                message(player, "machine-text.gui-title-prompt");
-                message(player, "machine-text.current", "value", definition.guiTitle());
-            }
             case HOLOGRAM_LINES -> {
                 message(player, "machine-text.hologram-prompt");
                 message(player, "machine-text.hologram-example");
@@ -86,8 +96,6 @@ final class MachineTextEditor {
         }
 
         switch (pending.field()) {
-            case GUI_TITLE -> support.update(player, pending.caseName(),
-                    root -> section(root, "gui").set("title", value));
             case HOLOGRAM_LINES -> applyHologramLines(player, pending.caseName(), value);
         }
         mainScreen.open(player, pending.caseName());
@@ -111,7 +119,6 @@ final class MachineTextEditor {
     }
 
     private enum Field {
-        GUI_TITLE,
         HOLOGRAM_LINES
     }
 

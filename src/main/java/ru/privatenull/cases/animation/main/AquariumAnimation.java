@@ -18,8 +18,8 @@ import ru.privatenull.cases.animation.AnimationRun;
 import ru.privatenull.cases.animation.RewardLabel;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
-import ru.privatenull.util.BukkitCompat.ParticleCompat;
-import ru.privatenull.util.SkullUtil;
+import ru.privatenull.pnlibrary.item.HeadUtil;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
 
 /** A temporary glass capsule with a water core and a smooth reward reveal. */
 public final class AquariumAnimation extends CaseAnimation {
@@ -48,7 +48,7 @@ public final class AquariumAnimation extends CaseAnimation {
         Location center = caseBlock.getLocation().add(0.5, 0.0, 0.5);
 
         ItemDisplay heart = item(world, center.clone().add(0.0, 1.02, 0.0),
-                SkullUtil.fromBase64(HEART_TEXTURE, "&#4FB6FFСердце моря"), 1.18f);
+                HeadUtil.create(HEART_TEXTURE, "&#4FB6FFСердце моря"), 1.18f);
         ItemStack rewardVisual = resolveRewardVisual(reward, def);
         ItemDisplay rewardDisplay = item(world, center.clone().add(0.0, 0.60, 0.0), rewardVisual, 0.01f);
         RewardLabel rewardLabel = RewardLabel.create(run, center,

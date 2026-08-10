@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'ru.privatenull'
-version = '1.5.1'
+version = '1.5.2'
 
 repositories {
     mavenCentral()
@@ -25,11 +25,14 @@ repositories {
         name = "rosewood"
         url = "https://repo.rosewooddev.io/repository/public/"
     }
+    maven {
+        name = "wesjd"
+        url = "https://mvn.wesjd.net/"
+    }
 }
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-    compileOnly("com.mojang:authlib:1.5.25")
     compileOnly("de.oliver:FancyHolograms:2.10.0")
     compileOnly("com.github.decentsoftware-eu.decentholograms:plugin:2.10.1")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
@@ -39,6 +42,7 @@ dependencies {
         exclude group: "org.xerial", module: "sqlite-jdbc"
     }
     implementation("org.bstats:bstats-bukkit:3.2.1")
+    implementation("net.wesjd:anvilgui:1.10.13-SNAPSHOT")
     compileOnly("org.xerial:sqlite-jdbc:3.53.2.0")
     compileOnly("net.kyori:adventure-text-serializer-legacy:4.17.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
@@ -59,6 +63,7 @@ tasks {
         mergeServiceFiles()
         relocate('ru.privatenull.pnlibrary', 'ru.privatenull.pncases.libs.pnlibrary')
         relocate('org.bstats', 'ru.privatenull.pncases.libs.bstats')
+        relocate('net.wesjd.anvilgui', 'ru.privatenull.pncases.libs.anvilgui')
     }
 
     jar {

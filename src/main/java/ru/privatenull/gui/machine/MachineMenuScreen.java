@@ -11,6 +11,7 @@ import org.bukkit.inventory.ItemStack;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.gui.GuiDesign;
+import ru.privatenull.modules.ModuleId;
 
 import java.util.List;
 
@@ -40,7 +41,7 @@ final class MachineMenuScreen {
                         "machine.titles.menu", "&0Настройка меню кейса", items.replacements(definition))
         );
         fill(inventory, definition);
-        caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
+        caseManager.getPlugin().openGui(player, inventory);
         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.18f, 1.25f);
     }
 
@@ -115,17 +116,21 @@ final class MachineMenuScreen {
     }
 
     private ItemStack contentToggle(CaseDefinition definition) {
-        boolean enabled = definition.guiLayout().previewEnabled();
+        boolean moduleEnabled = caseManager.getPlugin().getModules().isEnabled(ModuleId.PREVIEW);
+        boolean enabled = moduleEnabled && definition.guiLayout().previewEnabled();
         return items.configuredButton("machine.menu.content-toggle", GuiDesign.CONTENT,
                 "&x&4&2&9&F&9&1Содержимое кейса", List.of(
                         "", "&#65D1FC «Сейчас»",
-                        " &7- &fСтатус: " + (enabled ? "&aвключено" : "&cвыключено"),
+                        " &7- &fМодуль: " + (moduleEnabled ? "&aвключён" : "&cвыключен"),
+                        " &7- &fДля кейса: " + (definition.guiLayout().previewEnabled() ? "&aвключено" : "&cвыключено"),
                         "", "&#9EFC65 «Результат»",
                         enabled
                                 ? " &7- &fЛКМ открывает список наград."
                                 : " &7- &fЛКМ и ПКМ сразу открывают кейс.",
                         "", "&#FCA965 «Управление»",
-                        " &7- &fЛКМ — " + (enabled ? "выключить" : "включить"), ""), definition,
+                        moduleEnabled
+                                ? " &7- &fЛКМ — " + (enabled ? "выключить" : "включить")
+                                : " &7- &fВключите модуль в разделе «Модули».", ""), definition,
                 "status", enabled ? "&aвключено" : "&cвыключено",
                 "action", enabled ? "выключить" : "включить");
     }

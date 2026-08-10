@@ -17,8 +17,8 @@ import ru.privatenull.cases.animation.CaseAnimation;
 import ru.privatenull.cases.animation.AnimationRun;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
-import ru.privatenull.util.BukkitCompat.ParticleCompat;
-import ru.privatenull.util.ServerCompatibility;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
+import ru.privatenull.pnlibrary.compat.ServerCapabilities;
 import ru.privatenull.util.VisualEntity;
 
 import java.util.*;
@@ -393,7 +393,7 @@ public final class MobHuntAnimation extends CaseAnimation implements Listener {
     }
 
     private RewardVisual createRewardReveal(Location center, ItemStack item, String name) {
-        if (!ServerCompatibility.hasDisplayEntities()) {
+        if (!ServerCapabilities.hasDisplayEntities()) {
             return new LegacyRewardVisual(center, item, name);
         }
         try {

@@ -50,6 +50,10 @@ public final class RewardConfigParser {
             case PERSONAL -> parsePersonal(map);
         };
         if (!isValid(chance, type, parsed)) return null;
+        String configuredDisplayName = value(map.get("name"));
+        String displayName = configuredDisplayName == null || configuredDisplayName.isBlank()
+                ? parsed.displayName()
+                : configuredDisplayName;
 
         return new Reward(
                 chance,
@@ -61,7 +65,7 @@ public final class RewardConfigParser {
                 parsed.vaultAmount(),
                 parsed.playerPointsAmount(),
                 message,
-                parsed.displayName(),
+                displayName,
                 rarityId,
                 parsed.visualItem(),
                 parsed.command()

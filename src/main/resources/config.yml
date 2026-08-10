@@ -1,5 +1,15 @@
+# ───────────────────── pnCases 1.5.2 ─────────────────────
+
+# Модули: true — включить, false — выключить.
+modules:
+  rarity: true         # Редкости наград
+  preview: true        # Просмотр содержимого кейса
+  gui-animation: true  # Анимация появления предметов в GUI
+  title: true          # Анимация заголовка GUI
+
+# ───────────────────── Хранилище ─────────────────────
 database:
-  type: SQLITE # SQLITE / MYSQL / MONGODB
+  type: SQLITE # SQLITE, MYSQL или MONGODB
   sqlite:
     file: data.db
     connection-timeout-ms: 10000
@@ -17,9 +27,11 @@ database:
     database: pncases
     collection: pncases
 
+# ───────────────────── Голограммы ─────────────────────
 holograms:
-  provider: AUTO # AUTO / FANCY / DECENT
+  provider: AUTO # AUTO, FANCY или DECENT
 
+# ───────────────────── Символы наград ─────────────────────
 reward-symbols:
   vault: "$"
   playerpoints: "✦"

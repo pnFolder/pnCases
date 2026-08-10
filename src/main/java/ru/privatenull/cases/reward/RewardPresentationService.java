@@ -9,8 +9,9 @@ import ru.privatenull.PnCasesPlugin;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
 import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.util.BukkitCompat.EnchantmentCompat;
-import ru.privatenull.util.BukkitCompat.MaterialCompat;
+import ru.privatenull.modules.ModuleId;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.EnchantmentCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.MaterialCompat;
 import ru.privatenull.gui.GuiDesign;
 
 import java.util.ArrayList;
@@ -29,8 +30,10 @@ public final class RewardPresentationService {
 
     public ItemStack buildPreviewItem(CaseDefinition definition, Reward reward, int totalChance) {
         ItemStack item = buildDisplayItem(definition, reward);
-        PreviewRarityStyle rarity = resolveRarity(reward);
-        PreviewTypeStyle type = resolveType(reward.type());
+        PreviewRarityStyle rarity = plugin.getModules().isEnabled(ModuleId.RARITY)
+                ? resolveRarity(reward)
+                : new PreviewRarityStyle("", "", false);
+        PreviewTypeStyle type = resolveType(reward);
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
@@ -45,8 +48,7 @@ public final class RewardPresentationService {
                 "case", definition == null ? "" : color(definition.displayName()),
                 "case_id", definition == null ? "" : definition.name(),
                 "reward", rewardName,
-                "rarity_name", rarity.name(),
-                "rarity_id", rarity.id(),
+                "rarity", rarity.name(),
                 "type", type.color() + type.name(),
                 "type_name", type.name(),
                 "type_id", type.id(),
@@ -56,10 +58,12 @@ public final class RewardPresentationService {
                 "chance", formatChancePercent(reward.chance(), totalChance),
                 "amount", amount,
                 "duration", duration,
+                "group", reward.lpGroup() == null ? "" : reward.lpGroup(),
+                "permission", reward.lpNode() == null ? "" : reward.lpNode(),
                 "item_amount", String.valueOf(itemAmount)
         };
         meta.setDisplayName(plugin.getUi().text(
-                "preview.reward.name", "{rarity_name} &f{reward}", replacements));
+                "preview.reward.name", "{rarity} &f{reward}", replacements));
 
         List<String> originalLore = meta.hasLore() && meta.getLore() != null
                 ? new ArrayList<>(meta.getLore()) : List.of();
@@ -163,6 +167,11 @@ public final class RewardPresentationService {
         return (symbol == null ? "✦" : symbol) + amount;
     }
 
+    public String formattedRarity(Reward reward) {
+        if (reward == null || !plugin.getModules().isEnabled(ModuleId.RARITY)) return "";
+        return resolveRarity(reward).name();
+    }
+
     private ItemStack findMatchingAnimationItem(CaseDefinition definition, Reward reward) {
         if (definition == null || reward == null || definition.animationItems() == null) {
             return null;
@@ -198,18 +207,23 @@ public final class RewardPresentationService {
         String path = "preview.rarities." + id;
         String humanized = humanizeId(id);
         String name = styleValue(path + ".name", "preview.rarities.default.name", fallbackName)
-                .replace("{rarity_id}", humanized);
+                .replace("{rarity_id}", humanized)
+                .replace("{id}", humanized);
         boolean glow = styleBoolean(path + ".glow", "preview.rarities.default.glow", false);
         return new PreviewRarityStyle(id, name, glow);
     }
 
-    private PreviewTypeStyle resolveType(Reward.Type rewardType) {
+    private PreviewTypeStyle resolveType(Reward reward) {
+        Reward.Type rewardType = reward.type();
         String id = rewardType.name().toLowerCase(Locale.ROOT);
         return switch (rewardType) {
             case ITEM -> new PreviewTypeStyle(id, "Предмет", "&f", "◆", "");
             case VAULT -> new PreviewTypeStyle(id, "Монеты", "&a", "●", "");
             case PLAYERPOINTS -> new PreviewTypeStyle(id, "Поинты", "&b", "✦", "");
-            case LUCKPERMS -> new PreviewTypeStyle(id, "Привилегия", "&d", "★", "");
+            case LUCKPERMS -> reward.lpNode() != null && !reward.lpNode().isBlank()
+                    && (reward.lpGroup() == null || reward.lpGroup().isBlank())
+                    ? new PreviewTypeStyle(id, "Право", "&b", "◆", "")
+                    : new PreviewTypeStyle(id, "Привилегия", "&d", "★", "");
             case PERSONAL -> new PreviewTypeStyle(id, "Личная награда", "&e", "✦", "");
         };
     }
@@ -217,7 +231,7 @@ public final class RewardPresentationService {
     private List<String> defaultPreviewLore() {
         return List.of(
                 "", "&#9EFC65 «Основная информация»",
-                " &7- &fРедкость: {rarity_name}",
+                " &7- &fРедкость: {rarity}",
                 "", "&#65D1FC «Вероятность»",
                 " &7- &fВыпадение: &#FCA865{chance}"
         );
@@ -232,6 +246,8 @@ public final class RewardPresentationService {
             case PLAYERPOINTS -> List.of("", "&#FCA965 «Награда»",
                     " &7- &fПоинты: &b{amount}", "");
             case LUCKPERMS -> List.of("", "&#FCA965 «Награда»",
+                    " &7- &fПривилегия: &d{group}",
+                    " &7- &fПраво: &b{permission}",
                     " &7- &fСрок: &d{duration}", "");
             case PERSONAL -> List.of();
         };

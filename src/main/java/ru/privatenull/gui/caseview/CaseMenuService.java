@@ -1,6 +1,7 @@
 package ru.privatenull.gui.caseview;
 
 import ru.privatenull.gui.GuiSession;
+import ru.privatenull.modules.ModuleId;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -17,7 +18,7 @@ import ru.privatenull.cases.reward.RewardPresentationService;
 import ru.privatenull.storage.CasesDatabase.HistoryEntry;
 import ru.privatenull.pnlibrary.text.ColorUtil;
 import ru.privatenull.gui.GuiDesign;
-import ru.privatenull.util.ServerCompatibility;
+import ru.privatenull.pnlibrary.compat.ServerVersion;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -59,7 +60,8 @@ public final class CaseMenuService implements CaseManager.View {
         String buyHint = "&fЛКМ — купить ключ за &#FCA865" + buyExp + " уровней";
         String previewHint = "&fЛКМ — посмотреть содержимое";
         String openLeftHint = "&fЛКМ — открыть кейс";
-        boolean previewEnabled = definition.guiLayout().previewEnabled();
+        boolean previewEnabled = plugin.getModules().isEnabled(ModuleId.PREVIEW)
+                && definition.guiLayout().previewEnabled();
         String[] replacements = {
                 "case", color(definition.displayName()), "case_id", definition.name(),
                 "display-name", color(definition.displayName()), "title", definition.guiTitle(),
@@ -120,7 +122,7 @@ public final class CaseMenuService implements CaseManager.View {
         fillHistory(inventory, definition);
         if (layout.animationSlot() >= 0
                 && definition.fixedAnimation() == null
-                && !ServerCompatibility.useMinecraft1165AnimationMode()) {
+                && !ServerVersion.current().isReleaseLine(1, 16)) {
             inventory.setItem(layout.animationSlot(), buildAnimationButton(player, definition));
         }
         // Opening is the highest-priority action. Keep it last as an additional
@@ -136,7 +138,7 @@ public final class CaseMenuService implements CaseManager.View {
                 color(definition.guiTitle())
         );
         fill(inventory, player, definition);
-        plugin.getGuiOpenAnimations().open(player, inventory);
+        plugin.openGui(player, inventory);
     }
 
     private List<String> formatLore(List<String> source, String[] replacements) {
@@ -177,7 +179,7 @@ public final class CaseMenuService implements CaseManager.View {
         List<Integer> slots = new ArrayList<>(definition.guiLayout().historySlots());
         int animationSlot = definition.guiLayout().animationSlot();
         boolean animationSelectionHidden = definition.fixedAnimation() != null
-                || ServerCompatibility.useMinecraft1165AnimationMode();
+                || ServerVersion.current().isReleaseLine(1, 16);
         if (animationSelectionHidden
                 && animationSlot >= 0
                 && animationSlot < inventory.getSize()

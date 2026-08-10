@@ -1,48 +1,32 @@
 package ru.privatenull.commands;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.util.StringUtil;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
 import ru.privatenull.PnCasesPlugin;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.gui.machine.MachineGuiListener;
-import ru.privatenull.pnlibrary.update.UpdateChecker;
-import ru.privatenull.pnlibrary.text.ColorUtil;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
-public final class CasesCommand implements CommandExecutor, TabCompleter {
-
-    private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
-    private static final List<String> SUBCOMMANDS = List.of(
-            "createcase", "setcase", "delcase", "machine", "givekey", "takekey", "reload");
-    private static final List<String> CASE_SUBCOMMANDS = List.of("setcase", "delcase", "machine");
-    private static final List<String> AMOUNTS = List.of("1", "2", "3", "5", "10", "16", "32", "64");
-    private static final List<String> SILENT_FLAG = List.of("-s");
+public final class CasesCommand implements CommandExecutor {
 
     private final PnCasesPlugin plugin;
     private final CaseManager caseManager;
     private final MachineGuiListener machineGui;
+    private final CasesCommandMenu menu;
 
     public CasesCommand(PnCasesPlugin plugin, CaseManager caseManager, MachineGuiListener machineGui) {
         this.plugin = plugin;
         this.caseManager = caseManager;
         this.machineGui = machineGui;
+        this.menu = new CasesCommandMenu(plugin);
     }
 
     @Override
@@ -52,7 +36,7 @@ public final class CasesCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length == 0) {
-            sendCommandMenu(sender);
+            menu.send(sender);
             return true;
         }
 
@@ -68,49 +52,16 @@ public final class CasesCommand implements CommandExecutor, TabCompleter {
         };
         if (!known) {
             sender.sendMessage(plugin.getUi().get("unknown-command"));
-            sendCommandMenu(sender);
+            menu.send(sender);
         }
         return true;
     }
 
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (!sender.hasPermission("pncases.admin")) return new ArrayList<>();
-        if (args.length == 1) return filter(SUBCOMMANDS, args[0]);
-
-        String subcommand = args[0].toLowerCase(Locale.ROOT);
-        if (CASE_SUBCOMMANDS.contains(subcommand) && args.length == 2) {
-            return filter(caseManager.getConfiguredCaseNames(), args[1]);
-        }
-        if (subcommand.equals("givekey") || subcommand.equals("takekey")) {
-            if (args.length == 2) return filter(onlinePlayerNames(), args[1]);
-            if (args.length == 3) return filter(caseManager.getKeyNames(), args[2]);
-            if (args.length == 4) return filter(AMOUNTS, args[3]);
-            if (args.length == 5 && subcommand.equals("givekey")) {
-                return filter(SILENT_FLAG, args[4]);
-            }
-        }
-        return new ArrayList<>();
-    }
-
-    private static List<String> onlinePlayerNames() {
-        List<String> names = new ArrayList<>();
-        for (Player player : Bukkit.getOnlinePlayers()) names.add(player.getName());
-        return names;
-    }
-
-    private static List<String> filter(List<String> values, String prefix) {
-        List<String> matches = new ArrayList<>();
-        StringUtil.copyPartialMatches(prefix == null ? "" : prefix, values, matches);
-        Collections.sort(matches);
-        return matches;
-    }
-
     private boolean reload(CommandSender sender) {
         plugin.reloadConfig();
-        var validation = plugin.validateCurrentConfig();
         plugin.getUi().load();
         boolean casesReloaded = caseManager.reloadFromConfig();
+        var validation = plugin.validateCurrentConfig();
         plugin.reloadRuntimeConfig();
         if (casesReloaded) {
             sender.sendMessage(plugin.getUi().get("config-reloaded"));
@@ -306,65 +257,6 @@ public final class CasesCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    private void sendCommandMenu(CommandSender sender) {
-        String current = plugin.getDescription().getVersion();
-        MenuUpdateInfo update = menuUpdateInfo(current);
-        String prefix = plugin.getUi().get("prefix");
-
-        sender.sendMessage(menuComponent(prefix + " &8| &fПанель администратора"));
-        sender.sendMessage(menuComponent(""));
-        sender.sendMessage(menuComponent("&#9EFC65 «Состояние плагина»"));
-        sender.sendMessage(menuComponent(" &7- &fВерсия: &#FCA865" + current));
-        sender.sendMessage(menuComponent(" &7- &fСерверы: &#FCA8651.16.5–1.21.11"));
-        sender.sendMessage(menuComponent(" &7- &fОбновление: " + update.status()));
-        sender.sendMessage(menuComponent(" &7- &fПоддержка: &#65D1FC" + plugin.getSupportDiscord()));
-        sender.sendMessage(menuComponent(""));
-        sender.sendMessage(menuComponent("&#65D1FC «Управление»"));
-        sender.sendMessage(menuComponent(" &7Нажмите на команду, чтобы вставить её в чат."));
-        sender.sendMessage(menuComponent(""));
-        sendCommandLine(sender, "/pncases reload", "перезагрузить настройки");
-        sendCommandLine(sender, "/pncases machine <кейс>", "открыть Machine");
-        sendCommandLine(sender, "/pncases createcase <id>", "создать кейс");
-        sendCommandLine(sender, "/pncases setcase <кейс>", "поставить кейс на блок");
-        sendCommandLine(sender, "/pncases delcase <кейс>", "удалить кейс");
-        sendCommandLine(sender, "/pncases givekey <игрок> <кейс> <кол-во>", "выдать ключи");
-        sendCommandLine(sender, "/pncases takekey <игрок> <кейс> <кол-во>", "забрать ключи");
-    }
-
-    private static void sendCommandLine(CommandSender sender, String command, String description) {
-        Component line = menuComponent(" &#EFF7B9▸ ")
-                .append(menuComponent("&#EFF7B9" + command)
-                        .clickEvent(ClickEvent.suggestCommand(command.replaceAll("<[^>]+>", ""))))
-                .append(menuComponent(" &8— &7" + description));
-        sender.sendMessage(line);
-    }
-
-    private static Component menuComponent(String text) {
-        return LEGACY.deserialize(ColorUtil.colorize(text));
-    }
-
-    private MenuUpdateInfo menuUpdateInfo(String current) {
-        UpdateChecker checker = plugin.getUpdateChecker();
-        if (checker == null || !checker.isCheckCompleted()) {
-            return new MenuUpdateInfo("&7проверяется", "неизвестно", "");
-        }
-        if (checker.isUpdateAvailable()) {
-            String latest = knownOrUnknown(checker.getLatestVersion());
-            return new MenuUpdateInfo(
-                    "&eдоступно &f" + current + " &8→ §x§D§8§D§F§9§D" + latest,
-                    latest,
-                    knownOrUnknown(checker.getDownloadUrl())
-            );
-        }
-        String error = checker.getLastError();
-        if (error != null && !error.isBlank()) {
-            String stripped = ChatColor.stripColor(error);
-            return new MenuUpdateInfo("&cошибка проверки: &f" + (stripped == null ? error : stripped),
-                    knownOrUnknown(checker.getLatestVersion()), "");
-        }
-        return new MenuUpdateInfo("&aпоследняя версия", knownOrUnknown(checker.getLatestVersion()), "");
-    }
-
     private CaseDefinition caseAtTarget(Player player, int distance) {
         Block target = player.getTargetBlockExact(distance);
         return target == null ? null : caseManager.getCaseByBlock(target);
@@ -409,13 +301,6 @@ public final class CasesCommand implements CommandExecutor, TabCompleter {
         return player.getName() == null ? player.getUniqueId().toString() : player.getName();
     }
 
-    private static String knownOrUnknown(String value) {
-        return value == null || value.isBlank() ? "неизвестно" : value;
-    }
-
     private record ParsedAmount(int amount, boolean silent) {
-    }
-
-    private record MenuUpdateInfo(String status, String latest, String download) {
     }
 }

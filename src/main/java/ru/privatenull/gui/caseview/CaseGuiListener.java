@@ -17,9 +17,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.CaseDefinition;
+import ru.privatenull.pnlibrary.item.HeadUtil;
 import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.util.BukkitCompat.InventoryViewCompat;
-import ru.privatenull.util.SkullUtil;
+import ru.privatenull.modules.ModuleId;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,7 +66,8 @@ public final class CaseGuiListener implements Listener {
         CaseDefinition definition = caseManager.getCaseByName(holder.caseName());
         if (definition == null) return;
         if (slot == definition.guiLayout().openSlot()) {
-            if (definition.guiLayout().previewEnabled()
+            if (caseManager.getPlugin().getModules().isEnabled(ModuleId.PREVIEW)
+                    && definition.guiLayout().previewEnabled()
                     && (event.getClick() == ClickType.MIDDLE
                     || (event.getClick().isLeftClick() && definition.buyKeyWithXpLevels() <= 0))) {
                 rewardPreviewMenu.open(player, holder.caseName(), 0);
@@ -99,12 +101,6 @@ public final class CaseGuiListener implements Listener {
 
         String keyId = definition.name();
         int need = 1;
-        if (!caseManager.keyExists(keyId)) {
-            showInvalidKey(player, event.getInventory(), definition);
-            scheduleRefresh(player, holder.caseName(), playerId, 30L);
-            return;
-        }
-
         int have = caseManager.getPlugin().getDatabase().getKeys(playerId, keyId);
         if (have >= need) {
             clickLock.remove(playerId);
@@ -120,19 +116,6 @@ public final class CaseGuiListener implements Listener {
             showInsufficientPayment(player, event.getInventory(), definition, wantsBuy, have, need, buyLevels);
         }
         scheduleRefresh(player, holder.caseName(), playerId, 30L);
-    }
-
-    private void showInvalidKey(Player player, Inventory inventory, CaseDefinition definition) {
-        String title = "&cКлюч не настроен";
-        inventory.setItem(definition.guiLayout().openSlot(), pane(Material.BARRIER, title, List.of(
-                        "",
-                        "&#FC7165 «Ошибка настройки»",
-                        " &7- &fДля кейса не создан виртуальный ключ.",
-                        " &7- &fПересоздайте кейс или проверьте config.yml.",
-                        ""
-                )));
-        player.sendMessage(caseManager.getPlugin().getUi().get("key-not-configured"));
-        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.24f, 1.0f);
     }
 
     private void buyKeys(
@@ -250,7 +233,7 @@ public final class CaseGuiListener implements Listener {
     }
 
     private static ItemStack texturedPane(String texture, String name, List<String> lore) {
-        ItemStack item = SkullUtil.fromBase64(texture, name);
+        ItemStack item = HeadUtil.create(texture, name);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(ColorUtil.colorize(name));

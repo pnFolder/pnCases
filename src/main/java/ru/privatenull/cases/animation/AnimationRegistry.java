@@ -6,7 +6,8 @@ import ru.privatenull.cases.animation.legacy.LegacyCaseAnimation;
 import ru.privatenull.cases.animation.legacy.LegacyFortuneRingAnimation;
 import ru.privatenull.cases.animation.main.MobHuntAnimation;
 import ru.privatenull.cases.model.AnimationType;
-import ru.privatenull.util.ServerCompatibility;
+import ru.privatenull.pnlibrary.compat.ServerCapabilities;
+import ru.privatenull.pnlibrary.compat.ServerVersion;
 
 import java.lang.reflect.Constructor;
 import java.util.EnumMap;
@@ -21,7 +22,7 @@ public class AnimationRegistry {
 
     public AnimationRegistry(PnCasesPlugin plugin) {
         this.plugin = plugin;
-        if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+        if (ServerVersion.current().isReleaseLine(1, 16)) {
             CaseAnimation fortuneRing = new LegacyFortuneRingAnimation(plugin);
             for (AnimationType type : AnimationType.values()) {
                 animations.put(type, fortuneRing);
@@ -29,7 +30,8 @@ public class AnimationRegistry {
             return;
         }
 
-        boolean modern = ServerCompatibility.useModernAnimations();
+        boolean modern = ServerVersion.current().isAtLeast(1, 21, 0)
+                && ServerCapabilities.hasDisplayEntities();
         register(AnimationType.ANVIL, modern, "AnvilAnimation");
         register(AnimationType.DYNAMITE, modern, "DynamiteAnimation");
         register(AnimationType.PORTAL, modern, "PortalAnimation");

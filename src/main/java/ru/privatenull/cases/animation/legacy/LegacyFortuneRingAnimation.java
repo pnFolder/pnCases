@@ -14,9 +14,9 @@ import ru.privatenull.cases.animation.CaseAnimation;
 import ru.privatenull.cases.animation.AnimationRun;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
-import ru.privatenull.util.BukkitCompat.MaterialCompat;
-import ru.privatenull.util.BukkitCompat.ParticleCompat;
-import ru.privatenull.util.BukkitCompat.SoundCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.MaterialCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.SoundCompat;
 import ru.privatenull.util.VisualEntity;
 
 import java.util.ArrayList;

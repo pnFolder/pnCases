@@ -1,12 +1,11 @@
 package ru.privatenull.gui.machine;
 
-import ru.privatenull.gui.GuiSession;
-
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -14,7 +13,9 @@ import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.gui.GuiDesign;
+import ru.privatenull.gui.GuiSession;
 import ru.privatenull.gui.machine.MachineGuiSupport.SlotRole;
+import ru.privatenull.pnlibrary.text.ColorUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,144 +24,184 @@ import java.util.TreeSet;
 
 import static ru.privatenull.gui.machine.MachineGuiSupport.section;
 import static ru.privatenull.util.ItemFactory.isRealItem;
-import static ru.privatenull.util.ItemFactory.writeExactItem;
 import static ru.privatenull.util.ItemFactory.readableItemName;
+import static ru.privatenull.util.ItemFactory.writeExactItem;
 
 final class MachineLayoutEditor {
+
+    private static final int ROLE_PREVIEW = 4;
+    private static final int ROLE_OPEN = 10;
+    private static final int ROLE_HISTORY = 11;
+    private static final int ROLE_DECOR = 12;
+    private static final int ROLE_ANIMATION = 14;
+    private static final int ROLE_EMPTY = 15;
+    private static final int ROLE_ICON = 16;
+    private static final int ROLE_BACK = 22;
 
     private final CaseManager caseManager;
     private final MachineGuiSupport support;
     private final MachineItemFactory items;
+    private final MachineMenuScreen menuScreen;
 
-    MachineLayoutEditor(CaseManager caseManager, MachineGuiSupport support, MachineItemFactory items) {
+    MachineLayoutEditor(CaseManager caseManager, MachineGuiSupport support,
+                        MachineItemFactory items, MachineMenuScreen menuScreen) {
         this.caseManager = caseManager;
         this.support = support;
         this.items = items;
+        this.menuScreen = menuScreen;
     }
 
     void open(Player player, String caseName) {
         CaseDefinition definition = caseManager.getCaseByName(caseName);
         if (definition == null) return;
-        if (MachineGuiSupport.refreshIfOpen(
-                caseManager, player, GuiSession.Screen.MACHINE_LAYOUT, definition.name(),
-                inventory -> fill(inventory, definition))) {
-            return;
-        }
         Inventory inventory = Bukkit.createInventory(
-                GuiSession.machine(GuiSession.Screen.MACHINE_LAYOUT, caseName),
-                54,
+                GuiSession.machineLayout(caseName), definition.guiLayout().size(),
                 caseManager.getPlugin().getUi().text(
-                        "machine.titles.layout", "&0Разметка меню кейса", items.replacements(definition))
+                        "machine.titles.layout", "&0Разметка • Q назад", items.replacements(definition))
         );
-        fill(inventory, definition);
-        caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            inventory.setItem(slot, slotItem(definition, slot));
+        }
+        caseManager.getPlugin().openGui(player, inventory);
         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.18f, 1.15f);
     }
 
     void handleClick(Player player, InventoryClickEvent event, CaseDefinition definition, int slot) {
-        SlotRole current = support.roleAt(definition, slot);
-        ItemStack cursor = event.getCursor();
-        if (isRealItem(cursor)) {
-            applyCursorItem(player, definition, slot, current, cursor);
+        if (event.getClick() == ClickType.DROP || event.getClick() == ClickType.CONTROL_DROP) {
+            menuScreen.open(player, definition.name());
+            return;
+        }
+        if (slot < 0 || slot >= definition.guiLayout().size()) return;
+        openRolePicker(player, definition, slot);
+    }
+
+    void handleRoleClick(GuiSession holder, Player player, InventoryClickEvent event,
+                         CaseDefinition definition, int clickedSlot) {
+        int targetSlot = holder.selection();
+        if (targetSlot < 0 || targetSlot >= definition.guiLayout().size()) {
+            open(player, definition.name());
+            return;
+        }
+        if (clickedSlot == ROLE_BACK) {
+            open(player, definition.name());
             return;
         }
 
-        SlotRole next = support.stepRole(current, event.isRightClick());
-        if (isRequired(current) && isRequired(next)) {
-            swapRequiredRoles(player, definition, slot, current, next);
+        SlotRole current = support.roleAt(definition, targetSlot);
+        if (clickedSlot == ROLE_ICON) {
+            ItemStack cursor = event.getCursor();
+            if (!isRealItem(cursor)) {
+                player.sendMessage(ColorUtil.colorize("&#FC7165Положите нужный предмет на курсор и нажмите кнопку ещё раз."));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.18f, 1.0f);
+                return;
+            }
+            applyCursorItem(player, definition, targetSlot, current, cursor);
+            CaseDefinition updated = caseManager.getCaseByName(definition.name());
+            if (updated != null) openRolePicker(player, updated, targetSlot);
             return;
         }
-        if (isRequired(current) && next != current) {
-            player.sendMessage(caseManager.getPlugin().getUi().get(
-                    "machine-layout-required-slot", "slot", current.displayName));
+
+        SlotRole selected = roleAtButton(clickedSlot);
+        if (selected == null) return;
+        if (current == SlotRole.OPEN && selected != SlotRole.OPEN) {
+            player.sendMessage(ColorUtil.colorize("&#FC7165Сначала перенесите «Открытие» в другой слот. После этого текущий слот можно изменить."));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.18f, 1.0f);
+            openRolePicker(player, definition, targetSlot);
             return;
         }
-        if (current == SlotRole.ANIMATION && next != current) {
-            support.update(player, definition.name(), root -> {
-                ConfigurationSection gui = section(root, "gui");
-                gui.set("animation_slot", -1);
-                setRole(gui, definition, slot, next);
-            });
-            refresh(player, definition.name());
+        if (current == selected) {
+            openRolePicker(player, definition, targetSlot);
             return;
         }
-        applyRole(player, definition, slot, next);
+        support.update(player, definition.name(), root ->
+                setRole(section(root, "gui"), definition, targetSlot, current, selected));
+        open(player, definition.name());
     }
 
-    private void fill(Inventory inventory, CaseDefinition definition) {
-        for (int slot = 0; slot < inventory.getSize(); slot++) {
-            inventory.setItem(slot, slotItem(definition, slot));
-        }
+    private void openRolePicker(Player player, CaseDefinition definition, int slot) {
+        SlotRole current = support.roleAt(definition, slot);
+        Inventory inventory = Bukkit.createInventory(
+                GuiSession.machineLayoutRole(definition.name(), slot), 27,
+                ColorUtil.colorize("&0Слот " + slot + " • " + roleName(current)));
+        items.fill(inventory, items.pane(Material.BLACK_STAINED_GLASS_PANE, " ", List.of()));
+        inventory.setItem(ROLE_PREVIEW, slotItem(definition, slot));
+        inventory.setItem(ROLE_OPEN, roleButton(definition, SlotRole.OPEN, current));
+        inventory.setItem(ROLE_HISTORY, roleButton(definition, SlotRole.HISTORY, current));
+        inventory.setItem(ROLE_DECOR, roleButton(definition, SlotRole.DECOR, current));
+        inventory.setItem(ROLE_ANIMATION, roleButton(definition, SlotRole.ANIMATION, current));
+        inventory.setItem(ROLE_EMPTY, roleButton(definition, SlotRole.EMPTY, current));
+        inventory.setItem(ROLE_ICON, items.builtInButton(Material.ITEM_FRAME,
+                "&#65D1FCЗаменить иконку", List.of(
+                        "", " &7- &fПоложите предмет на курсор и нажмите.",
+                        " &7- &fИконка изменится для роли «" + roleName(current) + "».", "")));
+        inventory.setItem(ROLE_BACK, items.backButton(definition));
+        caseManager.getPlugin().openGui(player, inventory);
     }
 
-    private void refresh(Player player, String caseName) {
-        CaseDefinition updated = caseManager.getCaseByName(caseName);
-        if (updated == null) {
-            player.closeInventory();
-            return;
+    private ItemStack roleButton(CaseDefinition definition, SlotRole role, SlotRole current) {
+        boolean selected = role == current;
+        List<String> lore = new ArrayList<>();
+        lore.add("");
+        lore.add(selected ? " &a✓ Сейчас назначено этому слоту" : " &7- &fЛКМ — назначить этому слоту");
+        if (role == SlotRole.OPEN) lore.add(" &7- &fПереносит кнопку открытия сюда.");
+        if (current == SlotRole.OPEN && role != SlotRole.OPEN) {
+            lore.add(" &cНедоступно: сначала перенесите «Открытие».");
         }
-        if (!MachineGuiSupport.refreshIfOpen(
-                caseManager, player, GuiSession.Screen.MACHINE_LAYOUT, caseName,
-                inventory -> fill(inventory, updated))) {
-            open(player, caseName);
-        }
+        lore.add("");
+        return items.builtInButton(roleItem(definition, role),
+                (selected ? "&#9EFC65✓ " : role.color) + roleName(role), lore);
+    }
+
+    private SlotRole roleAtButton(int slot) {
+        return switch (slot) {
+            case ROLE_OPEN -> SlotRole.OPEN;
+            case ROLE_HISTORY -> SlotRole.HISTORY;
+            case ROLE_DECOR -> SlotRole.DECOR;
+            case ROLE_ANIMATION -> SlotRole.ANIMATION;
+            case ROLE_EMPTY -> SlotRole.EMPTY;
+            default -> null;
+        };
     }
 
     private void applyCursorItem(Player player, CaseDefinition definition, int slot,
                                  SlotRole role, ItemStack cursor) {
-        if (role == SlotRole.EMPTY) {
-            support.update(player, definition.name(), root -> {
-                ConfigurationSection gui = section(root, "gui");
-                writeExactItem(section(gui, "decor"), "item", cursor);
-                setRole(gui, definition, slot, SlotRole.DECOR);
-            });
-        } else if (role == SlotRole.DECOR) {
-            support.update(player, definition.name(), root ->
-                    writeExactItem(section(section(root, "gui"), "decor"), "item", cursor));
-        } else if (role == SlotRole.OPEN) {
-            support.update(player, definition.name(), root ->
-                    writeExactItem(section(root, "gui"), "button", cursor));
-        } else if (role == SlotRole.HISTORY) {
-            support.update(player, definition.name(), root -> writeExactItem(
-                    section(section(root, "gui"), "history"), "empty", cursor));
-        }
-        refresh(player, definition.name());
-    }
-
-    private void swapRequiredRoles(Player player, CaseDefinition definition, int clickedSlot,
-                                   SlotRole current, SlotRole next) {
-        int nextSlot = requiredSlot(definition, next);
         support.update(player, definition.name(), root -> {
             ConfigurationSection gui = section(root, "gui");
-            Set<Integer> decor = readSlots(gui.getConfigurationSection("decor"), definition.guiLayout().decorSlots());
-            Set<Integer> history = readSlots(gui.getConfigurationSection("history"), definition.guiLayout().historySlots());
-            decor.remove(clickedSlot);
-            decor.remove(nextSlot);
-            history.remove(clickedSlot);
-            history.remove(nextSlot);
-            setRequiredSlot(gui, next, clickedSlot);
-            setRequiredSlot(gui, current, nextSlot);
-            section(gui, "decor").set("slots", new ArrayList<>(decor));
-            section(gui, "history").set("slots", new ArrayList<>(history));
+            switch (role) {
+                case EMPTY -> {
+                    writeExactItem(section(gui, "decor"), "item", cursor);
+                    setRole(gui, definition, slot, role, SlotRole.DECOR);
+                }
+                case DECOR -> writeExactItem(section(gui, "decor"), "item", cursor);
+                case OPEN -> writeExactItem(gui, "button", cursor);
+                case HISTORY -> writeExactItem(section(gui, "history"), "empty", cursor);
+                case ANIMATION -> { }
+            }
         });
-        refresh(player, definition.name());
     }
 
-    private void applyRole(Player player, CaseDefinition definition, int slot, SlotRole role) {
-        support.update(player, definition.name(), root ->
-                setRole(section(root, "gui"), definition, slot, role));
-        refresh(player, definition.name());
-    }
-
-    private void setRole(ConfigurationSection gui, CaseDefinition definition, int slot, SlotRole role) {
-        Set<Integer> decor = readSlots(gui.getConfigurationSection("decor"), definition.guiLayout().decorSlots());
-        Set<Integer> history = readSlots(gui.getConfigurationSection("history"), definition.guiLayout().historySlots());
+    private void setRole(ConfigurationSection gui, CaseDefinition definition, int slot,
+                         SlotRole current, SlotRole role) {
+        Set<Integer> decor = readSlots(gui.getConfigurationSection("decor"),
+                definition.guiLayout().decorSlots(), definition.guiLayout().size());
+        Set<Integer> history = readSlots(gui.getConfigurationSection("history"),
+                definition.guiLayout().historySlots(), definition.guiLayout().size());
         decor.remove(slot);
         history.remove(slot);
-
+        if (current == SlotRole.ANIMATION && role != SlotRole.ANIMATION) gui.set("animation_slot", -1);
         switch (role) {
-            case OPEN, ANIMATION -> setRequiredSlot(gui, role, slot);
+            case OPEN -> {
+                int previousOpen = definition.guiLayout().openSlot();
+                if (previousOpen != slot) {
+                    decor.remove(previousOpen);
+                    history.remove(previousOpen);
+                    if (gui.getInt("animation_slot", definition.guiLayout().animationSlot()) == previousOpen) {
+                        gui.set("animation_slot", -1);
+                    }
+                }
+                gui.set("open_slot", slot);
+            }
+            case ANIMATION -> gui.set("animation_slot", slot);
             case DECOR -> decor.add(slot);
             case HISTORY -> history.add(slot);
             case EMPTY -> { }
@@ -169,42 +210,16 @@ final class MachineLayoutEditor {
         section(gui, "history").set("slots", new ArrayList<>(history));
     }
 
-    private static boolean isRequired(SlotRole role) {
-        return role == SlotRole.OPEN;
-    }
-
-    private static void setRequiredSlot(ConfigurationSection gui, SlotRole role, int slot) {
-        switch (role) {
-            case OPEN -> gui.set("open_slot", slot);
-            case ANIMATION -> gui.set("animation_slot", slot);
-            default -> throw new IllegalArgumentException("Not a required slot role: " + role);
-        }
-    }
-
-    private static int requiredSlot(CaseDefinition definition, SlotRole role) {
-        return switch (role) {
-            case OPEN -> definition.guiLayout().openSlot();
-            case ANIMATION -> definition.guiLayout().animationSlot();
-            default -> throw new IllegalArgumentException("Not a required slot role: " + role);
-        };
-    }
-
-    private Set<Integer> readSlots(ConfigurationSection section, List<Integer> fallback) {
-        if (section == null || !section.isList("slots")) return new TreeSet<>(fallback);
+    private Set<Integer> readSlots(ConfigurationSection source, List<Integer> fallback, int size) {
+        if (source == null || !source.isList("slots")) return new TreeSet<>(fallback);
         Set<Integer> slots = new TreeSet<>();
-        for (Object raw : section.getList("slots", List.of())) {
-            if (raw instanceof Number number) {
-                slots.add(number.intValue());
-                continue;
-            }
+        for (Object raw : source.getList("slots", List.of())) {
             try {
-                slots.add(Integer.parseInt(String.valueOf(raw)));
-            } catch (NumberFormatException ex) {
-                caseManager.getPlugin().getLogger().warning(
-                        "Machine GUI: пропущен неверный номер слота: " + raw);
+                int slot = raw instanceof Number number ? number.intValue() : Integer.parseInt(String.valueOf(raw));
+                if (slot >= 0 && slot < size) slots.add(slot);
+            } catch (NumberFormatException ignored) {
             }
         }
-        slots.removeIf(slot -> slot == null || slot < 0 || slot >= 54);
         return slots;
     }
 
@@ -213,42 +228,16 @@ final class MachineLayoutEditor {
         ItemStack item = roleItem(definition, role);
         String roleName = roleName(role);
         String itemName = role == SlotRole.EMPTY ? "" : readableItemName(item);
-
-        List<String> lore = new ArrayList<>();
-        lore.add("");
-        lore.add("&#65D1FC «Сейчас»");
-        lore.add(" &7- &fСлот: &#FCA865" + slot);
-        lore.add(" &7- &fРоль: " + role.color + roleName);
-        if (role != SlotRole.EMPTY) lore.add(" &7- &fПредмет: &#FCA865" + itemName);
-        if (slot >= definition.guiLayout().size()) {
-            lore.add("");
-            lore.add("&#FC7165 «Ограничение»");
-            lore.add(" &7- &fСлот появится после увеличения меню.");
-        }
-        if (role == SlotRole.ANIMATION && definition.fixedAnimation() != null) {
-            lore.add("");
-            lore.add("&#FC7165 «Ограничение»");
-            lore.add(" &7- &fАнимация кейса зафиксирована.");
-        }
-        if (role == SlotRole.ANIMATION) {
-            lore.add(" &7- &fСмените роль, чтобы убрать кнопку.");
-        }
-        lore.add("");
-        lore.add("&#FCA965 «Управление»");
-        lore.add(" &7- &fЛКМ — следующая роль");
-        lore.add(" &7- &fПКМ — предыдущая роль");
-        if (role == SlotRole.EMPTY || role == SlotRole.DECOR
-                || role == SlotRole.OPEN || role == SlotRole.HISTORY) {
-            lore.add(" &7- &fПредмет на курсоре — заменить иконку");
-        }
-        lore.add("");
+        List<String> lore = new ArrayList<>(List.of(
+                "", " &7- &fСлот: &#FCA865" + slot,
+                " &7- &fНазначение: " + role.color + roleName));
+        if (!itemName.isEmpty()) lore.add(" &7- &fИконка: &#FCA865" + itemName);
+        lore.addAll(List.of("", "&#FCA965 «Управление»",
+                " &7- &fЛКМ — открыть настройку слота",
+                " &7- &fQ — вернуться назад", ""));
         return items.configuredButton("machine.layout.slot", item, role.color + roleName, lore, definition,
-                "slot", String.valueOf(slot),
-                "role", roleName,
-                "role_color", role.color,
-                "role-color", role.color,
-                "item", itemName,
-                "available", slot >= definition.guiLayout().size() ? "&cнет" : "&aда");
+                "slot", String.valueOf(slot), "role", roleName, "role_color", role.color,
+                "role-color", role.color, "item", itemName, "available", "&aда");
     }
 
     private String roleName(SlotRole role) {
@@ -263,19 +252,11 @@ final class MachineLayoutEditor {
             case ANIMATION -> GuiDesign.animation(AnimationType.FORTUNE_RING);
             case HISTORY -> definition.guiLayout().emptyHistoryItem();
             case DECOR -> definition.guiLayout().decorItem();
-            case EMPTY -> new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+            case EMPTY -> new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
         };
-        Material fallback = switch (role) {
-            case OPEN -> Material.CHEST;
-            case ANIMATION -> Material.CLOCK;
-            case HISTORY -> Material.BARRIER;
-            case DECOR -> Material.GRAY_STAINED_GLASS_PANE;
-            case EMPTY -> Material.BLACK_STAINED_GLASS_PANE;
-        };
-        if (item == null || item.getType().isAir()) return new ItemStack(fallback);
+        if (item == null || item.getType().isAir()) return new ItemStack(Material.STONE_BUTTON);
         ItemStack clone = item.clone();
         clone.setAmount(1);
         return clone;
     }
-
 }

@@ -272,7 +272,7 @@ public final class CaseConfigRepository {
     }
 
     static boolean migrateCaseGui(ConfigurationSection root) {
-        boolean changed = migrateCost(root);
+        boolean changed = migrateCost(root) | removeGeneratedRewardMessages(root);
         ConfigurationSection gui = root.getConfigurationSection("gui");
         if (gui == null) return changed;
 
@@ -285,6 +285,12 @@ public final class CaseConfigRepository {
         if (legacy != null) {
             gui.set("open-item", null);
             changed = true;
+        }
+        for (String obsolete : List.of("animation-item", "animation_item")) {
+            if (gui.contains(obsolete, true)) {
+                gui.set(obsolete, null);
+                changed = true;
+            }
         }
         if (button == null) {
             button = gui.createSection("button");
@@ -335,6 +341,26 @@ public final class CaseConfigRepository {
             broadcast.set("lines", CaseDefinition.DEFAULT_BROADCAST_LINES);
             changed = true;
         }
+        return changed;
+    }
+
+    private static boolean removeGeneratedRewardMessages(ConfigurationSection root) {
+        if (!root.isList("rewards")) return false;
+        boolean changed = false;
+        List<Map<String, Object>> migrated = new ArrayList<>();
+        for (Map<?, ?> raw : root.getMapList("rewards")) {
+            Map<String, Object> reward = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : raw.entrySet()) {
+                if (entry.getKey() != null) reward.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+            Object message = reward.get("message");
+            if ("&aВы получили &6{reward}&a!".equals(message)) {
+                reward.remove("message");
+                changed = true;
+            }
+            migrated.add(reward);
+        }
+        if (changed) root.set("rewards", migrated);
         return changed;
     }
 
@@ -685,8 +711,7 @@ public final class CaseConfigRepository {
                 "chance", 100,
                 "rarity", "COMMON",
                 "type", "ITEM",
-                "item", Map.of("material", "CHEST", "amount", 1, "name", "&fНаграда кейса"),
-                "message", "&aВы получили &6{reward}&a!"
+                "item", Map.of("material", "CHEST", "amount", 1, "name", "&fНаграда кейса")
         )));
     }
 

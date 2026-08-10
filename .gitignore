@@ -2,6 +2,7 @@
 /.gradle/
 /build/
 /build/classes/java/main/
+/bin/
 /.idea/
 /.vscode/
 *.iml

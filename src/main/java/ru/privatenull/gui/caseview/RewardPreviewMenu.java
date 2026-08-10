@@ -12,9 +12,9 @@ import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
 import ru.privatenull.pnlibrary.text.ColorUtil;
 import ru.privatenull.gui.GuiDesign;
-import ru.privatenull.util.BukkitCompat.InventoryViewCompat;
-import ru.privatenull.util.SkullUtil;
-import ru.privatenull.util.BukkitCompat.SoundCompat;
+import ru.privatenull.pnlibrary.item.HeadUtil;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.SoundCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -151,7 +151,7 @@ public final class RewardPreviewMenu {
                 player.openInventory(inventory);
             }
         } else {
-            caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
+            caseManager.getPlugin().openGui(player, inventory);
         }
         SoundCompat.play(player,
                 new String[]{pageChange ? "UI_BUTTON_CLICK" : "BLOCK_BARREL_OPEN"},
@@ -177,7 +177,7 @@ public final class RewardPreviewMenu {
     }
 
     private ItemStack navigationButton(String texture, String name, List<String> lore) {
-        ItemStack item = SkullUtil.fromBase64(texture, name);
+        ItemStack item = HeadUtil.create(texture, name);
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
         meta.setDisplayName(ColorUtil.colorize(name));

@@ -6,6 +6,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import ru.privatenull.pnlibrary.item.HeadUtil;
 import ru.privatenull.pnlibrary.text.ColorUtil;
 
 import java.util.*;
@@ -36,7 +37,7 @@ public final class ItemFactory {
             base64 = normalizeMaterialBase64(sec.getString("material"));
         }
         if (base64 != null) {
-            ItemStack skull = SkullUtil.fromBase64(base64, c(sec.getString("name", "&fItem")));
+            ItemStack skull = HeadUtil.create(base64, c(sec.getString("name", "&fItem")));
             applyMeta(skull, sec.getString("name"), sec.getStringList("lore"), sec.getConfigurationSection("enchantments"));
             return skull;
         }
@@ -64,7 +65,7 @@ public final class ItemFactory {
         ItemStack it;
 
         if (base64 != null) {
-            it = SkullUtil.fromBase64(base64, c(asString(map.get("name"), "&fItem")));
+            it = HeadUtil.create(base64, c(asString(map.get("name"), "&fItem")));
         } else {
             Material mat = Material.matchMaterial(asString(map.get("material"), "STONE"));
             if (mat == null) mat = Material.STONE;

@@ -10,7 +10,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.util.BukkitCompat.EnchantmentCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.EnchantmentCompat;
 import ru.privatenull.gui.GuiDesign;
 
 import java.util.ArrayList;

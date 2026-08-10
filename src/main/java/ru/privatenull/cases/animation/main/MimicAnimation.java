@@ -24,7 +24,7 @@ import ru.privatenull.cases.animation.CaseAnimation;
 import ru.privatenull.cases.animation.RewardLabel;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.Reward;
-import ru.privatenull.util.BukkitCompat.MaterialCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.MaterialCompat;
 
 import java.util.ArrayList;
 import java.util.List;

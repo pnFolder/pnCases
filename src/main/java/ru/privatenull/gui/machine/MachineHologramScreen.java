@@ -43,7 +43,7 @@ final class MachineHologramScreen {
                         "machine.titles.hologram", "&0Настройка голограммы", items.replacements(definition))
         );
         fill(inventory, definition);
-        caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
+        caseManager.getPlugin().openGui(player, inventory);
         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.18f, 1.25f);
     }
 

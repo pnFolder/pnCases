@@ -9,7 +9,7 @@ import org.bukkit.entity.Player;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.IdleParticleSettings;
 import ru.privatenull.PnCasesPlugin;
-import ru.privatenull.util.BukkitCompat.ParticleCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
 
 import java.util.ArrayList;
 import java.util.Collection;

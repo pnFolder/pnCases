@@ -11,7 +11,7 @@
 #
 # Плейсхолдеры содержимого кейса:
 # {reward}, {case}, {case_id} — награда и данные кейса.
-# {rarity_name}, {rarity_id} — оформленное название и ID редкости.
+# {rarity} — полностью оформленная редкость: цвет, символ и название.
 # {chance} — вероятность выпадения.
 # {amount}, {item_amount}, {duration} — параметры награды.
 #
@@ -55,11 +55,11 @@ preview:
   title: "&0Содержимое кейса"
 
   reward:
-    name: "{rarity_name} &f{reward}"
+    name: "{rarity} &f{reward}"
     lore:
       - ""
       - "&#9EFC65 «Основная информация»"
-      - " &7- &fРедкость: {rarity_name}"
+      - " &7- &fРедкость: {rarity}"
       - ""
       - "&#65D1FC «Вероятность»"
       - " &7- &fВыпадение: &#FCA865{chance}"
@@ -88,7 +88,7 @@ preview:
 
   rarities:
     default:
-      name: "&f◆ {rarity_id}"
+      name: "&f◆ {id}"
       glow: false
     common:
       name: "&7◇ Обычная"

@@ -46,7 +46,7 @@ final class MachineMainScreen {
                 ColorUtil.colorize("&0Настройка кейса • " + caseName(definition))
         );
         fill(inventory, definition);
-        caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
+        caseManager.getPlugin().openGui(player, inventory);
         player.playSound(player.getLocation(), Sound.BLOCK_BARREL_OPEN, 0.22f, 1.15f);
     }
 
@@ -87,6 +87,26 @@ final class MachineMainScreen {
                         "",
                         "&#FCA965 «Управление»",
                         " &7- &fЛКМ — настроить меню"), definition));
+        inventory.setItem(SLOT_MAIN_REWARDS, items.sectionButton(
+                "machine.main.rewards", GuiDesign.CONTENT,
+                "&x&4&2&9&F&9&1Награды", List.of(
+                        "&#9EFC65 «Описание»",
+                        " &7- &fСоздание и настройка наград",
+                        " &7- &fбез ручного редактирования YAML.",
+                        "", "&#65D1FC «Сейчас»",
+                        " &7- &fНаград: &#FCA865" + definition.rewards().size(),
+                        "", "&#FCA965 «Управление»",
+                        " &7- &fЛКМ — открыть редактор"), definition));
+        inventory.setItem(SLOT_MAIN_MODULES, items.sectionButton(
+                "machine.main.modules", GuiDesign.TOGGLE,
+                "&x&4&2&9&F&9&1Модули", List.of(
+                        "&#9EFC65 «Описание»",
+                        " &7- &fГлобальное включение и отключение",
+                        " &7- &fфункций pnCases для всех кейсов.",
+                        "", "&#65D1FC «Сейчас»",
+                        " &7- &fВключено: &#FCA865" + caseManager.getPlugin().getModules().enabledModules().size(),
+                        "", "&#FCA965 «Управление»",
+                        " &7- &fЛКМ — настроить модули"), definition));
         inventory.setItem(SLOT_MAIN_HOLOGRAM, items.sectionButton(
                 "machine.main.hologram", GuiDesign.HOLOGRAM,
                 "&x&4&2&9&F&9&1Голограмма", List.of(
@@ -127,10 +147,7 @@ final class MachineMainScreen {
         inventory.setItem(SLOT_MAIN_CLOSE, items.closeButton(definition));
     }
 
-    /**
-     * A case is named for administrators by the key that opens it.  This keeps
-     * the Machine screen in sync with the name configured under keys.<id>.name.
-     */
+    /** Uses the case display name directly; virtual keys have no separate config entry. */
     private String caseName(CaseDefinition definition) {
         return definition.displayName();
     }

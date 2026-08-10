@@ -45,6 +45,21 @@ public final class UiConfig {
             "preview.reward.custom-model-data"
     );
     private static final Set<String> OBSOLETE_MESSAGE_PATHS = Set.of(
+            "command-help",
+            "command-version",
+            "command-discord",
+            "command-update-checking",
+            "command-update-latest",
+            "command-update-available",
+            "command-update-download",
+            "command-update-error",
+            "key-not-configured",
+            "not-enough-levels",
+            "machine-layout-required-slot",
+            "machine-text.current",
+            "machine-text.gui-title-prompt",
+            "machine-text.display-name-prompt",
+            "machine-text.display-name-info",
             "reward.default",
             "reward.luckperms",
             "reward.vault",
@@ -167,6 +182,7 @@ public final class UiConfig {
         boolean changed = copyMissingDefaults(loaded, defaults);
         if ("gui.yml".equals(resourceName)) {
             changed |= removeObsoleteGuiPaths(loaded);
+            changed |= migrateRarityPlaceholder(loaded);
         } else if ("messages.yml".equals(resourceName)) {
             changed |= removePaths(loaded, OBSOLETE_MESSAGE_PATHS);
         }
@@ -209,6 +225,50 @@ public final class UiConfig {
                 if (!target.contains(path, true)) continue;
                 target.set(path, null);
                 changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private boolean migrateRarityPlaceholder(YamlConfiguration target) {
+        boolean changed = false;
+        for (String path : new ArrayList<>(target.getKeys(true))) {
+            if (target.isConfigurationSection(path)) continue;
+            Object value = target.get(path);
+            if (value instanceof String line) {
+                String migrated = line
+                        .replace("{rarity_color}{rarity_symbol}{rarity_name}", "{rarity}")
+                        .replace("{rarity_color}{rarity_symbol}", "{rarity}")
+                        .replace("{rarity_name}", "{rarity}")
+                        .replace("{rarity_color}", "")
+                        .replace("{rarity_symbol}", "")
+                        .replace("{rarity_id}", path.startsWith("preview.rarities.") ? "{id}" : "{rarity}");
+                if (!migrated.equals(line)) {
+                    target.set(path, migrated);
+                    changed = true;
+                }
+            } else if (value instanceof List<?> list) {
+                List<Object> migrated = new ArrayList<>(list.size());
+                boolean listChanged = false;
+                for (Object entry : list) {
+                    if (!(entry instanceof String line)) {
+                        migrated.add(entry);
+                        continue;
+                    }
+                    String replacement = line
+                            .replace("{rarity_color}{rarity_symbol}{rarity_name}", "{rarity}")
+                            .replace("{rarity_color}{rarity_symbol}", "{rarity}")
+                            .replace("{rarity_name}", "{rarity}")
+                            .replace("{rarity_color}", "")
+                            .replace("{rarity_symbol}", "")
+                            .replace("{rarity_id}", path.startsWith("preview.rarities.") ? "{id}" : "{rarity}");
+                    migrated.add(replacement);
+                    listChanged |= !replacement.equals(line);
+                }
+                if (listChanged) {
+                    target.set(path, migrated);
+                    changed = true;
+                }
             }
         }
         return changed;

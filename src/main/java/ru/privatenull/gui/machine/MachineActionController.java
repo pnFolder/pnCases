@@ -13,7 +13,8 @@ import ru.privatenull.cases.model.AnimationType.Category;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.IdleParticleSettings;
 import ru.privatenull.cases.model.CaseGuiLayoutRules;
-import ru.privatenull.util.ServerCompatibility;
+import ru.privatenull.modules.ModuleId;
+import ru.privatenull.pnlibrary.compat.ServerVersion;
 
 import static ru.privatenull.gui.machine.MachineGuiSupport.*;
 import static ru.privatenull.util.ItemFactory.isRealItem;
@@ -31,6 +32,8 @@ final class MachineActionController {
     private final MachineAnimationScreen animationScreen;
     private final MachineShowcaseScreen showcaseScreen;
     private final MachineTextEditor textEditor;
+    private final MachineModulesScreen modulesScreen;
+    private final MachineRewardScreen rewardScreen;
 
     MachineActionController(
             CaseManager caseManager,
@@ -42,7 +45,9 @@ final class MachineActionController {
             MachineMenuScreen menuScreen,
             MachineAnimationScreen animationScreen,
             MachineShowcaseScreen showcaseScreen,
-            MachineTextEditor textEditor
+            MachineTextEditor textEditor,
+            MachineModulesScreen modulesScreen,
+            MachineRewardScreen rewardScreen
     ) {
         this.caseManager = caseManager;
         this.support = support;
@@ -54,6 +59,8 @@ final class MachineActionController {
         this.animationScreen = animationScreen;
         this.showcaseScreen = showcaseScreen;
         this.textEditor = textEditor;
+        this.modulesScreen = modulesScreen;
+        this.rewardScreen = rewardScreen;
     }
 
     void handle(GuiSession holder, Player player, InventoryClickEvent event, CaseDefinition definition, int slot) {
@@ -61,10 +68,17 @@ final class MachineActionController {
             case MACHINE_MAIN -> handleMain(player, event, definition, slot);
             case MACHINE_ANIMATION -> handleAnimation(holder, player, event, definition, slot);
             case MACHINE_LAYOUT -> layoutEditor.handleClick(player, event, definition, slot);
+            case MACHINE_LAYOUT_ROLE -> layoutEditor.handleRoleClick(holder, player, event, definition, slot);
             case MACHINE_HOLOGRAM -> handleHologram(player, event, definition, slot);
             case MACHINE_SHOWCASE -> handleShowcase(player, event, definition, slot);
             case MACHINE_MENU -> handleMenu(player, event, definition, slot);
             case MACHINE_PURCHASE -> handlePurchase(player, event, definition, slot);
+            case MACHINE_MODULES -> modulesScreen.handleClick(player, event, definition, slot);
+            case MACHINE_REWARDS -> rewardScreen.handleListClick(holder, player, event, definition, slot);
+            case MACHINE_REWARD -> rewardScreen.handleEditorClick(holder, player, event, definition, slot);
+            case MACHINE_REWARD_ICON -> rewardScreen.handleIconClick(holder, player, event, definition, slot);
+            case MACHINE_REWARD_MOVE -> rewardScreen.handleMoveClick(holder, player, definition, slot);
+            case MACHINE_REWARD_DELETE -> rewardScreen.handleDeleteClick(holder, player, definition, slot);
             default -> {
             }
         }
@@ -84,6 +98,10 @@ final class MachineActionController {
             showcaseScreen.open(player, definition.name());
         } else if (slot == SLOT_MAIN_PURCHASE) {
             purchaseScreen.open(player, definition.name());
+        } else if (slot == SLOT_MAIN_MODULES) {
+            modulesScreen.open(player, definition.name());
+        } else if (slot == SLOT_MAIN_REWARDS) {
+            rewardScreen.open(player, definition.name());
         }
     }
 
@@ -99,7 +117,7 @@ final class MachineActionController {
         }
 
         if (slot == SLOT_ANIMATION_MODE) {
-            if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+            if (ServerVersion.current().isReleaseLine(1, 16)) {
                 player.sendMessage(caseManager.getPlugin().getUi().get("animation-legacy-only"));
                 return;
             }
@@ -171,6 +189,11 @@ final class MachineActionController {
         } else if (slot == SLOT_LAYOUT) {
             layoutEditor.open(player, definition.name());
         } else if (slot == SLOT_CONTENT_TOGGLE) {
+            if (!caseManager.getPlugin().getModules().isEnabled(ModuleId.PREVIEW)) {
+                player.sendMessage(ru.privatenull.pnlibrary.text.ColorUtil.colorize(
+                        "&#FC7165Сначала включите модуль preview в разделе «Модули»."));
+                return;
+            }
             update(player, definition, root -> section(root, "gui").set(
                     "preview_enabled", !definition.guiLayout().previewEnabled()
             ));

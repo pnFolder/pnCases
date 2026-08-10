@@ -26,7 +26,7 @@ import ru.privatenull.gui.GuiSession;
 import ru.privatenull.gui.GuiSession;
 import ru.privatenull.pnlibrary.text.ColorUtil;
 import ru.privatenull.storage.CasesDatabase;
-import ru.privatenull.util.ServerCompatibility;
+import ru.privatenull.pnlibrary.compat.ServerVersion;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -83,7 +83,6 @@ public class CaseManager {
     private final Map<String, CaseDefinition> casesByName = new HashMap<>();
     private final Map<BlockKey, String> caseByBlock = new HashMap<>();
     private final Map<String, ConfigurationSection> caseSections = new HashMap<>();
-    private final Map<String, String> keyNames = new HashMap<>();
 
     private final Set<UUID> openingPlayers = ConcurrentHashMap.newKeySet();
     private final Map<BlockKey, UUID> busyCases = new ConcurrentHashMap<>();
@@ -143,7 +142,6 @@ public class CaseManager {
         casesByName.clear();
         caseByBlock.clear();
         caseSections.clear();
-        keyNames.clear();
         selectedCaseBlocks.clear();
         playerAnimations.clear();
     }
@@ -188,16 +186,11 @@ public class CaseManager {
     }
 
     public List<String> getKeyNames() {
-        Set<String> active = new TreeSet<>();
-        for (CaseDefinition definition : casesByName.values()) {
-            String normalized = definition.name().toLowerCase(Locale.ROOT);
-            if (keyNames.containsKey(normalized)) active.add(normalized);
-        }
-        return new ArrayList<>(active);
+        return new ArrayList<>(new TreeSet<>(casesByName.keySet()));
     }
 
     public boolean keyExists(String keyId) {
-        return keyId != null && getKeyNames().contains(keyId.toLowerCase(Locale.ROOT));
+        return keyId != null && casesByName.containsKey(keyId.toLowerCase(Locale.ROOT));
     }
 
     public int getLoadedCaseCount() { return casesByName.size(); }
@@ -236,18 +229,9 @@ public class CaseManager {
         if (!CaseConfigRepository.isValidId(caseName)) return CreateCaseResult.INVALID_ID;
         if (configRepository.exists(caseName)) return CreateCaseResult.ALREADY_EXISTS;
 
-        DefaultKeyChange keyChange = createDefaultKey(
-                caseName,
-                CaseConfigRepository.defaultDisplayName(caseName)
-        );
-        if (!keyChange.success()) return CreateCaseResult.SAVE_FAILED;
-
         CaseConfigRepository.CreateResult result = configRepository.create(caseName);
         if (result == CaseConfigRepository.CreateResult.CREATED) {
             return reloadFromConfig() ? CreateCaseResult.CREATED : CreateCaseResult.RELOAD_FAILED;
-        }
-        if (keyChange.created()) {
-            rollbackDefaultKey(caseName);
         }
         return CreateCaseResult.valueOf(result.name());
     }
@@ -261,50 +245,7 @@ public class CaseManager {
             return DeleteCaseResult.DELETE_FAILED;
         }
 
-        removeDefaultKey(normalized);
         return reloadFromConfig() ? DeleteCaseResult.DELETED : DeleteCaseResult.RELOAD_FAILED;
-    }
-
-    private DefaultKeyChange createDefaultKey(String caseName, String displayName) {
-        String keyId = CaseConfigRepository.normalizeName(caseName);
-        ConfigurationSection keys = plugin.getConfig().getConfigurationSection("keys");
-        boolean createdKeysSection = keys == null;
-        if (keys == null) {
-            keys = plugin.getConfig().createSection("keys");
-        }
-        if (keys.contains(keyId)) {
-            return new DefaultKeyChange(true, false);
-        }
-        ConfigurationSection key = keys.createSection(keyId);
-        key.set("name", displayName);
-        if (configRepository.saveMainConfig()) {
-            return new DefaultKeyChange(true, true);
-        }
-
-        keys.set(keyId, null);
-        if (createdKeysSection && keys.getKeys(false).isEmpty()) plugin.getConfig().set("keys", null);
-        return new DefaultKeyChange(false, false);
-    }
-
-    private void rollbackDefaultKey(String caseName) {
-        String keyId = CaseConfigRepository.normalizeName(caseName);
-        ConfigurationSection keys = plugin.getConfig().getConfigurationSection("keys");
-        if (keys == null || !keys.contains(keyId)) return;
-        keys.set(keyId, null);
-        if (!configRepository.saveMainConfig()) {
-            plugin.getLogger().severe("Не удалось откатить ключ '" + keyId + "' после ошибки создания кейса.");
-        }
-    }
-
-    private void removeDefaultKey(String caseName) {
-        ConfigurationSection keys = plugin.getConfig().getConfigurationSection("keys");
-        if (keys == null) return;
-        String keyId = CaseConfigRepository.normalizeName(caseName);
-        if (!keys.contains(keyId)) return;
-        keys.set(keyId, null);
-        if (!configRepository.saveMainConfig()) {
-            plugin.getLogger().warning("Кейс '" + caseName + "' удалён, но ключ '" + keyId + "' не удалось удалить из config.yml.");
-        }
     }
 
     public CaseDefinition getCaseByBlock(Block block) {
@@ -315,7 +256,7 @@ public class CaseManager {
     public AnimationRegistry getAnimationRegistry() { return animationRegistry; }
 
     public AnimationType getPlayerAnimation(UUID uuid, String caseId) {
-        if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+        if (ServerVersion.current().isReleaseLine(1, 16)) {
             return AnimationType.FORTUNE_RING;
         }
         PlayerCaseAnimation key = new PlayerCaseAnimation(uuid, caseId);
@@ -325,7 +266,7 @@ public class CaseManager {
 
     public void setPlayerAnimation(UUID uuid, String caseId, AnimationType type) {
         if (type == null) return;
-        if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+        if (ServerVersion.current().isReleaseLine(1, 16)) {
             type = AnimationType.FORTUNE_RING;
         }
         PlayerCaseAnimation key = new PlayerCaseAnimation(uuid, caseId);
@@ -438,15 +379,6 @@ public class CaseManager {
         Map<BlockKey, String> loadedBlocks = new HashMap<>();
         Map<BlockKey, String> configuredBlocks = new HashMap<>();
         Map<String, ConfigurationSection> loadedSections = new HashMap<>();
-        Map<String, String> loadedKeys = new HashMap<>();
-        ConfigurationSection keysSec = plugin.getConfig().getConfigurationSection("keys");
-        if (keysSec != null) {
-            for (String keyId : keysSec.getKeys(false)) {
-                ConfigurationSection ks = keysSec.getConfigurationSection(keyId);
-                String displayName = ks != null ? ks.getString("name", keyId) : keyId;
-                loadedKeys.put(keyId.toLowerCase(Locale.ROOT), color(displayName));
-            }
-        }
 
         CaseConfigRepository.LoadResult loadResult = configRepository.loadAll();
         if (!loadResult.successful()) {
@@ -490,8 +422,6 @@ public class CaseManager {
         caseByBlock.putAll(loadedBlocks);
         caseSections.clear();
         caseSections.putAll(loadedSections);
-        keyNames.clear();
-        keyNames.putAll(loadedKeys);
 
         var holograms = plugin.getHolograms();
         if (holograms != null) {
@@ -500,7 +430,8 @@ public class CaseManager {
         }
         idleParticles.syncCases(casesByName.values());
         closePnCasesGuis(null, true);
-        plugin.getLogger().info("Loaded cases: " + casesByName.size() + ", active blocks: " + caseByBlock.size() + ", keys: " + keyNames.size());
+        plugin.getLogger().info("Loaded cases: " + casesByName.size() + ", active blocks: " + caseByBlock.size()
+                + ", virtual keys: " + casesByName.size());
         return true;
     }
 
@@ -678,10 +609,6 @@ public class CaseManager {
 
     private CostReceipt takeConfiguredCost(Player p, CaseDefinition def) {
         String keyId = def.name();
-        if (!keyExists(keyId)) {
-            p.sendMessage(plugin.getUi().get("key-not-configured"));
-            return null;
-        }
         int have = database.getKeys(p.getUniqueId(), keyId);
         if (have < 1) {
             p.sendMessage(plugin.getUi().get("not-enough-keys",
@@ -723,7 +650,7 @@ public class CaseManager {
             AnimationType animationType = def.fixedAnimation() == null
                     ? getPlayerAnimation(playerId, def.name())
                     : def.fixedAnimation();
-            if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+            if (ServerVersion.current().isReleaseLine(1, 16)) {
                 animationType = AnimationType.FORTUNE_RING;
             }
             animation = animationRegistry.get(animationType);
@@ -969,7 +896,7 @@ public class CaseManager {
         if (matchingCase != null) {
             return color(matchingCase.displayName());
         }
-        return keyNames.getOrDefault(normalized, humanizeKeyName(keyId));
+        return humanizeKeyName(keyId);
     }
 
     public boolean giveReward(Player p, Reward reward) {
@@ -1083,9 +1010,6 @@ public class CaseManager {
             plugin.getLogger().log(Level.SEVERE,
                     "Не удалось вернуть стоимость открытия игроку " + player.getName() + ".", exception);
         }
-    }
-
-    private record DefaultKeyChange(boolean success, boolean created) {
     }
 
     private record PreparedOpening(

@@ -10,11 +10,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.1/pnCases-1.5.1.jar">
-    <img src="https://img.shields.io/badge/Скачать-1.5.1-EFF7B9?style=for-the-badge&labelColor=17241F" alt="Скачать pnCases 1.5.1">
+  <a href="https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.2/pnCases-1.5.2.jar">
+    <img src="https://img.shields.io/badge/Скачать-1.5.2-EFF7B9?style=for-the-badge&labelColor=17241F" alt="Скачать pnCases 1.5.2">
   </a>
-  <a href="https://github.com/Dy6HiLa/pnCases/releases/tag/v1.5.1">
-    <img src="https://img.shields.io/badge/Что%20нового-1.5.1-65D1FC?style=for-the-badge&labelColor=17241F" alt="Изменения pnCases 1.5.1">
+  <a href="https://github.com/Dy6HiLa/pnCases/releases/tag/v1.5.2">
+    <img src="https://img.shields.io/badge/Что%20нового-1.5.2-65D1FC?style=for-the-badge&labelColor=17241F" alt="Изменения pnCases 1.5.2">
   </a>
   <a href="https://discord.gg/J2cTeTQsy8">
     <img src="https://img.shields.io/badge/Discord-Поддержка-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord pnCases">
@@ -44,7 +44,7 @@
 
 ## Установка
 
-1. Скачайте [pnCases-1.5.1.jar](https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.1/pnCases-1.5.1.jar).
+1. Скачайте [pnCases-1.5.2.jar](https://github.com/Dy6HiLa/pnCases/releases/download/v1.5.2/pnCases-1.5.2.jar).
 2. Поместите JAR в папку `plugins/`.
 3. Полностью перезапустите сервер.
 4. Создайте кейс командой `/pncases createcase <id>`.

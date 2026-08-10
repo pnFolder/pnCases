@@ -37,15 +37,24 @@ public final class ConfigValidator {
         List<String> errors = new ArrayList<>();
         List<String> patches = new ArrayList<>();
 
-        boolean changed = patchMissing(config, patches, "reward-symbols.vault", "$");
+        boolean changed = patchMissing(config, patches, "modules.rarity", true);
+        changed |= patchMissing(config, patches, "modules.preview", true);
+        changed |= patchMissing(config, patches, "modules.gui-animation", true);
+        changed |= patchMissing(config, patches, "modules.title", true);
+        changed |= patchMissing(config, patches, "reward-symbols.vault", "$");
         changed |= patchMissing(config, patches, "database.type", "SQLITE");
         changed |= patchMissing(config, patches, "database.sqlite.file", "data.db");
         changed |= patchMissing(config, patches, "database.sqlite.connection-timeout-ms", 10_000L);
         changed |= patchMissing(config, patches, "reward-symbols.playerpoints", "✦");
         changed |= patchMissing(config, patches, "holograms.provider", "AUTO");
 
-        Set<String> knownKeys = validateKeys(config, warnings, errors);
-        validateCases(plugin, knownKeys, warnings, errors);
+        boolean removedLegacyKeys = config.contains("keys", true);
+        if (removedLegacyKeys) {
+            config.set("keys", null);
+            changed = true;
+        }
+
+        validateCases(plugin, warnings, errors);
 
         if (changed) {
             boolean saved = new CaseConfigRepository(plugin).saveMainConfig();
@@ -56,6 +65,9 @@ public final class ConfigValidator {
 
         if (!patches.isEmpty()) {
             plugin.getLogger().info("Config validation: добавлены недостающие поля config.yml: " + String.join(", ", patches));
+        }
+        if (removedLegacyKeys) {
+            plugin.getLogger().info("Config migration: устаревшая секция keys удалена; виртуальные ключи создаются из cases/*.yml.");
         }
         for (String warning : warnings) {
             plugin.getLogger().warning("Config warning: " + warning);
@@ -82,30 +94,7 @@ public final class ConfigValidator {
         return true;
     }
 
-    private static Set<String> validateKeys(FileConfiguration config, List<String> warnings, List<String> errors) {
-        Set<String> knownKeys = new HashSet<>();
-        ConfigurationSection keys = config.getConfigurationSection("keys");
-        if (keys == null) {
-            errors.add("Секция keys отсутствует. Виртуальные ключи кейсов не смогут работать.");
-            return knownKeys;
-        }
-
-        for (String keyId : keys.getKeys(false)) {
-            knownKeys.add(keyId.toLowerCase(Locale.ROOT));
-            ConfigurationSection key = keys.getConfigurationSection(keyId);
-            if (key == null) {
-                warnings.add("keys." + keyId + " должен быть секцией с name, например: name: '&aКлюч'.");
-                continue;
-            }
-            if (!key.isString("name")) {
-                warnings.add("keys." + keyId + ".name отсутствует. В игре будет показан технический id ключа.");
-            }
-        }
-        return knownKeys;
-    }
-
-    private static void validateCases(PnCasesPlugin plugin, Set<String> knownKeys,
-                                      List<String> warnings, List<String> errors) {
+    private static void validateCases(PnCasesPlugin plugin, List<String> warnings, List<String> errors) {
         Set<String> seenIds = new HashSet<>();
         Map<String, String> blockOwners = new HashMap<>();
         File directory = new File(plugin.getDataFolder(), "cases");
@@ -134,7 +123,7 @@ public final class ConfigValidator {
                 }
                 ConfigurationSection section = yaml;
                 warnIdMismatch(path, caseId, section, warnings);
-                validateCase(path, section, knownKeys, warnings, errors);
+                validateCase(path, section, warnings, errors);
                 validateUniqueBlocks(path, caseId, section, blockOwners, errors);
             }
         }
@@ -155,7 +144,6 @@ public final class ConfigValidator {
     private static void validateCase(
             String path,
             ConfigurationSection section,
-            Set<String> knownKeys,
             List<String> warnings,
             List<String> errors
     ) {

@@ -6,7 +6,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.model.IdleParticleSettings;
-import ru.privatenull.util.SkullUtil;
+import ru.privatenull.pnlibrary.item.HeadUtil;
 
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +35,13 @@ public final class GuiDesign {
     public static final String CONTENT = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYzY3ZDVkMzdjZDY0Y2UzZmI1NzM3N2QyNWQ2MTUyYWE0YWMyZTM3OTU0MjQ4ZDVkOTFmODhmYmQ3OTFmNDc2NiJ9fX0=";
     public static final String STYLE = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMmFhMDE2M2ZiODAyYWIxOGE5ZWVjZjljOTk2Nzk3NmJiMTc5NDFjMjMxZTU1Y2IyNTZkM2RmNGNlZjlhMSJ9fX0=";
     public static final String THEME = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvODViYzAxNzM0MzljNzg1YjY1ODczZGQ4OGRmN2MwYTUzOTc0MTlmNjdmYTY5NzI3Zjc4ZGUxNDZhNTFjN2JkYSJ9fX0=";
+    public static final String REWARD_ITEM = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvOGNjNzk5NTRkMzUwYTk4YzcyMTcyNTY4MzFmNjVjNjJhNDI4MDc0YjZlNGFlOWVlZGU3YTQ0ZjlkZTRhNyJ9fX0=";
+    public static final String REWARD_COINS = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYjBhN2I5NGM0ZTU4MWI2OTkxNTlkNDg4NDZlYzA5MTM5MjUwNjIzN2M4OWE5N2M5MzI0OGEwZDhhYmM5MTZkNSJ9fX0=";
+    public static final String REWARD_POINTS = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMjljODk5YzE0MzhjNGY4MTkyYTVjN2U2Yjc1OGZhYmE4ZmRkNTQ2MDRlZDg5YmY2MjI3YjZmY2MyYzc1YTQyMyJ9fX0=";
+    public static final String REWARD_PRIVILEGE = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNzg0YmQ0N2JjNGQ1NjRlNGMyYTA3OTIxMDBiZmQ1MDExMzYzODI1NmMxZjYyMGNkZjdmM2I0ODMwNGU4Mjc4NyJ9fX0=";
+    public static final String REWARD_PERMISSION = TITLE;
+    public static final String REWARD_COMMAND = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNmQwZjQwNjFiZmI3NjdhN2Y5MjJhNmNhNzE3NmY3YTliMjA3MDliZDA1MTI2OTZiZWIxNWVhNmZhOThjYTU1YyJ9fX0=";
+    public static final String REWARD_BASE64 = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZTc4ZTZhODNmZmEzYTE2OWZjN2ExMmM2ZjZhYzkzMWZmMWIyMTJjMzYwYTU2Nzc0ZTRjOGQ0ZTI2OWI5NGU1YiJ9fX0=";
 
     private static final String ANVIL = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZTg1NWIzZTFkOWE3YjlmZDc2YTc3NmZhNGVlYzg3MWQ1MmVkMjY5MzI1Mzg2MjhjNDNkZTMyZDFkMmQ3NDMifX19";
     private static final String DYNAMITE = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvM2FmNTk3NzZmMmYwMzQxMmM3YjU5NDdhNjNhMGNmMjgzZDUxZmU2NWFjNmRmN2YyZjg4MmUwODM0NDU2NWU5In19fQ==";
@@ -52,7 +59,7 @@ public final class GuiDesign {
     }
 
     public static ItemStack head(String texture, String name) {
-        return SkullUtil.fromBase64(texture, name);
+        return HeadUtil.create(texture, name);
     }
 
     public static void hideAttributes(ItemMeta meta) {

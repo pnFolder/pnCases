@@ -12,9 +12,10 @@ import ru.privatenull.cases.CaseManager;
 import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.model.AnimationType.Category;
 import ru.privatenull.cases.model.CaseDefinition;
-import ru.privatenull.util.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
 import ru.privatenull.gui.GuiDesign;
-import ru.privatenull.util.ServerCompatibility;
+import ru.privatenull.pnlibrary.compat.ServerCapabilities;
+import ru.privatenull.pnlibrary.compat.ServerVersion;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,7 +72,7 @@ final class MachineAnimationScreen {
                 )
         );
         fill(inventory, definition, category);
-        caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
+        caseManager.getPlugin().openGui(player, inventory);
         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.18f, 1.25f);
     }
 
@@ -95,10 +96,11 @@ final class MachineAnimationScreen {
     }
 
     AnimationType[] availableTypes() {
-        if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+        if (ServerVersion.current().isReleaseLine(1, 16)) {
             return new AnimationType[]{AnimationType.FORTUNE_RING};
         }
-        if (!ServerCompatibility.useModernAnimations()) {
+        if (!ServerVersion.current().isAtLeast(1, 21, 0)
+                || !ServerCapabilities.hasDisplayEntities()) {
             return Arrays.stream(AnimationType.values())
                     .filter(type -> type != AnimationType.PILLAGER_RAID
                             && type != AnimationType.DRAGON
@@ -140,7 +142,7 @@ final class MachineAnimationScreen {
     }
 
     private ItemStack modeButton(CaseDefinition definition) {
-        boolean legacy = ServerCompatibility.useMinecraft1165AnimationMode();
+        boolean legacy = ServerVersion.current().isReleaseLine(1, 16);
         AnimationType fixed = legacy ? AnimationType.FORTUNE_RING : definition.fixedAnimation();
         boolean selected = fixed == null;
         String state = legacy ? "&eОграничено версией 1.16.5"
@@ -233,7 +235,7 @@ final class MachineAnimationScreen {
     }
 
     private List<String> headerLore() {
-        if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+        if (ServerVersion.current().isReleaseLine(1, 16)) {
             return List.of(
                     "",
                     "&#9EFC65 «Совместимость»",

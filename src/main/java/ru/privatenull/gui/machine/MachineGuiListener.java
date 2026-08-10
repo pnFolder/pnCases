@@ -20,21 +20,24 @@ public final class MachineGuiListener implements Listener {
     private final MachineMainScreen mainScreen;
     private final MachineActionController actions;
     private final MachineTextEditor textEditor;
+    private final MachineRewardScreen rewardScreen;
 
     public MachineGuiListener(CaseManager caseManager) {
         this.caseManager = caseManager;
 
         MachineGuiSupport support = new MachineGuiSupport(caseManager);
         MachineItemFactory itemFactory = new MachineItemFactory(caseManager, support);
-        MachineLayoutEditor layoutEditor = new MachineLayoutEditor(caseManager, support, itemFactory);
 
         this.mainScreen = new MachineMainScreen(caseManager, support, itemFactory);
+        MachineModulesScreen modulesScreen = new MachineModulesScreen(caseManager, mainScreen, itemFactory);
+        this.rewardScreen = new MachineRewardScreen(caseManager, support, mainScreen, itemFactory);
         MachineHologramScreen hologramScreen = new MachineHologramScreen(caseManager, support, itemFactory);
         MachinePurchaseScreen purchaseScreen = new MachinePurchaseScreen(caseManager, support, itemFactory);
         MachineMenuScreen menuScreen = new MachineMenuScreen(caseManager, itemFactory);
+        MachineLayoutEditor layoutEditor = new MachineLayoutEditor(caseManager, support, itemFactory, menuScreen);
         MachineAnimationScreen animationScreen = new MachineAnimationScreen(caseManager, itemFactory);
         MachineShowcaseScreen showcaseScreen = new MachineShowcaseScreen(caseManager, itemFactory);
-        this.textEditor = new MachineTextEditor(caseManager, support, mainScreen);
+        this.textEditor = new MachineTextEditor(caseManager, support, mainScreen, menuScreen);
         this.actions = new MachineActionController(
                 caseManager,
                 support,
@@ -45,7 +48,9 @@ public final class MachineGuiListener implements Listener {
                 menuScreen,
                 animationScreen,
                 showcaseScreen,
-                textEditor
+                textEditor,
+                modulesScreen,
+                rewardScreen
         );
     }
 
@@ -100,11 +105,13 @@ public final class MachineGuiListener implements Listener {
 
     @EventHandler
     public void onChat(AsyncPlayerChatEvent event) {
+        if (rewardScreen.handleChat(event)) return;
         textEditor.handleChat(event);
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         textEditor.cancel(event.getPlayer());
+        rewardScreen.cancel(event.getPlayer());
     }
 }

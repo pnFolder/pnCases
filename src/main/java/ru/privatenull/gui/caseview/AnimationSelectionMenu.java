@@ -15,11 +15,12 @@ import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.model.AnimationType.Category;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.util.BukkitCompat.EnchantmentCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.EnchantmentCompat;
 import ru.privatenull.gui.GuiDesign;
-import ru.privatenull.util.BukkitCompat.InventoryViewCompat;
-import ru.privatenull.util.ServerCompatibility;
-import ru.privatenull.util.BukkitCompat.SoundCompat;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pnlibrary.compat.ServerCapabilities;
+import ru.privatenull.pnlibrary.compat.ServerVersion;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.SoundCompat;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -53,7 +54,7 @@ final class AnimationSelectionMenu {
         );
         render(inventory, definition,
                 caseManager.getPlayerAnimation(player.getUniqueId(), caseName), category);
-        caseManager.getPlugin().getGuiOpenAnimations().open(player, inventory);
+        caseManager.getPlugin().openGui(player, inventory);
         player.playSound(player.getLocation(), Sound.BLOCK_BARREL_OPEN, 0.28f, 1.15f);
     }
 
@@ -251,10 +252,11 @@ final class AnimationSelectionMenu {
     }
 
     private AnimationType[] availableTypes() {
-        if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+        if (ServerVersion.current().isReleaseLine(1, 16)) {
             return new AnimationType[]{AnimationType.FORTUNE_RING};
         }
-        if (!ServerCompatibility.useModernAnimations()) {
+        if (!ServerVersion.current().isAtLeast(1, 21, 0)
+                || !ServerCapabilities.hasDisplayEntities()) {
             return Arrays.stream(AnimationType.values())
                     .filter(type -> type != AnimationType.PILLAGER_RAID
                             && type != AnimationType.DRAGON

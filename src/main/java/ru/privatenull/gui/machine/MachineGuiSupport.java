@@ -13,8 +13,8 @@ import ru.privatenull.cases.model.AnimationType;
 import ru.privatenull.cases.model.CaseDefinition;
 import ru.privatenull.cases.model.CaseGuiLayout;
 import ru.privatenull.gui.GuiDesign;
-import ru.privatenull.util.BukkitCompat.InventoryViewCompat;
-import ru.privatenull.util.ServerCompatibility;
+import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pnlibrary.compat.ServerVersion;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,11 +23,13 @@ import java.util.function.Consumer;
 
 final class MachineGuiSupport {
 
-    static final int SLOT_MAIN_ANIMATION = 11;
-    static final int SLOT_MAIN_MENU = 13;
-    static final int SLOT_MAIN_HOLOGRAM = 15;
-    static final int SLOT_MAIN_PARTICLES = 30;
-    static final int SLOT_MAIN_PURCHASE = 32;
+    static final int SLOT_MAIN_ANIMATION = 10;
+    static final int SLOT_MAIN_MENU = 12;
+    static final int SLOT_MAIN_REWARDS = 14;
+    static final int SLOT_MAIN_MODULES = 16;
+    static final int SLOT_MAIN_HOLOGRAM = 20;
+    static final int SLOT_MAIN_PARTICLES = 22;
+    static final int SLOT_MAIN_PURCHASE = 24;
     static final int SLOT_MAIN_CLOSE = 49;
     static final int SLOT_ANIMATION_MODE = 13;
     static final int SLOT_HOLOGRAM_TOGGLE = 20;
@@ -88,7 +90,7 @@ final class MachineGuiSupport {
     }
 
     String currentAnimationLabel(CaseDefinition definition) {
-        if (ServerCompatibility.useMinecraft1165AnimationMode()) {
+        if (ServerVersion.current().isReleaseLine(1, 16)) {
             return GuiDesign.animationName(AnimationType.FORTUNE_RING) + " &8(режим 1.16.5)";
         }
         AnimationType fixed = definition.fixedAnimation();
