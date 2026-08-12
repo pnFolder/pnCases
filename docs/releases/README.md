@@ -1,12 +1,3 @@
 # Архив релизов
 
-- [pnCases 1.5.0](RELEASE-1.5.0.md)
-- [pnCases 1.4.7](RELEASE-1.4.7.md)
-- [pnCases 1.4.6](RELEASE-1.4.6.md)
-- [pnCases 1.4.5](RELEASE-1.4.5.md)
-- [pnCases 1.4.4](RELEASE-1.4.4.md)
-- [pnCases 1.4.3](RELEASE-1.4.3.md)
-- [pnCases 1.4.2](RELEASE-1.4.2.md)
-- [pnCases 1.4.1](RELEASE-1.4.1.md)
-- [pnCases 1.4](RELEASE-1.4.md)
-- [pnCases 1.3](RELEASE-1.3.md)
+История версий и файлы для скачивания находятся на странице [GitHub Releases](https://github.com/Dy6HiLa/pnCases/releases).
