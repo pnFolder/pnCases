@@ -5,7 +5,7 @@
 #
 # Доступные значения rarity:
 # COMMON, UNCOMMON, RARE, EPIC, LEGENDARY, MYTHIC.
-# Их оформление настраивается в gui.yml -> preview.rarities.
+# Их названия настраиваются в config.yml -> rarity.
 
 # Блоки добавляются автоматически через /pncases setcase test.
 blocks: []
@@ -18,12 +18,16 @@ hologram:
   y: 1.5
   lines:
     - '&x&4&2&9&F&9&1&lТестовый кейс'
-    - '&7ПКМ &8— &fоткрыть'
+    - '&7Правая кнопка мыши &8— &fоткрыть'
     - '&8Ключ: &x&4&2&9&F&9&1test'
 
 idle-particles:
   enabled: true
   theme: ELECTRIC
+  interval_ticks: 2
+  radius: 0.85
+  height: 1.35
+  speed: 0.14
   view_distance: 28
 
 gui:
@@ -45,35 +49,29 @@ gui:
     name: '&x&4&2&9&F&9&1&lОткрыть тестовый кейс'
     lore:
       - ''
-      - '&#9EFC65 «Основная информация»'
-      - ' &7- &fВнутри примеры всех типов наград.'
-      - ' &7- &fНаград: &#FCA8655'
+      - ' &#A6B0BAОткрытие и просмотр содержимого кейса'
       - ''
-      - '&#65D1FC «Текущие параметры»'
-      - ' &7- &fКлючи: &#FCA865{have} &7/ &#FCA865{need}'
-      - ' &7- &fТип ключа: {key_name}'
+      - ' &#C2CBD3Ключи'
+      - ' &#69747E↳ &#A7F3D0{have} / {need}'
       - ''
-      - '&#FCA965 «Управление»'
-      - ' &7- {left-click}'
-      - ' &7- {right-click}'
+      - ' &#FFB347[&#FFA43C Л&#FF9536К&#FF8630М &#FF772A] &f{left_action}'
+      - ' &#FF8A8A[&#FF7979 П&#F96868К&#F25757М &#EB4646] &f{right_action}'
       - ''
   insufficient-keys:
     name: '&#FF5A64Недостаточно ключей'
     lore:
       - ''
-      - '&#FC7165 «Недостаточно ключей»'
-      - ' &7- &fДоступно: &#FCA865{have}'
-      - ' &7- &fТребуется: &#FCA865{need}'
+      - ' &#A6B0BAДля открытия нужен ещё один ключ'
       - ''
-      - '&#65D1FC «Что делать»'
-      - ' &7- &fПолучите ключ и попробуйте снова.'
+      - ' &#C2CBD3Ключи'
+      - ' &#69747E↳ &#A7F3D0{have} / {need}'
       - ''
 
 broadcast:
   enabled: true
   lines:
     - ''
-    - '&#EFF7B9К§x§6§8§A§F§9§4Е§x§8§D§B§F§9§7Й§x§B§3§C§F§9§AС&#EFF7B9Ы'
+    - '&#EFF7B9&lК&#68AF94&lЕ&#8DBF97&lЙ&#B3CF9A&lС&#EFF7B9&lЫ'
     - ''
     - '&#EFF7B9▸ &fИгрок &#EFF7B9{player} &fоткрыл кейс &#EFF7B9{case}'
     - '&#EFF7B9▸ &fНаграда: &f{reward}'

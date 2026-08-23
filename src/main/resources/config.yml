@@ -1,15 +1,11 @@
-# ───────────────────── pnCases 1.5.2 ─────────────────────
+# Переключатели функций.
+features:
+  rarity: true
+  preview: true
 
-# Модули: true — включить, false — выключить.
-modules:
-  rarity: true         # Редкости наград
-  preview: true        # Просмотр содержимого кейса
-  gui-animation: true  # Анимация появления предметов в GUI
-  title: true          # Анимация заголовка GUI
-
-# ───────────────────── Хранилище ─────────────────────
+# Тип хранилища: SQLITE, MYSQL, MONGODB или REDIS. Смена требует перезапуска.
 database:
-  type: SQLITE # SQLITE, MYSQL или MONGODB
+  type: SQLITE
   sqlite:
     file: data.db
     connection-timeout-ms: 10000
@@ -26,12 +22,34 @@ database:
     uri: "mongodb://localhost:27017"
     database: pncases
     collection: pncases
+  redis:
+    uri: "redis://localhost:6379/0"
+    namespace: "pncases"
 
-# ───────────────────── Голограммы ─────────────────────
+# Локализация предметов: ru_ru или en_us.
+localization:
+  locale: ru_ru
+
+# Провайдер голограмм: AUTO, FANCY или DECENT.
 holograms:
-  provider: AUTO # AUTO, FANCY или DECENT
+  provider: AUTO
 
-# ───────────────────── Символы наград ─────────────────────
-reward-symbols:
-  vault: "$"
-  playerpoints: "✦"
+# Названия редкостей. {id} содержит ID пользовательской редкости.
+rarity:
+  default: "&f◆ {id}"
+  common: "&7◇ Обычная"
+  uncommon: "&a◆ Необычная"
+  rare: "&9◆ Редкая"
+  epic: "&5✦ Эпическая"
+  legendary: "&6★ Легендарная"
+  mythic: "&d✹ Мифическая"
+
+# Стиль голограммы награды в анимациях.
+animations:
+  reward-hologram:
+    scale: 1.45
+    height-offset: 0.16
+    visibility-distance: 48
+    brightness: 15
+    movement-ticks: 2
+    reveal-delay-ticks: 6

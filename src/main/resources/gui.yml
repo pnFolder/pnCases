@@ -13,98 +13,56 @@
 # {reward}, {case}, {case_id} — награда и данные кейса.
 # {rarity} — полностью оформленная редкость: цвет, символ и название.
 # {chance} — вероятность выпадения.
-# {amount}, {item_amount}, {duration} — параметры награды.
 #
-# В rarities можно свободно менять оформленное name и glow.
 # Слоты, навигация, системные иконки и Machine GUI находятся в коде.
 
 case:
   animation-button:
-    name: "&x&A&F&9&2&F&FВыбор анимации"
+    name: '&#5FD7FFАнимация открытия'
     lore:
-      - ""
-      - "&#9EFC65 «Текущие параметры»"
-      - " &7- &fАнимация: {animation}"
-      - ""
-      - "&#65D1FC «Действие»"
-      - " &7- &fЛКМ — открыть выбор"
-      - ""
+      - ''
+      - ' &#A6B0BAНастройка отображения кейса'
+      - ''
+      - ' &#C2CBD3Анимация'
+      - ' &#69747E↳ &#A7F3D0{animation}'
+      - ''
+      - ' &#FFB347[&#FFA43C Л&#FF9536К&#FF8630М &#FF772A] &fИзменить'
+      - ' &#FF8A8A[&#FF7979 П&#F96868К&#F25757М &#EB4646] &fСбросить'
+      - ''
 
   history:
     item:
-      name: "&x&A&0&E&F&A&1◆ {reward}"
+      name: "&#5FD7FF{reward}"
       lore:
-        - ""
-        - "&#9EFC65 «Основная информация»"
-        - " &7- &fИгрок: &x&F&B&C&A&0&8{player}"
-        - " &7- &fНаграда: {reward}"
-        - ""
-        - "&#65D1FC «Время открытия»"
-        - " &7- &f{time}"
-        - ""
+        - ''
+        - ' &#A6B0BAПоследнее открытие этого кейса'
+        - ''
+        - ' &#C2CBD3Игрок'
+        - ' &#69747E↳ &#A7F3D0{player}'
+        - ' &#C2CBD3Награда'
+        - ' &#69747E↳ &#A7F3D0{reward}'
+        - ' &#C2CBD3Время'
+        - ' &#69747E↳ &#A7F3D0{time}'
+        - ''
     empty:
-      name: "&8История пуста"
+      name: "&#5FD7FFИстория открытий"
       lore:
-        - ""
-        - "&#9EFC65 «Основная информация»"
-        - " &7- &fПоследние открытия кейса"
-        - " &7- &fбудут отображаться здесь."
-        - ""
+        - ''
+        - ' &#A6B0BAЗдесь появятся последние'
+        - ' &#A6B0BAполученные игроками награды'
+        - ''
 
 preview:
   title: "&0Содержимое кейса"
-
   reward:
-    name: "{rarity} &f{reward}"
+    name: "{reward}"
     lore:
       - ""
-      - "&#9EFC65 «Основная информация»"
-      - " &7- &fРедкость: {rarity}"
-      - ""
-      - "&#65D1FC «Вероятность»"
-      - " &7- &fВыпадение: &#FCA865{chance}"
-    type-lore:
-      item:
-        - ""
-        - "&#FCA965 «Награда»"
-        - " &7- &fКоличество: &#FCA865{item_amount}"
-        - ""
-      vault:
-        - ""
-        - "&#FCA965 «Награда»"
-        - " &7- &fМонеты: &a{amount}"
-        - ""
-      playerpoints:
-        - ""
-        - "&#FCA965 «Награда»"
-        - " &7- &fПоинты: &b{amount}"
-        - ""
-      luckperms:
-        - ""
-        - "&#FCA965 «Награда»"
-        - " &7- &fСрок: &d{duration}"
-        - ""
-      personal: []
-
-  rarities:
-    default:
-      name: "&f◆ {id}"
-      glow: false
-    common:
-      name: "&7◇ Обычная"
-      glow: false
-    uncommon:
-      name: "&a◆ Необычная"
-      glow: false
-    rare:
-      name: "&9◆ Редкая"
-      glow: false
-    epic:
-      name: "&5✦ Эпическая"
-      glow: true
-    legendary:
-      name: "&6★ Легендарная"
-      glow: true
-    mythic:
-      name: "&d✹ Мифическая"
-      glow: true
+      # Тип: {type}
+      # Количество предметов: &#FCA865{item_amount}
+      # Количество: &#FCA865{amount}
+      # Группа: &d{group}
+      # Право: &b{permission}
+      # Срок: &d{duration}
+      # Шанс: &#FCA865{chance}
+      # Редкость: {rarity}

@@ -1,18 +1,19 @@
 name: pnCases
+bstats-id: 32592
 version: "${version}"
-main: ru.privatenull.PnCasesPlugin
+main: ru.privatenull.pncases.PnCasesPlugin
 api-version: "1.16"
 authors: [privatenull]
 website: https://github.com/Dy6HiLa/pnCases
 description: pnCases - plugin for creating cases and keys
-softdepend: [LuckPerms, FancyHolograms, DecentHolograms, Vault, PlayerPoints, ProtocolLib]
+depend: [ProtocolLib]
+softdepend: [LuckPerms, FancyHolograms, DecentHolograms, Vault, PlayerPoints]
 libraries:
   - org.xerial:sqlite-jdbc:3.53.2.0
 commands:
   pncases:
     description: privatenull developer plugin
     aliases: [cases]
-    usage: /pncases createcase <id> | /pncases machine [case] | /pncases setcase <case> | /pncases delcase <case> | /pncases givekey <player> <key> <amount> | /pncases reload
     permission: pncases.admin
 permissions:
   pncases.admin:

@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'ru.privatenull'
-version = '1.5.2'
+version = '1.5.3'
 
 repositories {
     mavenCentral()
@@ -35,16 +35,16 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     compileOnly("de.oliver:FancyHolograms:2.10.0")
     compileOnly("com.github.decentsoftware-eu.decentholograms:plugin:2.10.1")
-    compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
-    compileOnly("org.black_ixx:playerpoints:3.3.5")
     compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
     implementation("ru.privatenull:pnLibrary:1.0.0") {
         exclude group: "org.xerial", module: "sqlite-jdbc"
     }
-    implementation("org.bstats:bstats-bukkit:3.2.1")
     implementation("net.wesjd:anvilgui:1.10.13-SNAPSHOT")
+    implementation("redis.clients:jedis:7.5.3")
     compileOnly("org.xerial:sqlite-jdbc:3.53.2.0")
     compileOnly("net.kyori:adventure-text-serializer-legacy:4.17.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
 }
 
 tasks {
@@ -61,6 +61,8 @@ tasks {
         relocate('ru.privatenull.pnlibrary', 'ru.privatenull.pncases.libs.pnlibrary')
         relocate('org.bstats', 'ru.privatenull.pncases.libs.bstats')
         relocate('net.wesjd.anvilgui', 'ru.privatenull.pncases.libs.anvilgui')
+        relocate('redis.clients.jedis', 'ru.privatenull.pncases.libs.jedis')
+        relocate('org.apache.commons.pool2', 'ru.privatenull.pncases.libs.pool2')
     }
 
     jar {
@@ -88,6 +90,10 @@ tasks.withType(JavaCompile).configureEach {
     if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
         options.release.set(targetJavaVersion)
     }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 configurations.configureEach {
