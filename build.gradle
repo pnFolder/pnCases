@@ -59,6 +59,9 @@ tasks {
 
     shadowJar {
         archiveClassifier.set('')
+        manifest {
+            attributes 'paperweight-mappings-namespace': 'spigot'
+        }
         mergeServiceFiles()
         relocate('ru.privatenull.pnlibrary', 'ru.privatenull.pncases.libs.pnlibrary')
         relocate('org.bstats', 'ru.privatenull.pncases.libs.bstats')
