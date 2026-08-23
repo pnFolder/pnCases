@@ -4,7 +4,7 @@ import org.bukkit.command.CommandSender;
 import net.kyori.adventure.text.event.ClickEvent;
 import ru.privatenull.pncases.PnCasesPlugin;
 import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.pnlibrary.update.GitHubUpdater;
+import ru.privatenull.pnlibrary.update.PluginUpdateService;
 import ru.privatenull.pnlibrary.compat.ServerVersion;
 
 final class CasesCommandMenu {
@@ -42,16 +42,16 @@ final class CasesCommandMenu {
     }
 
     private String updateStatus(String currentVersion) {
-        GitHubUpdater checker = plugin.getUpdater();
+        PluginUpdateService checker = plugin.getUpdater();
         if (checker == null || !checker.isCheckCompleted()) {
             return "&7проверяется";
         }
         if (checker.isUpdateAvailable()) {
-            String latest = checker.getLatestVersion();
+            String latest = checker.latestVersion();
             return "&eдоступно &f" + currentVersion + " &8→ &#D8DF9D"
                     + (latest == null || latest.isBlank() ? "неизвестно" : latest);
         }
-        if (checker.getLastError() != null && !checker.getLastError().isBlank()) {
+        if (checker.lastError() != null && !checker.lastError().isBlank()) {
             return "&cпроверка недоступна";
         }
         return "&aактуальная версия";

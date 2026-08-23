@@ -1,5 +1,4 @@
 name: pnCases
-bstats-id: 32592
 version: "${version}"
 main: ru.privatenull.pncases.PnCasesPlugin
 api-version: "1.16"

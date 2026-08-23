@@ -25,7 +25,6 @@ import java.util.Set;
  */
 public final class ConfigurationSyncService {
 
-    private static final List<String> DOCUMENTS = List.of("config.yml", "gui.yml", "messages.yml");
     private static final String STATE_DIRECTORY = ".pncases";
     private static final String STATE_FILE = "yaml-templates.yml";
 
@@ -44,15 +43,15 @@ public final class ConfigurationSyncService {
         nextState.set("format", 1);
         List<String> updated = new ArrayList<>();
 
-        for (String document : DOCUMENTS) {
+        for (String document : BundledConfigurationResources.DOCUMENTS) {
             YamlConfiguration bundled = loadResource(plugin, document);
             if (bundled == null) {
                 return Result.failure("не удалось прочитать встроенный " + document);
             }
 
             File userFile = new File(plugin.getDataFolder(), document);
-            if (!userFile.exists()) {
-                plugin.saveResource(document, false);
+            if (!BundledConfigurationResources.copyIfMissing(plugin, document, userFile)) {
+                return Result.failure("не удалось создать " + document);
             }
             YamlConfiguration user = loadRequired(userFile, plugin);
             if (user == null) {
@@ -269,7 +268,7 @@ public final class ConfigurationSyncService {
     }
 
     private static YamlConfiguration loadResource(PnCasesPlugin plugin, String name) {
-        try (InputStream input = plugin.getResource(name)) {
+        try (InputStream input = BundledConfigurationResources.open(plugin, name)) {
             if (input == null) throw new IOException("resource " + name + " not found");
             YamlConfiguration yaml = new YamlConfiguration();
             try (InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {

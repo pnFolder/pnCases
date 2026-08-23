@@ -6,7 +6,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import ru.privatenull.pncases.cases.CaseManager;
 import ru.privatenull.pncases.command.CasesCommand;
 import ru.privatenull.pncases.command.CasesTabCompleter;
+import ru.privatenull.pncases.compat.HotReloadClassCache;
 import ru.privatenull.pncases.config.ConfigurationSyncService;
+import ru.privatenull.pncases.config.BundledConfigurationResources;
 import ru.privatenull.pncases.config.UiConfig;
 import ru.privatenull.pncases.gui.GuiSession;
 import ru.privatenull.pncases.gui.caseview.CaseGuiListener;
@@ -23,8 +25,9 @@ import ru.privatenull.pnlibrary.gui.GuiUpdateService;
 import ru.privatenull.pnlibrary.localization.ItemLocalization;
 import ru.privatenull.pnlibrary.localization.MinecraftLocale;
 import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pnlibrary.banner.PluginBanner;
 import ru.privatenull.pnlibrary.lifecycle.PluginRuntime;
-import ru.privatenull.pnlibrary.update.GitHubUpdater;
+import ru.privatenull.pnlibrary.update.PluginUpdateService;
 import ru.privatenull.pncases.storage.*;
 import ru.privatenull.pnlibrary.compat.ServerCapabilities;
 import ru.privatenull.pnlibrary.compat.ServerVersion;
@@ -44,8 +47,15 @@ public final class PnCasesPlugin extends JavaPlugin {
     private CasesDatabase database;
     private DatabaseRouter databaseRouter;
     private ItemLocalization itemLocalization;
+    private PluginBanner.Identity identity;
     private PluginRuntime runtime;
     private final Map<UUID, Integer> guiTransitionOrigins = new HashMap<>();
+
+    @Override
+    public void onLoad() {
+        BundledConfigurationResources.capture(this);
+        HotReloadClassCache.preload(this);
+    }
 
     @Override
     public void onEnable() {
@@ -57,7 +67,7 @@ public final class PnCasesPlugin extends JavaPlugin {
         }
         ServerCapabilities.logEnvironment(this);
 
-        saveDefaultConfig();
+        BundledConfigurationResources.capture(this);
         ConfigurationSyncService.Result sync = synchronizeConfiguration();
         if (!sync.successful()) {
             getLogger().severe("Не удалось безопасно обновить конфигурацию: " + sync.error());
@@ -67,7 +77,15 @@ public final class PnCasesPlugin extends JavaPlugin {
         reloadConfig();
         loadItemLocalization();
         economies = EconomyService.create(this);
-        runtime = PluginRuntime.start(this);
+        identity = new PluginBanner.Identity(this, "PnFolder")
+                .github("Dy6HiLa", "pnCases")
+                .bStats(32592)
+                .notifyAdministrators(true)
+                .notificationPermission("pncases.admin")
+                .notifyOnlineAdministrators(true)
+                .notifyAdministratorsOnJoin(true)
+                .supportUrl("https://discord.gg/SZxPP9surw");
+        runtime = PluginRuntime.start(identity);
         try {
             databaseRouter = DatabaseRouter.from(
                     getConfig().getConfigurationSection("database"), getDataFolder());
@@ -204,8 +222,8 @@ public final class PnCasesPlugin extends JavaPlugin {
         if (playerId != null) guiTransitionOrigins.remove(playerId);
     }
 
-    public GitHubUpdater getUpdater() {
-        return runtime == null ? null : runtime.updates();
+    public PluginUpdateService getUpdater() {
+        return runtime == null || !runtime.hasUpdates() ? null : runtime.updates();
     }
 
     public boolean rarityEnabled() {
@@ -227,7 +245,7 @@ public final class PnCasesPlugin extends JavaPlugin {
     }
 
     public String getSupportDiscord() {
-        return PluginRuntime.supportUrl();
+        return identity == null ? "https://discord.gg/SZxPP9surw" : identity.supportUrl();
     }
 
     public ItemLocalization getItemLocalization() {

@@ -119,7 +119,9 @@ public final class UiConfig {
             File file,
             YamlConfiguration current
     ) {
-        if (!file.exists()) plugin.saveResource(resourceName, false);
+        if (!BundledConfigurationResources.copyIfMissing(plugin, resourceName, file)) {
+            plugin.getLogger().severe("Не удалось создать " + resourceName);
+        }
         YamlConfiguration defaults = loadResource(resourceName);
         YamlConfiguration loaded = new YamlConfiguration();
         try {
@@ -140,7 +142,7 @@ public final class UiConfig {
 
     private YamlConfiguration loadResource(String resourceName) {
         YamlConfiguration defaults = new YamlConfiguration();
-        try (InputStream input = plugin.getResource(resourceName)) {
+        try (InputStream input = BundledConfigurationResources.open(plugin, resourceName)) {
             if (input == null) throw new IOException("resource " + resourceName + " not found");
             try (InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
                 defaults.load(reader);
