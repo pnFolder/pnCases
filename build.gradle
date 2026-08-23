@@ -39,7 +39,9 @@ dependencies {
     implementation("ru.privatenull:pnLibrary:1.0.0") {
         exclude group: "org.xerial", module: "sqlite-jdbc"
     }
-    implementation("net.wesjd:anvilgui:1.10.13-SNAPSHOT")
+    implementation("net.wesjd:anvilgui:1.10.13-SNAPSHOT") {
+        changing = true
+    }
     implementation("redis.clients:jedis:7.5.3")
     compileOnly("org.xerial:sqlite-jdbc:3.53.2.0")
     compileOnly("net.kyori:adventure-text-serializer-legacy:4.17.0")
@@ -98,6 +100,7 @@ tasks.withType(Test).configureEach {
 
 configurations.configureEach {
     attributes.attribute(org.gradle.api.attributes.java.TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 
 processResources {
