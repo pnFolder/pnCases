@@ -202,6 +202,10 @@ rewards:
 
 В `PERSONAL` доступны `{player}` и `{uuid}`. Для успешного сообщения конкретной награды используется поле `message`.
 
+Поле `message` можно размещать на уровне награды или внутри секции
+`luckperms`, `vault` и `playerpoints`. В сообщении доступны `{player}`, `{uuid}`,
+`{reward}`, `{amount}`, `{money}`, `{points}`, `{group}`, `{permission}` и `{duration}`.
+
 ## Анимации открытия
 
 Доступные анимации:

@@ -142,6 +142,7 @@ rewards:
       group: vip
       duration: 1h
       # node: example.permission
+    message: '&aВы получили {group} на {duration}!'
     visual:
       material: NETHER_STAR
       name: '&dVIP на 1 час'

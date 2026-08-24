@@ -38,7 +38,7 @@ public final class RewardConfigParser {
         String rawType = String.valueOf(map.containsKey("type") ? map.get("type") : "ITEM");
         Reward.Type type = parseType(rawType);
         if (type == null) type = Reward.Type.ITEM;
-        String message = value(map.get("message"));
+        String message = rewardMessage(map, type);
         Object rarity = map.get("rarity");
         String rarityId = Reward.normalizeRarityId(rarity == null ? null : String.valueOf(rarity), chance);
 
@@ -130,6 +130,19 @@ public final class RewardConfigParser {
         ItemStack visual = visualItem(map, displayName);
         displayName = visualName(visual, displayName == null ? "&dЛичная награда" : displayName);
         return new ParsedReward(null, visual, null, null, null, 0.0, 0, displayName, command);
+    }
+
+    private String rewardMessage(Map<?, ?> reward, Reward.Type type) {
+        if (reward.containsKey("message")) return value(reward.get("message"));
+        String sectionName = switch (type) {
+            case LUCKPERMS -> "luckperms";
+            case VAULT -> "vault";
+            case PLAYERPOINTS -> "playerpoints";
+            case ITEM, PERSONAL -> null;
+        };
+        if (sectionName == null) return null;
+        Map<?, ?> section = nestedMap(reward, sectionName);
+        return section == null ? null : value(section.get("message"));
     }
 
     private ItemStack visualItem(Map<?, ?> reward, String displayName) {

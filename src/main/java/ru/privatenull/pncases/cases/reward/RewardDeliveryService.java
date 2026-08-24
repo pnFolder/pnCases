@@ -172,16 +172,22 @@ public final class RewardDeliveryService {
                                    String moneyAmount, String pointsAmount) {
         String configured = reward.message();
         if (configured == null || configured.isBlank()) return;
-        player.sendMessage(formatMessage(configured, rewardLabel, moneyAmount, pointsAmount));
+        player.sendMessage(formatMessage(player, reward, configured, rewardLabel, moneyAmount, pointsAmount));
     }
 
-    private String formatMessage(String raw, String rewardLabel, String moneyAmount, String pointsAmount) {
+    private String formatMessage(Player player, Reward reward, String raw, String rewardLabel,
+                                 String moneyAmount, String pointsAmount) {
         String amount = !moneyAmount.isBlank() ? moneyAmount : pointsAmount;
         return color(raw
+                .replace("{player}", player.getName())
+                .replace("{uuid}", player.getUniqueId().toString())
                 .replace("{reward}", rewardLabel)
                 .replace("{amount}", amount)
                 .replace("{money}", moneyAmount)
-                .replace("{points}", pointsAmount));
+                .replace("{points}", pointsAmount)
+                .replace("{group}", value(reward.lpGroup()))
+                .replace("{permission}", value(reward.lpNode()))
+                .replace("{duration}", value(reward.lpDuration())));
     }
 
     private String formatBroadcast(
@@ -216,5 +222,9 @@ public final class RewardDeliveryService {
 
     private static String color(String value) {
         return ColorUtil.colorize(value);
+    }
+
+    private static String value(String value) {
+        return value == null ? "" : value;
     }
 }
