@@ -7,7 +7,6 @@ import static ru.privatenull.pncases.cases.animation.type.TimeDistortionEffects.
 import java.util.List;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -23,6 +22,7 @@ import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.core.AnimationTimeline;
 import ru.privatenull.pncases.cases.animation.core.TimelineCaseAnimation;
 import ru.privatenull.pncases.cases.animation.core.TimelineTask;
+import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
 import ru.privatenull.pncases.cases.animation.effect.RewardLabel;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
@@ -124,7 +124,7 @@ public final class TimeDistortionAnimation extends TimelineCaseAnimation {
                     playSound(world, keeperStage, Sound.BLOCK_PORTAL_TRIGGER, 0.12f, 1.62f);
                 }
                 if (local == 14) {
-                    world.spawnParticle(Particle.FLASH, entry.clone().add(0.0, 1.1, 0.0),
+                    AnimationParticles.flash(world, entry.clone().add(0.0, 1.1, 0.0),
                             1, 0.0, 0.0, 0.0, 0.0);
                     playSound(world, entry, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.18f, 0.82f);
                 }
@@ -236,7 +236,7 @@ public final class TimeDistortionAnimation extends TimelineCaseAnimation {
                             0.10f, 1.86f - (float) progress * 1.18f);
                 }
                 if (local == 35) {
-                    world.spawnParticle(Particle.FLASH, merge.clone().add(0.0, 1.0, 0.0),
+                    AnimationParticles.flash(world, merge.clone().add(0.0, 1.0, 0.0),
                             1, 0.0, 0.0, 0.0, 0.0);
                     playSound(world, merge, Sound.BLOCK_RESPAWN_ANCHOR_DEPLETE, 0.20f, 0.54f);
                 }
@@ -263,7 +263,7 @@ public final class TimeDistortionAnimation extends TimelineCaseAnimation {
                 if (local % 6 == 0) playSound(world, keeperLocation,
                         Sound.BLOCK_NOTE_BLOCK_HAT, 0.09f, 1.72f - (float) progress * 1.02f);
                 if (local == 24) {
-                    world.spawnParticle(Particle.FLASH, keeperLocation.clone().add(0.0, 1.0, 0.0),
+                    AnimationParticles.flash(world, keeperLocation.clone().add(0.0, 1.0, 0.0),
                             1, 0.0, 0.0, 0.0, 0.0);
                     playSound(world, keeperLocation, Sound.ENTITY_ENDERMAN_TELEPORT, 0.16f, 0.52f);
                 }

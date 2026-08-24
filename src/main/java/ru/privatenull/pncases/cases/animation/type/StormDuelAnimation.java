@@ -147,9 +147,9 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
                 if (local == 14) {
                     world.strikeLightningEffect(leftStart);
                     world.strikeLightningEffect(rightStart);
-                    world.spawnParticle(Particle.FLASH, leftStart.clone().add(0.0, 1.0, 0.0),
+                    AnimationParticles.flash(world, leftStart.clone().add(0.0, 1.0, 0.0),
                             1, 0.02, 0.10, 0.02, 0.0);
-                    world.spawnParticle(Particle.FLASH, rightStart.clone().add(0.0, 1.0, 0.0),
+                    AnimationParticles.flash(world, rightStart.clone().add(0.0, 1.0, 0.0),
                             1, 0.02, 0.10, 0.02, 0.0);
                     playSound(world, leftStart, Sound.ITEM_TRIDENT_THUNDER, 0.15f, 1.62f);
                     playSound(world, rightStart, Sound.ITEM_TRIDENT_THUNDER, 0.15f, 1.38f);
@@ -337,7 +337,8 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
                     run.hide(rawBase.getBlock(), Material.AIR);
                     world.strikeLightningEffect(center.clone().add(0.0, 0.35, 0.0));
                     world.spawnParticle(particle(EXPLOSION), center.clone().add(0.0, 1.15, 0.0), 3, 0.32, 0.32, 0.32, 0.02);
-                    world.spawnParticle(Particle.FLASH, center.clone().add(0.0, 1.20, 0.0), 2, 0.08, 0.08, 0.08, 0.0);
+                    AnimationParticles.flash(world, center.clone().add(0.0, 1.20, 0.0),
+                            2, 0.08, 0.08, 0.08, 0.0);
                     world.spawnParticle(Particle.SONIC_BOOM, center.clone().add(0.0, 1.18, 0.0), 1, 0.0, 0.0, 0.0, 0.0);
                     world.spawnParticle(particle(TOTEM), center.clone().add(0.0, 1.12, 0.0),
                             22, 0.45, 0.52, 0.45, 0.10);

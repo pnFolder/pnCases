@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases.animation.effect;
 
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.World;
@@ -29,5 +30,20 @@ public final class AnimationParticles {
                              BlockData data) {
         if (world == null || particle == null || location == null || data == null) return;
         world.spawnParticle(particle, location, count, offsetX, offsetY, offsetZ, extra, data);
+    }
+
+    /**
+     * FLASH used no data through 1.21.10, but requires a Color on 1.21.11+.
+     */
+    public static void flash(World world, Location location, int count,
+                             double offsetX, double offsetY, double offsetZ, double extra) {
+        if (world == null || location == null) return;
+        if (Particle.FLASH.getDataType() == Color.class) {
+            world.spawnParticle(Particle.FLASH, location, count,
+                    offsetX, offsetY, offsetZ, extra, Color.WHITE);
+            return;
+        }
+        world.spawnParticle(Particle.FLASH, location, count,
+                offsetX, offsetY, offsetZ, extra);
     }
 }

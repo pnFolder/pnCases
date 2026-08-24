@@ -75,8 +75,10 @@ final class TimeDistortionEffects {
     }
 
     static void temporalSkip(World world, Location from, Location to) {
-        world.spawnParticle(Particle.FLASH, from.clone().add(0.0, 1.0, 0.0), 1, 0.0, 0.0, 0.0, 0.0);
-        world.spawnParticle(Particle.FLASH, to.clone().add(0.0, 1.0, 0.0), 1, 0.0, 0.0, 0.0, 0.0);
+        AnimationParticles.flash(world, from.clone().add(0.0, 1.0, 0.0),
+                1, 0.0, 0.0, 0.0, 0.0);
+        AnimationParticles.flash(world, to.clone().add(0.0, 1.0, 0.0),
+                1, 0.0, 0.0, 0.0, 0.0);
         line(world, from.clone().add(0.0, 1.0, 0.0), to.clone().add(0.0, 1.0, 0.0), VIOLET, 9);
     }
 
