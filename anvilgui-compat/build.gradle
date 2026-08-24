@@ -1,0 +1,97 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'ru.privatenull'
+version = '1.10.13-pncompat'
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'papermc-repo'
+        url = 'https://repo.papermc.io/repository/maven-public/'
+    }
+    maven {
+        name = 'wesjd'
+        url = 'https://mvn.wesjd.net/'
+    }
+}
+
+configurations {
+    anvilGuiBase
+}
+
+dependencies {
+    compileOnly('io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT')
+    compileOnly('net.wesjd:anvilgui:1.10.13-SNAPSHOT')
+    anvilGuiBase('net.wesjd:anvilgui:1.10.13-SNAPSHOT')
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+def paperclipDirectory = layout.buildDirectory.dir('paperclip')
+def paperclipJar = paperclipDirectory.map { it.file('paper-1.21.11-34.jar') }
+def mappedServerJar = paperclipDirectory.map { it.file('versions/1.21.11/paper-1.21.11.jar') }
+def paperclipUrl = 'https://fill-data.papermc.io/v1/objects/623705ec041ca7547f9e8746ad5a30f10c14fb92ea7c44666e10182e7340d127/paper-1.21.11-34.jar'
+def paperclipSha256 = '623705ec041ca7547f9e8746ad5a30f10c14fb92ea7c44666e10182e7340d127'
+
+def sha256 = { File file ->
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    file.withInputStream { stream ->
+        byte[] buffer = new byte[8192]
+        for (int read = stream.read(buffer); read >= 0; read = stream.read(buffer)) {
+            if (read > 0) digest.update(buffer, 0, read)
+        }
+    }
+    digest.digest().encodeHex().toString()
+}
+
+def downloadPaperclip = tasks.register('downloadPaperclip') {
+    inputs.property('url', paperclipUrl)
+    inputs.property('sha256', paperclipSha256)
+    outputs.file paperclipJar
+    outputs.upToDateWhen {
+        paperclipJar.get().asFile.exists()
+                && sha256(paperclipJar.get().asFile) == paperclipSha256
+    }
+    doLast {
+        File target = paperclipJar.get().asFile
+        target.parentFile.mkdirs()
+        ant.get(src: paperclipUrl, dest: target, verbose: true)
+        String actual = sha256(target)
+        if (actual != paperclipSha256) {
+            throw new GradleException("Paper 1.21.11 build 34 SHA-256 mismatch: ${actual}")
+        }
+    }
+}
+
+def patchPaperServer = tasks.register('patchPaperServer', Exec) {
+    dependsOn downloadPaperclip
+    inputs.file paperclipJar
+    workingDir paperclipDirectory
+    executable javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }.get().executablePath.asFile
+    args '-Dpaperclip.patchonly=true', '-jar', paperclipJar.get().asFile.name
+    outputs.file mappedServerJar
+}
+
+tasks.compileJava {
+    dependsOn patchPaperServer
+    classpath += files(mappedServerJar)
+}
+
+tasks.jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from({ configurations.anvilGuiBase.collect { zipTree(it) } }) {
+        exclude 'net/wesjd/anvilgui/version/Wrapper1_21_R7.class'
+        exclude 'net/wesjd/anvilgui/version/Wrapper1_21_R7$AnvilContainer.class'
+    }
+}

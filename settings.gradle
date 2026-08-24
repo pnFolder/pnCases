@@ -1,3 +1,5 @@
 rootProject.name = 'pnCases'
 
 includeBuild('../pnLibrary')
+
+include 'anvilgui-compat'

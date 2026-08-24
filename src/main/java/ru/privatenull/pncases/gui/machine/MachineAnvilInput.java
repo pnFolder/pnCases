@@ -17,11 +17,9 @@ import java.util.function.Function;
 final class MachineAnvilInput {
 
     private final Plugin plugin;
-    private final MachineAnvilBackend paperBackend;
 
     MachineAnvilInput(Plugin plugin) {
         this.plugin = plugin;
-        this.paperBackend = createPaperBackend(plugin);
     }
 
     void open(Player player, String title, String initialValue, ItemStack icon,
@@ -37,11 +35,6 @@ final class MachineAnvilInput {
                     "Сохранить предметом справа", null
             ).stream().map(ColorUtil::colorize).toList());
             inputIcon.setItemMeta(meta);
-        }
-
-        if (paperBackend != null) {
-            paperBackend.open(player, title, initialValue, inputIcon, validator, accept, cancel);
-            return;
         }
 
         new AnvilGUI.Builder()
@@ -72,21 +65,6 @@ final class MachineAnvilInput {
                 .open(player);
     }
 
-    private static MachineAnvilBackend createPaperBackend(Plugin plugin) {
-        if (!org.bukkit.Bukkit.getBukkitVersion().startsWith("1.21.11-")) return null;
-        try {
-            Class<?> type = Class.forName(
-                    "ru.privatenull.pncases.gui.machine.PaperAnvilInput",
-                    true,
-                    MachineAnvilInput.class.getClassLoader()
-            );
-            return (MachineAnvilBackend) type.getDeclaredConstructor(Plugin.class).newInstance(plugin);
-        } catch (ReflectiveOperationException | LinkageError exception) {
-            plugin.getLogger().severe("Не удалось подключить Paper Anvil API: " + exception.getMessage());
-            return null;
-        }
-    }
-
     private static String renameText(Player player, AnvilGUI.StateSnapshot snapshot) {
         Object view = player.getOpenInventory();
         try {
@@ -106,10 +84,4 @@ final class MachineAnvilInput {
         }
         return snapshot.getText();
     }
-}
-
-interface MachineAnvilBackend {
-
-    void open(Player player, String title, String initialValue, ItemStack icon,
-              Function<String, String> validator, Consumer<String> accept, Runnable cancel);
 }

@@ -39,9 +39,8 @@ dependencies {
     implementation("ru.privatenull:pnLibrary:1.0.0") {
         exclude group: "org.xerial", module: "sqlite-jdbc"
     }
-    implementation("net.wesjd:anvilgui:1.10.13-SNAPSHOT") {
-        changing = true
-    }
+    compileOnly("net.wesjd:anvilgui:1.10.13-SNAPSHOT")
+    implementation(project(":anvilgui-compat"))
     implementation("redis.clients:jedis:7.5.3")
     compileOnly("org.xerial:sqlite-jdbc:3.53.2.0")
     compileOnly("net.kyori:adventure-text-serializer-legacy:4.17.0")
