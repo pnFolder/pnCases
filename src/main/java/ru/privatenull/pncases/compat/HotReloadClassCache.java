@@ -2,7 +2,9 @@ package ru.privatenull.pncases.compat;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +24,10 @@ import java.util.stream.Stream;
 public final class HotReloadClassCache {
 
     private static final String CLASS_PATH_PREFIX = "ru/privatenull/pncases/";
+    private static final String LIBRARY_PATH_PREFIX = CLASS_PATH_PREFIX + "libs/";
+    private static final String PN_LIBRARY_PATH_PREFIX = LIBRARY_PATH_PREFIX + "pnlibrary/";
+    private static final String ANVIL_GUI_PATH_PREFIX = LIBRARY_PATH_PREFIX + "anvilgui/";
+    private static final String ANVIL_GUI_WRAPPER_PATH_PREFIX = ANVIL_GUI_PATH_PREFIX + "version/Wrapper";
     private static boolean loaded;
 
     private HotReloadClassCache() {
@@ -47,6 +53,10 @@ public final class HotReloadClassCache {
         int prepared = 0;
         int skipped = 0;
         for (String className : classNames) {
+            if (!supportsRuntimeBytecode(loader, className)) {
+                skipped++;
+                continue;
+            }
             try {
                 Class.forName(className, false, loader);
                 prepared++;
@@ -85,7 +95,12 @@ public final class HotReloadClassCache {
     }
 
     private static boolean isPluginClass(String path) {
-        return path.startsWith(CLASS_PATH_PREFIX)
+        boolean firstParty = path.startsWith(CLASS_PATH_PREFIX)
+                && !path.startsWith(LIBRARY_PATH_PREFIX);
+        boolean restartCriticalLibrary = path.startsWith(PN_LIBRARY_PATH_PREFIX)
+                || (path.startsWith(ANVIL_GUI_PATH_PREFIX)
+                && !path.startsWith(ANVIL_GUI_WRAPPER_PATH_PREFIX));
+        return (firstParty || restartCriticalLibrary)
                 && path.endsWith(".class")
                 && !path.endsWith("module-info.class");
     }
@@ -94,7 +109,21 @@ public final class HotReloadClassCache {
         return path.substring(0, path.length() - ".class".length()).replace('/', '.');
     }
 
-    private static String message(Exception exception) {
+    private static boolean supportsRuntimeBytecode(ClassLoader loader, String className) {
+        String resource = className.replace('.', '/') + ".class";
+        try (InputStream stream = loader.getResourceAsStream(resource)) {
+            if (stream == null) return true;
+            DataInputStream data = new DataInputStream(stream);
+            if (data.readInt() != 0xCAFEBABE) return true;
+            data.readUnsignedShort();
+            int major = data.readUnsignedShort();
+            return major <= Runtime.version().feature() + 44;
+        } catch (IOException ignored) {
+            return true;
+        }
+    }
+
+    private static String message(Throwable exception) {
         String message = exception.getMessage();
         return message == null || message.isBlank()
                 ? exception.getClass().getSimpleName()
