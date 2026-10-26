@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/pncases-cover-v2.png" alt="pnCases" width="100%">
-</p>
-
 <h1 align="center">pnCases</h1>
 
 <p align="center">
