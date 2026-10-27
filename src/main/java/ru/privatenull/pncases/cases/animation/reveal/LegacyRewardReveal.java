@@ -5,7 +5,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.inventory.ItemStack;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.effect.RewardLabel;
-import ru.privatenull.pnlibrary.entity.VisualEntity;
+import ru.privatenull.pncases.support.entity.VisualEntity;
 
 import java.util.List;
 

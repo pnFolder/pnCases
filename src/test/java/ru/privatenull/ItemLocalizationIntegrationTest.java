@@ -2,8 +2,8 @@ package ru.privatenull;
 
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
-import ru.privatenull.pnlibrary.localization.ItemLocalization;
-import ru.privatenull.pnlibrary.localization.MinecraftLocale;
+import ru.privatenull.pncases.support.localization.ItemLocalization;
+import ru.privatenull.pncases.support.localization.MinecraftLocale;
 
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;

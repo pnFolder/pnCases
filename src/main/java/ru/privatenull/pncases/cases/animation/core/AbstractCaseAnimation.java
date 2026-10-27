@@ -8,21 +8,19 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.scheduler.BukkitRunnable;
+import ru.privatenull.pncases.support.task.PluginRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import ru.privatenull.pncases.PnCasesPlugin;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.text.ColorUtil;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
+import ru.privatenull.pncases.support.text.ColorUtil;
 
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class AbstractCaseAnimation {
-
-    private static final float MIN_VOLUME = 0.08f;
-    private static final float MAX_VOLUME = 0.22f;
 
     protected final PnCasesPlugin plugin;
 
@@ -35,11 +33,11 @@ public abstract class AbstractCaseAnimation {
     /** Schedules and registers an animation task in its owning session. */
     protected final BukkitTask scheduleTask(
             AnimationSession session,
-            BukkitRunnable task,
+            PluginRunnable task,
             long delay,
             long period
     ) {
-        BukkitTask scheduled = task.runTaskTimer(plugin, delay, period);
+        BukkitTask scheduled = task.runTaskTimer(plugin.tasks(), delay, period);
         return session.track(scheduled);
     }
 
@@ -67,23 +65,12 @@ public abstract class AbstractCaseAnimation {
 
     public static void playSound(World world, Location location, Sound sound,
                                  float requestedVolume, float pitch) {
-        if (world == null || location == null || sound == null) return;
-        world.playSound(location, sound, normalizeVolume(requestedVolume), normalizePitch(pitch));
+        AnimationEffects.sound(world, location, sound, requestedVolume, pitch);
     }
 
     public static void playSound(Player player, Location location, Sound sound,
                                  float requestedVolume, float pitch) {
-        if (player == null || sound == null) return;
-        player.playSound(location == null ? player.getLocation() : location,
-                sound, normalizeVolume(requestedVolume), normalizePitch(pitch));
-    }
-
-    private static float normalizeVolume(float requestedVolume) {
-        return Math.max(MIN_VOLUME, Math.min(MAX_VOLUME, requestedVolume));
-    }
-
-    private static float normalizePitch(float pitch) {
-        return Math.max(0.5f, Math.min(2.0f, pitch));
+        AnimationEffects.sound(player, location, sound, requestedVolume, pitch);
     }
 
     /** Cancels only runs owned by the unloading world. */

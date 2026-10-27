@@ -1,0 +1,58 @@
+# ПРИМЕР: награды-команды (type: PERSONAL). Команды выполняются от имени консоли, слеш не нужен.
+# Доступны {player} и {uuid}. Команды идут по порядку.
+# Так можно выдать что угодно: предметы других плагинов, эффекты, титулы, телепорт, ключи другого кейса.
+blocks: []
+display-name: '&cКейс команд'
+
+gui:
+  title: '{display-name}'
+  size: 27
+  open_slot: 13
+
+rewards:
+  # Одна команда в поле command.
+  - type: PERSONAL
+    chance: 50
+    rarity: COMMON
+    command: 'give {player} golden_apple 3'
+    name: '&e3 золотых яблока'
+    message: '&eВы получили {reward}!'
+    visual:
+      material: GOLDEN_APPLE
+      name: '&e3 золотых яблока'
+
+  # Несколько команд списком в commands.
+  - type: PERSONAL
+    chance: 30
+    rarity: RARE
+    commands:
+      - 'effect give {player} speed 300 1'
+      - 'effect give {player} jump_boost 300 1'
+      - 'tell {player} Эффекты на 5 минут!'
+    name: '&bСкорость и прыжок'
+    message: '&bВы получили {reward}!'
+    visual:
+      material: SUGAR
+      name: '&bСкорость и прыжок'
+
+  # Ключ от другого кейса. Ключ выдаёт команда самого pnCases.
+  - type: PERSONAL
+    chance: 15
+    rarity: EPIC
+    command: 'pncases givekey {player} 01-items 1'
+    name: '&aКлюч от кейса с предметами'
+    visual:
+      material: TRIPWIRE_HOOK
+      name: '&aКлюч от кейса с предметами'
+
+  # Сообщение на весь сервер плюс награда.
+  - type: PERSONAL
+    chance: 5
+    rarity: LEGENDARY
+    commands:
+      - 'give {player} netherite_ingot 2'
+      - 'broadcast &6{player} &fвыбил слитки незерита!'
+    name: '&52 слитка незерита'
+    visual:
+      material: NETHERITE_INGOT
+      name: '&52 слитка незерита'

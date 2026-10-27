@@ -1,0 +1,100 @@
+# ПРИМЕР: где какие плейсхолдеры работают. Полный список с пояснениями в PLACEHOLDERS.txt.
+# Это просто образец: поставь блок командой /pncases setcase, скопировав файл в папку cases.
+blocks: []
+display-name: '&bКейс с плейсхолдерами'
+
+# В голограмме: {display-name}, {case_id}, {world}, {x}, {y}, {z}.
+hologram:
+  enabled: true
+  type: TEXT
+  y: 1.5
+  lines:
+    - '{display-name}'
+    - '&7ID кейса: &f{case_id}'
+    - '&8Блок: {world} {x} {y} {z}'
+
+gui:
+  title: '{display-name}'
+  size: 27
+  open_slot: 13
+  button:
+    material: CHEST
+    name: '{display-name}'
+    lore:
+      - ''
+      - ' &7Ключи: &a{have} / {need}'   # есть / нужно
+      - ''
+      - ' &f[ЛКМ] &7{left_action}'
+      - ' &f[ПКМ] &7{right_action}'
+      - ' &f[SHIFT + ПКМ] &7{bulk_action}'
+  insufficient-keys:
+    name: '&cНедостаточно ключей'
+    lore:
+      - ' &7Ключи: &c{have} / {need}'
+
+# В оповещении: {player}, {case}, {case_id}, {reward}.
+broadcast:
+  enabled: true
+  lines:
+    - '&e▸ &f{player} открыл &e{case} &8({case_id}) &fи получил &e{reward}'
+
+rewards:
+  # {reward}, {amount}, {player} в сообщении награды-предмета.
+  - type: ITEM
+    chance: 40
+    rarity: COMMON
+    message: '&a{player}, вы получили {reward} x{amount}!'
+    item:
+      material: DIAMOND
+      amount: 2
+
+  # {money} в сообщении награды-денег.
+  - type: VAULT
+    chance: 30
+    rarity: UNCOMMON
+    vault:
+      amount: 750
+      message: '&aНачислено {money} монет!'
+    visual:
+      material: SUNFLOWER
+      name: '&a750 монет'
+
+  # {points} в сообщении награды-поинтов.
+  - type: PLAYERPOINTS
+    chance: 20
+    rarity: RARE
+    playerpoints:
+      amount: 50
+      message: '&bНачислено {points} поинтов!'
+    visual:
+      material: AMETHYST_SHARD
+      name: '&b50 поинтов'
+
+  # {group}, {duration} в сообщении LuckPerms. Для права вместо группы есть {permission}.
+  - type: LUCKPERMS
+    chance: 8
+    rarity: EPIC
+    luckperms:
+      group: vip
+      duration: 1d
+    message: '&dВы получили {group} на {duration}!'
+    visual:
+      material: NETHER_STAR
+      name: '&dVIP на 1 день'
+
+  # В командах доступны только {player} и {uuid}.
+  - type: PERSONAL
+    chance: 2
+    rarity: LEGENDARY
+    commands:
+      - 'say {player} ({uuid}) получил приз из кейса'
+    name: '&6Секретный приз'
+    visual:
+      material: ENDER_EYE
+      name: '&6Секретный приз'
+
+# Плейсхолдеры PlaceholderAPI для других плагинов (таб, скорборд):
+#   %pncases_keys_<ID кейса>%   ключи игрока
+#   %pncases_cases%             сколько кейсов загружено
+#   %pncases_opening%           true, если игрок открывает кейс
+#   %pncases_version%           версия pnCases

@@ -2,13 +2,14 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.inventory.ItemStack;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.PnCasesPlugin;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 import static ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation.playSound;
 import ru.privatenull.pncases.cases.animation.core.AnimationFrame;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
@@ -115,7 +116,7 @@ public final class DynamiteAnimation extends TimelineCaseAnimation {
                             bounceVY = Math.abs(velY) * 0.28;
                             bounceCount = 0;
                             playSound(w, base, Sound.BLOCK_STONE_HIT, 0.28f, 0.8f);
-                            AnimationParticles.block(w, particle(BLOCK),
+                            AnimationEffects.block(w, particle(BLOCK),
                                     new Location(w, curX, tntTarget.getY() + 0.05, curZ),
                                     8, 0.2, 0.0, 0.2, 0.02,
                                     Material.DIRT.createBlockData());
@@ -140,7 +141,7 @@ public final class DynamiteAnimation extends TimelineCaseAnimation {
                         tnt.teleport(new Location(w, curX, curY, curZ));
                     }
                     if (t % 2 == 0) {
-                        w.spawnParticle(particle(SMOKE), new Location(w, curX, curY + 0.5, curZ),
+                        spawn(w, particle(SMOKE), new Location(w, curX, curY + 0.5, curZ),
                                 2, 0.05, 0.05, 0.05, 0.01);
                     }
                     if (t % 6 == 0 && !bouncing) {
@@ -164,8 +165,8 @@ public final class DynamiteAnimation extends TimelineCaseAnimation {
                     }
 
                     Location fuseTop = tntTarget.clone().add(0, 1.05, 0);
-                    w.spawnParticle(particle(SMOKE), fuseTop, 2, 0.03, 0.0, 0.03, 0.01);
-                    if (t % 3 == 0) w.spawnParticle(Particle.FLAME, fuseTop, 1, 0.02, 0.0, 0.02, 0.01);
+                    spawn(w, particle(SMOKE), fuseTop, 2, 0.03, 0.0, 0.03, 0.01);
+                    if (t % 3 == 0) spawn(w, Particle.FLAME, fuseTop, 1, 0.02, 0.0, 0.02, 0.01);
 
                     if (t % 5 == 0) {
                         float progress = (float) timeline.progress("fuse", t);
@@ -179,19 +180,19 @@ public final class DynamiteAnimation extends TimelineCaseAnimation {
 
                     Location boom = tntTarget.clone().add(0, 0.5, 0);
 
-                    w.spawnParticle(particle(EXPLOSION), boom, 1, 0, 0, 0, 0);
-                    w.spawnParticle(particle(SMOKE), boom, 60, 0.7, 0.4, 0.7, 0.08);
-                    w.spawnParticle(particle(LARGE_SMOKE), boom, 25, 0.6, 0.3, 0.6, 0.04);
-                    w.spawnParticle(Particle.FLAME, boom, 40, 0.5, 0.3, 0.5, 0.12);
-                    w.spawnParticle(Particle.LAVA, boom, 20, 0.4, 0.2, 0.4, 0.0);
-                    w.spawnParticle(Particle.ELECTRIC_SPARK, boom, 50, 0.5, 0.3, 0.5, 0.15);
-                    w.spawnParticle(Particle.CRIT, boom, 30, 0.4, 0.3, 0.4, 0.2);
+                    spawn(w, particle(EXPLOSION), boom, 1, 0, 0, 0, 0);
+                    spawn(w, particle(SMOKE), boom, 60, 0.7, 0.4, 0.7, 0.08);
+                    spawn(w, particle(LARGE_SMOKE), boom, 25, 0.6, 0.3, 0.6, 0.04);
+                    spawn(w, Particle.FLAME, boom, 40, 0.5, 0.3, 0.5, 0.12);
+                    spawn(w, Particle.LAVA, boom, 20, 0.4, 0.2, 0.4, 0.0);
+                    spawn(w, Particle.ELECTRIC_SPARK, boom, 50, 0.5, 0.3, 0.5, 0.15);
+                    spawn(w, Particle.CRIT, boom, 30, 0.4, 0.3, 0.4, 0.2);
 
                     for (int i = 0; i < 20; i++) {
                         double angle = 2 * Math.PI * i / 20;
                         Location ring = boom.clone().add(0.8 * Math.cos(angle), 0, 0.8 * Math.sin(angle));
-                        w.spawnParticle(particle(SMOKE), ring, 4, 0.05, 0.1, 0.05, 0.05);
-                        w.spawnParticle(Particle.FLAME, ring, 2, 0.02, 0.05, 0.02, 0.06);
+                        spawn(w, particle(SMOKE), ring, 4, 0.05, 0.1, 0.05, 0.05);
+                        spawn(w, Particle.FLAME, ring, 2, 0.02, 0.05, 0.02, 0.06);
                     }
 
                     playSound(w, base, Sound.ENTITY_GENERIC_EXPLODE, 0.42f, 0.7f);
@@ -263,7 +264,7 @@ public final class DynamiteAnimation extends TimelineCaseAnimation {
                         debrisY[i] += debrisVel[i][1];
                         debrisZ[i] += debrisVel[i][2];
                         if (debrisY[i] < base.getY() - 0.3) {
-                            AnimationParticles.block(w, particle(BLOCK),
+                            AnimationEffects.block(w, particle(BLOCK),
                                     new Location(w, debrisX[i], base.getY() + 0.1, debrisZ[i]),
                                     6, 0.1, 0.0, 0.1, 0.02, Material.DIRT.createBlockData());
                             safeRemove(bd);
@@ -272,7 +273,7 @@ public final class DynamiteAnimation extends TimelineCaseAnimation {
                         bd.teleport(new Location(w, debrisX[i], debrisY[i], debrisZ[i]));
                         bd.setRotation(bd.getLocation().getYaw() + 5f, bd.getLocation().getPitch() + 3f);
                         if (t % 3 == 0)
-                            w.spawnParticle(particle(SMOKE), bd.getLocation(), 1, 0.03, 0.03, 0.03, 0.005);
+                            spawn(w, particle(SMOKE), bd.getLocation(), 1, 0.03, 0.03, 0.03, 0.005);
                     }
 
                     double phaseProgress = timeline.progress("debris", t);
@@ -294,24 +295,25 @@ public final class DynamiteAnimation extends TimelineCaseAnimation {
                     }
 
                     if (t % 2 == 0)
-                        w.spawnParticle(particle(LARGE_SMOKE), base.clone().add(0, 0.3, 0), 3, 0.3, 0.1, 0.3, 0.02);
+                        spawn(w, particle(LARGE_SMOKE), base.clone().add(0, 0.3, 0), 3, 0.3, 0.1, 0.3, 0.02);
 
                     if (t == timeline.end("debris") - 10) {
-                        w.spawnParticle(Particle.END_ROD, base.clone().add(0, 0.2, 0), 20, 0.1, 0.05, 0.1, 0.04);
+                        spawn(w, Particle.END_ROD, base.clone().add(0, 0.2, 0), 20, 0.1, 0.05, 0.1, 0.04);
                         playSound(w, base, Sound.BLOCK_BEACON_POWER_SELECT, 0.28f, 1.4f);
                     }
                 }
 
                 if (t == timeline.start("reveal")) {
+                    run.protectReward(base.clone().add(0.0, 1.35, 0.0));
                     org.bukkit.util.Transformation st = rewardDisplay.getTransformation();
                     rewardDisplay.setTransformation(new org.bukkit.util.Transformation(
                             st.getTranslation(), st.getLeftRotation(),
                             new Vector3f(0.2f, 0.2f, 0.2f), st.getRightRotation()
                     ));
                     Location pop = base.clone().add(0, 0.5, 0);
-                    w.spawnParticle(Particle.END_ROD, pop, 40, 0.3, 0.2, 0.3, 0.08);
-                    w.spawnParticle(Particle.ELECTRIC_SPARK, pop, 30, 0.25, 0.15, 0.25, 0.1);
-                    w.spawnParticle(particle(SMOKE), pop, 15, 0.2, 0.1, 0.2, 0.04);
+                    spawn(w, Particle.END_ROD, pop, 40, 0.3, 0.2, 0.3, 0.08);
+                    spawn(w, Particle.ELECTRIC_SPARK, pop, 30, 0.25, 0.15, 0.25, 0.1);
+                    spawn(w, particle(SMOKE), pop, 15, 0.2, 0.1, 0.2, 0.04);
                     playSound(w, base, Sound.BLOCK_BEACON_ACTIVATE, 0.34f, 1.3f);
                     playSound(w, base, Sound.ENTITY_PLAYER_LEVELUP, 0.28f, 1.5f);
                     playSound(player, player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.32f, 1.4f);
@@ -340,24 +342,24 @@ public final class DynamiteAnimation extends TimelineCaseAnimation {
                         double ringR = 0.5 + 0.3 * Math.sin(phaseProgress * Math.PI * 3);
                         for (int ring = 0; ring < 6; ring++) {
                             double angle = (2 * Math.PI * ring) / 6 + t * 0.08;
-                            w.spawnParticle(particle(SMOKE),
+                            spawn(w, particle(SMOKE),
                                     rewardLoc.clone().add(ringR * Math.cos(angle), 0.1, ringR * Math.sin(angle)),
                                     1, 0, 0, 0, 0.005);
                         }
                     }
                     if (t % 6 == 0)
-                        w.spawnParticle(Particle.ELECTRIC_SPARK, rewardLoc, 1, 0.25, 0.15, 0.25, 0.025);
+                        spawn(w, Particle.ELECTRIC_SPARK, rewardLoc, 1, 0.25, 0.15, 0.25, 0.025);
                     if (t % 10 == 0)
                         playSound(w, base, Sound.BLOCK_FIRE_AMBIENT, 0.15f, 1.5f + (float) phaseProgress * 0.5f);
                 }
 
                 if (t >= timeline.duration()) {
                     Location rewardLoc = base.clone().add(0, 2.3, 0);
-                    w.spawnParticle(particle(EXPLOSION), rewardLoc, 1, 0, 0, 0, 0);
-                    w.spawnParticle(Particle.ELECTRIC_SPARK, rewardLoc, 10, 0.4, 0.3, 0.4, 0.06);
-                    w.spawnParticle(Particle.END_ROD, rewardLoc, 7, 0.3, 0.2, 0.3, 0.035);
-                    w.spawnParticle(particle(SMOKE), rewardLoc, 7, 0.5, 0.3, 0.5, 0.03);
-                    w.spawnParticle(Particle.LAVA, rewardLoc, 4, 0.3, 0.2, 0.3, 0.0);
+                    spawn(w, particle(EXPLOSION), rewardLoc, 1, 0, 0, 0, 0);
+                    spawn(w, Particle.ELECTRIC_SPARK, rewardLoc, 10, 0.4, 0.3, 0.4, 0.06);
+                    spawn(w, Particle.END_ROD, rewardLoc, 7, 0.3, 0.2, 0.3, 0.035);
+                    spawn(w, particle(SMOKE), rewardLoc, 7, 0.5, 0.3, 0.5, 0.03);
+                    spawn(w, Particle.LAVA, rewardLoc, 4, 0.3, 0.2, 0.3, 0.0);
                     playSound(w, base, Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.34f, 1.0f);
                     playSound(w, base, Sound.ENTITY_PLAYER_LEVELUP, 0.30f, 1.5f);
                     playSound(player, player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.34f, 1.1f);

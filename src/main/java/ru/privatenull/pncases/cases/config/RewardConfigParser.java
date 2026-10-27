@@ -5,7 +5,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.pncases.cases.model.Reward;
 import ru.privatenull.pncases.cases.reward.RewardPresentationService;
-import ru.privatenull.pnlibrary.item.ItemFactory;
+import ru.privatenull.pncases.support.item.ItemFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -68,7 +68,8 @@ public final class RewardConfigParser {
                 displayName,
                 rarityId,
                 parsed.visualItem(),
-                parsed.command()
+                parsed.command(),
+                parsed.commands()
         );
     }
 
@@ -84,7 +85,7 @@ public final class RewardConfigParser {
             ItemMeta meta = item.getItemMeta();
             if (meta != null && meta.hasDisplayName()) displayName = meta.getDisplayName();
         }
-        if (displayName == null && item != null) displayName = "&f" + item.getType().name();
+        if (displayName == null && item != null) displayName = presentation.defaultItemName(item);
         ItemStack visual = visualItem(map, displayName);
         if (item == null) item = visual;
         if (visual == null) visual = item;
@@ -126,10 +127,11 @@ public final class RewardConfigParser {
 
     private ParsedReward parsePersonal(Map<?, ?> map) {
         String command = value(map.get("command"));
+        List<String> commands = stringList(map.get("commands"));
         String displayName = value(map.get("name"));
         ItemStack visual = visualItem(map, displayName);
         displayName = visualName(visual, displayName == null ? "&dЛичная награда" : displayName);
-        return new ParsedReward(null, visual, null, null, null, 0.0, 0, displayName, command);
+        return new ParsedReward(null, visual, null, null, null, 0.0, 0, displayName, command, commands);
     }
 
     private String rewardMessage(Map<?, ?> reward, Reward.Type type) {
@@ -188,7 +190,7 @@ public final class RewardConfigParser {
             case VAULT -> parsed.vaultAmount() > 0.0;
             case PLAYERPOINTS -> parsed.playerPointsAmount() > 0;
             case LUCKPERMS -> notBlank(parsed.group()) || notBlank(parsed.node());
-            case PERSONAL -> notBlank(parsed.command());
+            case PERSONAL -> notBlank(parsed.command()) || !parsed.commands().isEmpty();
         };
     }
 
@@ -198,6 +200,16 @@ public final class RewardConfigParser {
 
     private boolean notBlank(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private List<String> stringList(Object raw) {
+        if (!(raw instanceof List<?> values)) return List.of();
+        List<String> result = new ArrayList<>();
+        for (Object value : values) {
+            String command = value(value);
+            if (command != null && !command.isBlank()) result.add(command);
+        }
+        return List.copyOf(result);
     }
 
     private int integer(Object value, int fallback) {
@@ -260,7 +272,14 @@ public final class RewardConfigParser {
             double vaultAmount,
             int playerPointsAmount,
             String displayName,
-            String command
+            String command,
+            List<String> commands
     ) {
+        private ParsedReward(ItemStack item, ItemStack visualItem, String group, String node,
+                             String duration, double vaultAmount, int playerPointsAmount,
+                             String displayName, String command) {
+            this(item, visualItem, group, node, duration, vaultAmount, playerPointsAmount,
+                    displayName, command, List.of());
+        }
     }
 }

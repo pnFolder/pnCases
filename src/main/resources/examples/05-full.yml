@@ -1,0 +1,123 @@
+# ПРИМЕР: кейс со всеми настройками. Все блоки, кроме rewards, необязательные.
+blocks: []                # заполняется командой /pncases setcase <ID>
+display-name: '&x&4&2&9&F&9&1Полный кейс'
+
+# Текст над кейсом. y — высота.
+hologram:
+  enabled: true
+  type: TEXT
+  y: 1.5
+  lines:
+    - '&x&4&2&9&F&9&1&lПолный кейс'
+    - '&7Правая кнопка мыши &8— &fоткрыть'
+
+# Частицы вокруг кейса. theme: MAGIC, PORTAL, ELECTRIC, FIRE, TOXIC, FROST (остальные видно в Machine).
+idle-particles:
+  enabled: true
+  theme: MAGIC
+  interval_ticks: 2
+  radius: 0.85
+  height: 1.35
+  speed: 0.14
+  view_distance: 28
+
+gui:
+  title: '{display-name}'
+  size: 54
+  open_slot: 22
+  preview_enabled: true   # false: и ЛКМ, и ПКМ сразу открывают кейс
+  decor:
+    slots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 45, 46, 47, 48, 49, 50, 51, 52, 53]
+    item:
+      material: GRAY_STAINED_GLASS_PANE
+      name: ' '
+  history:
+    slots: [36, 37, 38, 39, 40, 41, 42, 43, 44]   # сюда выводятся последние выпавшие награды
+  button:
+    material: CHEST
+    name: '&x&4&2&9&F&9&1&lОткрыть кейс'
+    lore:
+      - ''
+      - ' &7Ключи: &a{have} / {need}'
+      - ''
+      - ' &f[ЛКМ] &7{left_action}'
+      - ' &f[ПКМ] &7{right_action}'
+      - ' &f[SHIFT + ПКМ] &7{bulk_action}'
+  insufficient-keys:
+    name: '&cНедостаточно ключей'
+    lore:
+      - ' &7Ключи: &c{have} / {need}'
+
+# Оповещение всему серверу о выигрыше.
+broadcast:
+  enabled: true
+  lines:
+    - ''
+    - '&e▸ &fИгрок &e{player} &fоткрыл кейс &e{case}'
+    - '&e▸ &fНаграда: &f{reward}'
+    - ''
+
+# Покупка ключа за уровни опыта (только опыт, не деньги).
+cost:
+  xp-purchase:
+    enabled: true
+    levels: 10
+
+# Гарант: после N открытий игроку выпадет награда не ниже указанной редкости. Счёт у каждого игрока свой.
+guarantee:
+  enabled: true
+  openings: 50
+  minimum-rarity: LEGENDARY
+  reset-after-win: true
+
+# Анимация открытия. fixed — одна на кейс. Варианты: ANVIL, DYNAMITE, PORTAL, POISON, FORTUNE_RING,
+# PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION, PRISM,
+# STAR_CAROUSEL, AUTUMN_MAPLE, NEW_YEAR_TREE. Без fixed анимация выбирается случайно.
+animation:
+  fixed: DRAGON
+  items:
+    - material: DIAMOND
+    - material: EMERALD
+    - material: NETHER_STAR
+
+rewards:
+  - type: ITEM
+    chance: 55
+    rarity: COMMON
+    item:
+      material: BREAD
+      amount: 16
+  - type: VAULT
+    chance: 25
+    rarity: UNCOMMON
+    vault:
+      amount: 1000
+    visual:
+      material: SUNFLOWER
+      name: '&a1000 монет'
+  - type: PERSONAL
+    chance: 12
+    rarity: EPIC
+    commands:
+      - 'give {player} diamond 5'
+    name: '&b5 алмазов'
+    visual:
+      material: DIAMOND
+      name: '&b5 алмазов'
+  - type: LUCKPERMS
+    chance: 6
+    rarity: LEGENDARY
+    luckperms:
+      group: vip
+      duration: 7d
+    visual:
+      material: NETHER_STAR
+      name: '&dVIP на 7 дней'
+  - type: PLAYERPOINTS
+    chance: 2
+    rarity: MYTHIC
+    playerpoints:
+      amount: 1000
+    visual:
+      material: AMETHYST_CLUSTER
+      name: '&d1000 поинтов'

@@ -6,8 +6,8 @@ import ru.privatenull.pncases.cases.animation.legacy.LegacyCaseAnimation;
 import ru.privatenull.pncases.cases.animation.legacy.LegacyFortuneRingAnimation;
 import ru.privatenull.pncases.cases.animation.type.MobHuntAnimation;
 import ru.privatenull.pncases.cases.model.AnimationType;
-import ru.privatenull.pnlibrary.compat.ServerCapabilities;
-import ru.privatenull.pnlibrary.compat.ServerVersion;
+import ru.privatenull.pncases.support.compat.ServerCapabilities;
+import ru.privatenull.pncases.support.compat.ServerVersion;
 
 import java.lang.reflect.Constructor;
 import java.util.EnumMap;
@@ -43,6 +43,10 @@ public class AnimationCatalog {
         register(AnimationType.MIMIC, modern, "MimicAnimation");
         register(AnimationType.STORM_DUEL, modern, "StormDuelAnimation");
         register(AnimationType.TIME_DISTORTION, modern, "TimeDistortionAnimation");
+        register(AnimationType.PRISM, modern, "PrismAnimation");
+        register(AnimationType.STAR_CAROUSEL, modern, "StarCarouselAnimation");
+        register(AnimationType.NEW_YEAR_TREE, modern, "NewYearTreeAnimation");
+        register(AnimationType.AUTUMN_MAPLE, modern, "AutumnMapleAnimation");
         animations.put(AnimationType.MOB_HUNT, new MobHuntAnimation(plugin));
     }
 

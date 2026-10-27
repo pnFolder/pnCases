@@ -2,6 +2,7 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -25,7 +26,7 @@ import ru.privatenull.pncases.cases.animation.core.TimelineCaseAnimation;
 import ru.privatenull.pncases.cases.animation.core.TimelineTask;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.MaterialCompat;
+import ru.privatenull.pncases.support.compat.BukkitCompat.MaterialCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -118,7 +119,7 @@ public final class MimicAnimation extends TimelineCaseAnimation {
                 }
                 if (tick == 30) {
                     playSound(world, center, Sound.ENTITY_RAVAGER_ROAR, 0.18f, 1.45f);
-                    world.spawnParticle(particle(POOF), body, 5, 0.42, 0.24, 0.42, 0.02);
+                    spawn(world, particle(POOF), body, 5, 0.42, 0.24, 0.42, 0.02);
                 }
             }
 
@@ -137,7 +138,7 @@ public final class MimicAnimation extends TimelineCaseAnimation {
 
                 if ((tick - timeline.end("wake")) % 11 == 1) {
                     playSound(world, body, Sound.BLOCK_WOOD_PLACE, 0.14f, 0.72f + (float) progress * 0.35f);
-                    world.spawnParticle(Particle.CLOUD, body.clone().subtract(0.0, 0.48, 0.0),
+                    spawn(world, Particle.CLOUD, body.clone().subtract(0.0, 0.48, 0.0),
                             3, 0.28, 0.05, 0.28, 0.01);
                 }
             }
@@ -173,7 +174,7 @@ public final class MimicAnimation extends TimelineCaseAnimation {
 
                     if (tick == swallowEnd) {
                         playSound(world, mimic.mouth(), Sound.ENTITY_GENERIC_EAT, 0.15f, 0.72f + index * 0.11f);
-                        world.spawnParticle(particle(POOF), mimic.mouth(), 3, 0.16, 0.12, 0.16, 0.01);
+                        spawn(world, particle(POOF), mimic.mouth(), 3, 0.16, 0.12, 0.16, 0.01);
                     }
                 }
 
@@ -195,7 +196,7 @@ public final class MimicAnimation extends TimelineCaseAnimation {
 
                 if (tick % 7 == 0) {
                     playSound(world, body, Sound.ENTITY_PLAYER_BURP, 0.12f, 0.52f + (float) progress * 0.30f);
-                    world.spawnParticle(particle(SMOKE), mimic.mouth(), 2, 0.12, 0.10, 0.12, 0.01);
+                    spawn(world, particle(SMOKE), mimic.mouth(), 2, 0.12, 0.10, 0.12, 0.01);
                 }
             }
 
@@ -226,9 +227,10 @@ public final class MimicAnimation extends TimelineCaseAnimation {
                 }
 
                 if (tick == timeline.start("reveal")) {
+                    run.protectReward(center.clone().add(0.0, 1.35, 0.0));
                     playSound(world, center, Sound.ENTITY_FOX_SPIT, 0.20f, 0.70f);
                     playSound(world, center, Sound.BLOCK_CHEST_OPEN, 0.16f, 1.55f);
-                    world.spawnParticle(particle(POOF), mimic.mouth(), 8, 0.28, 0.22, 0.28, 0.03);
+                    spawn(world, particle(POOF), mimic.mouth(), 8, 0.28, 0.22, 0.28, 0.03);
                 }
                 if (tick == timeline.end("reveal") - 12) {
                     playSound(world, rewardLocation, Sound.ENTITY_PLAYER_LEVELUP, 0.20f, 1.55f);
@@ -247,8 +249,8 @@ public final class MimicAnimation extends TimelineCaseAnimation {
 
             private void finalBurst() {
                 Location rewardLocation = rewardDisplay.getLocation();
-                world.spawnParticle(Particle.END_ROD, rewardLocation, 7, 0.30, 0.30, 0.30, 0.02);
-                world.spawnParticle(particle(FIREWORK), rewardLocation, 4, 0.25, 0.25, 0.25, 0.02);
+                spawn(world, Particle.END_ROD, rewardLocation, 7, 0.30, 0.30, 0.30, 0.02);
+                spawn(world, particle(FIREWORK), rewardLocation, 4, 0.25, 0.25, 0.25, 0.02);
                 playSound(world, rewardLocation, Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.22f, 1.20f);
             }
 

@@ -12,5 +12,9 @@ public enum AnimationType {
     DRAGON,
     MIMIC,
     STORM_DUEL,
-    TIME_DISTORTION
+    TIME_DISTORTION,
+    PRISM,
+    STAR_CAROUSEL,
+    AUTUMN_MAPLE,
+    NEW_YEAR_TREE
 }

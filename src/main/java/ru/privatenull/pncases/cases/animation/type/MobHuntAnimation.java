@@ -2,6 +2,7 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.*;
 import org.bukkit.entity.*;
@@ -15,6 +16,7 @@ import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.scheduler.BukkitTask;
 import ru.privatenull.pncases.PnCasesPlugin;
 import static ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation.playSound;
+import ru.privatenull.pncases.cases.animation.core.AnimationMobSpawner;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.core.InteractiveAnimationTask;
 import ru.privatenull.pncases.cases.animation.core.InteractiveCaseAnimation;
@@ -22,8 +24,8 @@ import ru.privatenull.pncases.cases.animation.reveal.LegacyRewardReveal;
 import ru.privatenull.pncases.cases.animation.reveal.RewardReveal;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
-import ru.privatenull.pnlibrary.compat.ServerCapabilities;
+import ru.privatenull.pncases.support.compat.BukkitCompat.ParticleCompat;
+import ru.privatenull.pncases.support.compat.ServerCapabilities;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -197,11 +199,11 @@ public final class MobHuntAnimation extends InteractiveCaseAnimation implements 
         boolean zombie = ThreadLocalRandom.current().nextBoolean();
         Mob mob;
         if (zombie) {
-            Zombie entity = world.spawn(location, Zombie.class);
+            Zombie entity = AnimationMobSpawner.spawn(world, location, Zombie.class);
             entity.setBaby(false);
             mob = entity;
         } else {
-            mob = world.spawn(location, Skeleton.class);
+            mob = AnimationMobSpawner.spawn(world, location, Skeleton.class);
         }
         mob.setCustomName((zombie ? "§cЗомби" : "§fСкелет") + " §8| §7Страж кейса");
         mob.setCustomNameVisible(true);
@@ -332,11 +334,12 @@ public final class MobHuntAnimation extends InteractiveCaseAnimation implements 
         }
         ItemStack visual = resolveRewardVisual(session.reward, session.definition);
         Location frameCenter = location.clone().add(0.0, 0.55, 0.0);
+        session.run.protectReward(frameCenter);
         session.rewardReveal = createRewardReveal(session.run, frameCenter, visual,
                 resolveRewardName(session.reward, visual));
         for (Entity entity : session.rewardReveal.entities()) session.run.track(entity);
         playSound(world, location, Sound.ENTITY_PLAYER_LEVELUP, 0.65f, forced ? 1.10f : 1.55f);
-        world.spawnParticle(particle(TOTEM), frameCenter, 8, 0.35, 0.45, 0.35, 0.045);
+        spawn(world, particle(TOTEM), frameCenter, 8, 0.35, 0.45, 0.35, 0.045);
         session.revealTask = scheduleTask(session.run,
                 new ru.privatenull.pncases.cases.animation.core.AnimationTask(session.run, "mob-hunt-reveal") {
             int tick;

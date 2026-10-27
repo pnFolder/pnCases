@@ -6,7 +6,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.pncases.cases.model.AnimationType;
 import ru.privatenull.pncases.cases.model.IdleParticleSettings;
-import ru.privatenull.pnlibrary.item.HeadUtil;
+import ru.privatenull.pncases.support.item.HeadUtil;
 
 import java.util.List;
 import java.util.Locale;
@@ -97,6 +97,10 @@ public final class GuiDesign {
             case MIMIC -> CONTENT;
             case STORM_DUEL -> PILLAGER;
             case TIME_DISTORTION -> THEME;
+            case PRISM -> STYLE;
+            case STAR_CAROUSEL -> SHOWCASE;
+            case NEW_YEAR_TREE -> AQUARIUM;
+            case AUTUMN_MAPLE -> HOLOGRAM;
         };
         return head(texture, animationName(type));
     }
@@ -131,6 +135,10 @@ public final class GuiDesign {
             case MIMIC -> gradient("Голодный мимик", 0xFFB347, 0xE05252);
             case STORM_DUEL -> gradient("Грозовая дуэль", 0x65D1FC, 0xA978FF);
             case TIME_DISTORTION -> gradient("Искажение времени", 0xFFE38A, 0x65D1FC);
+            case PRISM -> gradient("Призма", 0x65D1FC, 0x9EFC65);
+            case STAR_CAROUSEL -> gradient("Звёздный хоровод", 0xFFF5C2, 0xB5B4FF);
+            case NEW_YEAR_TREE -> gradient("Новогодняя ёлка", 0xE8F6FF, 0x65D1FC);
+            case AUTUMN_MAPLE -> gradient("Осенний клён", 0xFFB347, 0xE05A2B);
         };
     }
 
@@ -148,12 +156,16 @@ public final class GuiDesign {
             case MIMIC -> "Голодный мимик";
             case STORM_DUEL -> "Грозовая дуэль";
             case TIME_DISTORTION -> "Искажение времени";
+            case PRISM -> "Призма";
+            case STAR_CAROUSEL -> "Звёздный хоровод";
+            case NEW_YEAR_TREE -> "Новогодняя ёлка";
+            case AUTUMN_MAPLE -> "Осенний клён";
         };
     }
 
     public static String animationSelectionName(AnimationType type) {
         String name = animationPlainName(type);
-        return type == AnimationType.STORM_DUEL || type == AnimationType.TIME_DISTORTION
+        return type == AnimationType.NEW_YEAR_TREE || type == AnimationType.AUTUMN_MAPLE
                 ? name + " &8" + NEW_TAG
                 : name;
     }
@@ -208,6 +220,24 @@ public final class GuiDesign {
                     "Часовщик собирает кейс из прошлого.",
                     "Его будущий двойник создаёт парадокс,",
                     "а обратный ход освобождает награду.");
+            case PRISM -> List.of(
+                    "Предметы наград образуют вертикальное колесо",
+                    "с лазурным следом. Колесо замирает",
+                    "и раскрывает выигрыш.");
+            case STAR_CAROUSEL -> List.of(
+                    "Восемь предметов наград кружатся над землёй.",
+                    "Белые искры соединяют их в хоровод,",
+                    "из которого выходит выигранная награда.");
+            case NEW_YEAR_TREE -> List.of(
+                    "Падает снег, и на месте кейса растёт ёлка.",
+                    "Её гирлянду включают, и огонёк бежит по",
+                    "лампочкам-наградам, замедляется и замирает",
+                    "на выигрышной, которая становится призом.");
+            case AUTUMN_MAPLE -> List.of(
+                    "Вырастает клён: листья желтеют и краснеют на глазах.",
+                    "Светлячок перелетает от плода к плоду, замедляется",
+                    "и садится на выигрышный. Плод падает с ветки",
+                    "и рассыпается, открывая приз.");
         };
     }
 

@@ -39,7 +39,7 @@ public record HologramDefinition(
         return new HologramDefinition(name, "animation", Type.TEXT, location.clone(),
                 HologramText.normalize(lines), null, null,
                 "CENTER", "CENTER", true, true, Color.fromARGB(0, 0, 0, 0),
-                1, null, null, style.visibilityDistance(), style.interpolationTicks(),
+                0, null, null, style.visibilityDistance(), style.interpolationTicks(),
                 new HologramVector(style.scale(), style.scale(), style.scale()), null,
                 new HologramBrightness(style.brightness(), style.brightness()));
     }

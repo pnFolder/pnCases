@@ -13,8 +13,8 @@ import ru.privatenull.pncases.cases.model.AnimationType;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.CaseGuiLayout;
 import ru.privatenull.pncases.gui.GuiDesign;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
-import ru.privatenull.pnlibrary.compat.ServerVersion;
+import ru.privatenull.pncases.support.compat.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pncases.support.compat.ServerVersion;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,30 +23,50 @@ import java.util.function.Consumer;
 
 final class MachineGuiSupport {
 
-    static final int SLOT_MAIN_ANIMATION = 10;
-    static final int SLOT_MAIN_MENU = 12;
-    static final int SLOT_MAIN_REWARDS = 14;
+    // Home screen: four sections in the first row, three tools in the second.
+    static final int SLOT_MAIN_REWARDS = 10;
+    static final int SLOT_MAIN_ANIMATION = 12;
+    static final int SLOT_MAIN_MENU = 14;
     static final int SLOT_MAIN_FEATURES = 16;
-    static final int SLOT_MAIN_HOLOGRAM = 20;
-    static final int SLOT_MAIN_PARTICLES = 22;
-    static final int SLOT_MAIN_PURCHASE = 24;
+    static final int SLOT_MAIN_CHECK = 19;
+    static final int SLOT_MAIN_PREVIEW = 21;
+    static final int SLOT_MAIN_UNDO = 23;
+    static final int SLOT_MAIN_BIND = 28;
+    static final int SLOT_MAIN_KEY = 30;
+    static final int SLOT_MAIN_CASES = 45;
     static final int SLOT_MAIN_CLOSE = 49;
+    // "Additional" screen: four cards of this case (three open their settings), then the global switches.
+    static final int SLOT_EXTRA_HOLOGRAM = 10;
+    static final int SLOT_EXTRA_SHOWCASE = 12;
+    static final int SLOT_EXTRA_PURCHASE = 14;
+    static final int SLOT_EXTRA_GIFT = 16;
+    static final int SLOT_EXTRA_PROXIMITY = 29;
+    static final int SLOT_EXTRA_BUNDLE = 33;
+    static final int SLOT_EXTRA_WORKBENCH = 35;
+    static final int SLOT_WORKBENCH_TOGGLE = 15;
+    static final int SLOT_WORKBENCH_AMOUNT = 24;
+    static final int SLOT_WORKBENCH_CLEAR = 33;
+    static final int SLOT_WORKBENCH_DELETE = 42;
+    static final int SLOT_WORKBENCH_ADD = 40;
+    static final int SLOT_EXTRA_RARITY = 20;
+    static final int SLOT_EXTRA_HISTORY = 22;
+    static final int SLOT_EXTRA_PREVIEW = 24;
+    static final int SLOT_EXTRA_WHOLE = 31;
     static final int SLOT_ANIMATION_MODE = 47;
-    static final int SLOT_HOLOGRAM_TOGGLE = 20;
-    static final int SLOT_HOLOGRAM_HEIGHT = 22;
-    static final int SLOT_HOLOGRAM_LINES = 24;
-    static final int SLOT_PARTICLES_TOGGLE = 20;
-    static final int SLOT_PARTICLES_THEME = 24;
-    static final int SLOT_XP_BUY = 21;
-    static final int SLOT_XP_LEVELS = 23;
+    static final int SLOT_ANIMATION_CATEGORY = 53;
+    static final int SLOT_HOLOGRAM_TOGGLE = 11;
+    static final int SLOT_HOLOGRAM_HEIGHT = 13;
+    static final int SLOT_HOLOGRAM_LINES = 15;
+    static final int SLOT_XP_BUY = 12;
+    static final int SLOT_XP_LEVELS = 14;
+    static final int SLOT_MENU_INFO = 4;
     static final int SLOT_GUI_SIZE = 11;
     static final int SLOT_GUI_TITLE = 13;
     static final int SLOT_LAYOUT = 15;
     static final int SLOT_OPEN_ITEM = 20;
     static final int SLOT_DECOR_ITEM = 22;
     static final int SLOT_EMPTY_HISTORY_ITEM = 24;
-    static final int SLOT_CONTENT_TOGGLE = 30;
-    static final int SLOT_PREVIEW_CASE = 32;
+    static final int SLOT_CONTENT_TOGGLE = 31;
     static final int SLOT_BACK = 49;
 
     private final CaseManager caseManager;
@@ -158,9 +178,29 @@ final class MachineGuiSupport {
             String caseName,
             Consumer<Inventory> renderer
     ) {
+        return refreshIfOpen(caseManager, player, expectedType, caseName, -1, -1, renderer);
+    }
+
+    /**
+     * Redraws the open window in place, changing only the slots that differ, so nothing flickers and the
+     * opening animation does not run again. {@code page} is applied to the open window when it is not
+     * negative; {@code selection} must match the open window when it is not negative (another reward
+     * needs a new window).
+     */
+    static boolean refreshIfOpen(
+            CaseManager caseManager,
+            Player player,
+            GuiSession.Screen expectedType,
+            String caseName,
+            int page,
+            int selection,
+            Consumer<Inventory> renderer
+    ) {
         Inventory inventory = InventoryViewCompat.topInventory(player);
         if (inventory == null || !(inventory.getHolder() instanceof GuiSession holder)) return false;
         if (holder.screen() != expectedType || !holder.caseName().equalsIgnoreCase(caseName)) return false;
+        if (selection >= 0 && holder.selection() != selection) return false;
+        if (page >= 0) holder.page(page);
 
         caseManager.getPlugin().getGuiOpenAnimations().cancel(player);
         Inventory rendered = Bukkit.createInventory(holder, inventory.getSize());

@@ -3,17 +3,22 @@ version: "${version}"
 main: ru.privatenull.pncases.PnCasesPlugin
 api-version: "1.16"
 authors: [privatenull]
-website: https://github.com/Dy6HiLa/pnCases
+website: https://github.com/PnFolder/pnCases
 description: pnCases - plugin for creating cases and keys
 depend: [ProtocolLib]
-softdepend: [LuckPerms, FancyHolograms, DecentHolograms, Vault, PlayerPoints]
+softdepend: [pnLibrary, LuckPerms, FancyHolograms, DecentHolograms, Vault, PlayerPoints, WorldGuard]
 libraries:
   - org.xerial:sqlite-jdbc:3.53.2.0
 commands:
   pncases:
     description: privatenull developer plugin
     aliases: [cases]
-    permission: pncases.admin
 permissions:
   pncases.admin:
     default: op
+  pncases.gift:
+    description: Разрешает дарить ключи другим игрокам
+    default: false
+  pncases.gift.unlimited:
+    description: Снимает лимиты на подарки ключей (пример правила в config.yml)
+    default: false

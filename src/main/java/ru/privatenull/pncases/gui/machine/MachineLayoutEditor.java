@@ -15,7 +15,7 @@ import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.gui.GuiDesign;
 import ru.privatenull.pncases.gui.GuiSession;
 import ru.privatenull.pncases.gui.machine.MachineGuiSupport.SlotRole;
-import ru.privatenull.pnlibrary.text.ColorUtil;
+import ru.privatenull.pncases.support.text.ColorUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,8 +23,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import static ru.privatenull.pncases.gui.machine.MachineGuiSupport.section;
-import static ru.privatenull.pnlibrary.item.ItemFactory.isRealItem;
-import static ru.privatenull.pnlibrary.item.ItemFactory.writeExactItem;
+import static ru.privatenull.pncases.support.item.ItemFactory.isRealItem;
+import static ru.privatenull.pncases.support.item.ItemFactory.writeExactItem;
 
 final class MachineLayoutEditor {
 

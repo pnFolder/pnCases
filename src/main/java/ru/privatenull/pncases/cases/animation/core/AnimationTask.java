@@ -1,12 +1,12 @@
 package ru.privatenull.pncases.cases.animation.core;
 
-import org.bukkit.scheduler.BukkitRunnable;
+import ru.privatenull.pncases.support.task.PluginRunnable;
 
 /**
  * Guards one scheduled animation stage. A broken visual tick must never leave
  * the case locked or prevent the already reserved reward from completing.
  */
-public abstract class AnimationTask extends BukkitRunnable {
+public abstract class AnimationTask extends PluginRunnable {
 
     private final AnimationSession run;
     private final String stage;

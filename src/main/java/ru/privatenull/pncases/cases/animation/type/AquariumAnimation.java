@@ -13,7 +13,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Transformation;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.PnCasesPlugin;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 import static ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation.playSound;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.core.AnimationFrame;
@@ -24,8 +24,8 @@ import ru.privatenull.pncases.cases.animation.core.TimelineTask;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
 import ru.privatenull.pncases.gui.GuiDesign;
-import ru.privatenull.pnlibrary.item.HeadUtil;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
+import ru.privatenull.pncases.support.item.HeadUtil;
+import ru.privatenull.pncases.support.compat.BukkitCompat.ParticleCompat;
 
 /** A temporary glass capsule with a water core and a smooth reward reveal. */
 public final class AquariumAnimation extends TimelineCaseAnimation {
@@ -85,6 +85,9 @@ public final class AquariumAnimation extends TimelineCaseAnimation {
                     waterParticles(world, center, tick, 0.48, 5);
                     if (tick % 18 == 0) playSound(world, center, Sound.ENTITY_PLAYER_SPLASH, 0.12f, 1.65f);
                 } else if (timeline.in("reveal", tick)) {
+                    if (tick == timeline.start("reveal")) {
+                        run.protectReward(center.clone().add(0.0, 1.35, 0.0));
+                    }
                     double progress = easeOut(timeline.progress("reveal", tick));
                     float heartScale = (float) (1.18 * (1.0 - progress));
                     scale(heart, Math.max(0.01f, heartScale));
@@ -103,7 +106,7 @@ public final class AquariumAnimation extends TimelineCaseAnimation {
                     if (tick == 86 && hidden && caseBlock.getType() == Material.GLASS) {
                         playSound(world, center, Sound.BLOCK_GLASS_BREAK, 0.35f, 1.70f);
                         caseBlock.setType(Material.AIR, false);
-                        AnimationParticles.block(world, particle(BLOCK), center.clone().add(0.0, 0.55, 0.0), 18,
+                        AnimationEffects.block(world, particle(BLOCK), center.clone().add(0.0, 0.55, 0.0), 18,
                                 0.32, 0.32, 0.32, 0.08, Material.GLASS.createBlockData());
                     }
                     if (tick == 128) {

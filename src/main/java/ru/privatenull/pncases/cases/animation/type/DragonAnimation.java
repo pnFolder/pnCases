@@ -2,6 +2,7 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -18,7 +19,7 @@ import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.PnCasesPlugin;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.core.AnimationFrame;
 import ru.privatenull.pncases.cases.animation.core.AnimationTimeline;
@@ -89,7 +90,7 @@ public final class DragonAnimation extends TimelineCaseAnimation {
                 tick = frame.tick();
                 if (tick == 1) {
                     playSound(world, center, Sound.ENTITY_ENDER_DRAGON_GROWL, 0.20f, 0.72f);
-                    world.spawnParticle(Particle.PORTAL, center.clone().add(0.0, 2.2, 0.0),
+                    spawn(world, Particle.PORTAL, center.clone().add(0.0, 2.2, 0.0),
                             34, 2.4, 1.2, 2.4, 0.10);
                 }
 
@@ -144,9 +145,9 @@ public final class DragonAnimation extends TimelineCaseAnimation {
                 Location impact = center.clone().add(0.0, 0.62, 0.0);
                 if (breathTick <= 8) {
                     double charge = breathTick / 8.0;
-                    AnimationParticles.plain(world, Particle.DRAGON_BREATH, mouth,
+                    AnimationEffects.plain(world, Particle.DRAGON_BREATH, mouth,
                             2 + breathTick / 2, 0.08, 0.08, 0.08, 0.01);
-                    world.spawnParticle(Particle.ELECTRIC_SPARK, mouth,
+                    spawn(world, Particle.ELECTRIC_SPARK, mouth,
                             Math.max(1, breathTick / 2), 0.10 * charge, 0.10 * charge, 0.10 * charge, 0.02);
                 } else {
                     drawBreath(world, mouth, impact, tick);
@@ -157,11 +158,11 @@ public final class DragonAnimation extends TimelineCaseAnimation {
                     run.hide(rawBase.getBlock(), Material.AIR);
                     playSound(world, center, Sound.ENTITY_ENDER_DRAGON_SHOOT, 0.22f, 0.72f);
                     playSound(world, center, Sound.BLOCK_RESPAWN_ANCHOR_DEPLETE, 0.16f, 1.35f);
-                    AnimationParticles.plain(world, Particle.DRAGON_BREATH, impact,
+                    AnimationEffects.plain(world, Particle.DRAGON_BREATH, impact,
                             30, 0.48, 0.30, 0.48, 0.07);
-                    world.spawnParticle(Particle.SOUL_FIRE_FLAME, impact,
+                    spawn(world, Particle.SOUL_FIRE_FLAME, impact,
                             18, 0.38, 0.22, 0.38, 0.04);
-                    world.spawnParticle(Particle.ELECTRIC_SPARK, impact,
+                    spawn(world, Particle.ELECTRIC_SPARK, impact,
                             16, 0.32, 0.20, 0.32, 0.08);
                 }
                 if (tick % 12 == 0) {
@@ -185,12 +186,13 @@ public final class DragonAnimation extends TimelineCaseAnimation {
                 if (rewardLabel != null) rewardLabel.showAbove(rewardLocation, 0.88);
 
                 if (tick % 3 == 0) {
-                    AnimationParticles.plain(world, Particle.DRAGON_BREATH, rewardLocation,
+                    AnimationEffects.plain(world, Particle.DRAGON_BREATH, rewardLocation,
                             2, 0.22, 0.18, 0.22, 0.012);
-                    world.spawnParticle(Particle.END_ROD, rewardLocation,
+                    spawn(world, Particle.END_ROD, rewardLocation,
                             1, 0.20, 0.18, 0.20, 0.01);
                 }
                 if (tick == timeline.start("reveal")) {
+                    run.protectReward(center.clone().add(0.0, 1.25, 0.0));
                     playSound(world, center, Sound.BLOCK_END_PORTAL_SPAWN, 0.18f, 1.55f);
                 }
                 if (tick == timeline.end("reveal") - 12) {
@@ -200,11 +202,11 @@ public final class DragonAnimation extends TimelineCaseAnimation {
 
             private void finalBurst() {
                 Location rewardLocation = rewardDisplay.getLocation();
-                AnimationParticles.plain(world, Particle.DRAGON_BREATH, rewardLocation,
+                AnimationEffects.plain(world, Particle.DRAGON_BREATH, rewardLocation,
                         10, 0.42, 0.42, 0.42, 0.045);
-                world.spawnParticle(Particle.END_ROD, rewardLocation,
+                spawn(world, Particle.END_ROD, rewardLocation,
                         7, 0.35, 0.35, 0.35, 0.03);
-                world.spawnParticle(particle(FIREWORK), rewardLocation,
+                spawn(world, particle(FIREWORK), rewardLocation,
                         4, 0.28, 0.28, 0.28, 0.025);
                 playSound(world, center, Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.22f, 1.18f);
             }
@@ -296,14 +298,14 @@ public final class DragonAnimation extends TimelineCaseAnimation {
             double progress = step / 16.0;
             Location point = mouth.clone().add(ray.clone().multiply(progress));
             double spread = 0.015 + progress * 0.10;
-            AnimationParticles.plain(world, Particle.DRAGON_BREATH, point, 2,
+            AnimationEffects.plain(world, Particle.DRAGON_BREATH, point, 2,
                     spread, spread, spread, 0.01);
             if ((step + tick) % 3 == 0) {
-                world.spawnParticle(Particle.SOUL_FIRE_FLAME, point, 1,
+                spawn(world, Particle.SOUL_FIRE_FLAME, point, 1,
                         spread * 0.5, spread * 0.5, spread * 0.5, 0.005);
             }
         }
-        AnimationParticles.plain(world, Particle.DRAGON_BREATH, impact,
+        AnimationEffects.plain(world, Particle.DRAGON_BREATH, impact,
                 8, 0.30, 0.22, 0.30, 0.04);
     }
 
@@ -318,7 +320,7 @@ public final class DragonAnimation extends TimelineCaseAnimation {
     }
 
     private static void trail(World world, Location location, int count) {
-        AnimationParticles.plain(world, Particle.DRAGON_BREATH, location,
+        AnimationEffects.plain(world, Particle.DRAGON_BREATH, location,
                 count, 0.14, 0.14, 0.14, 0.02);
     }
 
@@ -361,11 +363,11 @@ public final class DragonAnimation extends TimelineCaseAnimation {
     }
 
     private static void dust(World world, Location location, Particle.DustOptions dust) {
-        AnimationParticles.dust(world, particle(DUST), location, 1, 0.0, 0.0, 0.0, 0.0, dust);
+        AnimationEffects.dust(world, particle(DUST), location, 1, 0.0, 0.0, 0.0, 0.0, dust);
     }
 
     private static void dust(World world, Location location, Particle particle) {
-        world.spawnParticle(particle, location, 1, 0.0, 0.0, 0.0, 0.0);
+        spawn(world, particle, location, 1, 0.0, 0.0, 0.0, 0.0);
     }
 
     private static Vector horizontal(Vector vector) {

@@ -9,8 +9,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.pncases.cases.CaseManager;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
-import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.EnchantmentCompat;
+import ru.privatenull.pncases.support.text.ColorUtil;
+import ru.privatenull.pncases.support.compat.BukkitCompat.EnchantmentCompat;
 import ru.privatenull.pncases.gui.GuiDesign;
 
 import java.util.ArrayList;
@@ -24,6 +24,16 @@ final class MachineItemFactory {
     private static final String VALUE_PREFIX = " &#69747E↳ &#A7F3D0";
     private static final String LEFT_ACTION = " &#FFB347[&#FFA43C Л&#FF9536К&#FF8630М &#FF772A] &f";
     private static final String RIGHT_ACTION = " &#FF8A8A[&#FF7979 П&#F96868К&#F25757М &#EB4646] &f";
+    // Same letter-by-letter gradient style as the two above: blue for Shift + left, violet for Shift + right,
+    // green for an item on the cursor.
+    private static final String SHIFT_LEFT_ACTION =
+            " &#65D1FC[&#5FC7F6 Shift&#59BCF0 +&#53B1EA Л&#4DA6E4К&#479BDEМ &#4190D8] &f";
+    private static final String SHIFT_RIGHT_ACTION =
+            " &#C4A7FF[&#BC9CFA Shift&#B491F5 +&#AC86F0 П&#A47BEBК&#9C70E6М &#9465E1] &f";
+    private static final String MIDDLE_ACTION =
+            " &#EFF7B9[&#E3EDAC Колёсико&#D7E39F ] &f";
+    private static final String ITEM_ACTION =
+            " &#A7F3D0[&#9CEAC4 Предмет&#91E1B8 +&#86D8AC Л&#7BCFA0К&#70C694М &#65BD88] &f";
 
     private final CaseManager caseManager;
     private final MachineGuiSupport state;
@@ -36,6 +46,11 @@ final class MachineItemFactory {
     ItemStack selectable(String path, Material material, boolean selected, String name, List<String> lore,
                          CaseDefinition definition, String... extra) {
         return selectable(path, new ItemStack(material), selected, name, lore, definition, extra);
+    }
+
+    ItemStack selectable(String path, String texture, boolean selected, String name, List<String> lore,
+                         CaseDefinition definition, String... extra) {
+        return selectable(path, GuiDesign.head(texture, name), selected, name, lore, definition, extra);
     }
 
     ItemStack selectable(String path, MachineIcon icon, boolean selected, String name, List<String> lore,
@@ -71,11 +86,10 @@ final class MachineItemFactory {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
-        List<String> lore = lore(
-                hint,
-                "Предмет", itemName(item),
-                "Заменить предмет с курсора", null
-        );
+        List<String> lore = hintLore(
+                List.of(hint),
+                List.of("Предмет", itemName(item)),
+                Hint.item("заменить предметом с курсора"));
         String[] replacements = replacements(definition,
                 "hint", hint,
                 "item", itemName(item));
@@ -161,12 +175,69 @@ final class MachineItemFactory {
     }
 
     String name(String value) {
-        return NAME_COLOR + value;
+        return color(NAME_COLOR) + value;
     }
 
     String plain(String value) {
         String plain = ChatColor.stripColor(color(value));
         return plain == null ? "" : plain;
+    }
+
+    /** One line of the click guide at the bottom of a button: which click does what. */
+    record Hint(String prefix, String action) {
+        static Hint left(String action) {
+            return new Hint(LEFT_ACTION, action);
+        }
+
+        static Hint right(String action) {
+            return new Hint(RIGHT_ACTION, action);
+        }
+
+        static Hint shiftLeft(String action) {
+            return new Hint(SHIFT_LEFT_ACTION, action);
+        }
+
+        static Hint shiftRight(String action) {
+            return new Hint(SHIFT_RIGHT_ACTION, action);
+        }
+
+        static Hint middle(String action) {
+            return new Hint(MIDDLE_ACTION, action);
+        }
+
+        /** An item taken from the cursor and dropped onto the button. */
+        static Hint item(String action) {
+            return new Hint(ITEM_ACTION, action);
+        }
+    }
+
+    /** Lore with an explicit click guide: every supported click gets its own coloured line. */
+    List<String> hintLore(List<String> description, List<String> parameters, Hint... hints) {
+        return designHintLore(description, parameters, List.of(hints));
+    }
+
+    List<String> hintLore(String description, Hint... hints) {
+        return designHintLore(description == null || description.isBlank() ? List.of() : List.of(description),
+                List.of(), List.of(hints));
+    }
+
+    static List<String> designHintLore(List<String> description, List<String> parameters, List<Hint> hints) {
+        List<String> result = new ArrayList<>();
+        result.add("");
+        for (String line : description) result.add(color(DESCRIPTION_COLOR) + line);
+
+        if (!description.isEmpty() && !parameters.isEmpty()) result.add("");
+        for (int index = 0; index + 1 < parameters.size(); index += 2) {
+            result.add(color(PARAMETER_COLOR) + parameters.get(index));
+            result.add(color(VALUE_PREFIX) + parameters.get(index + 1));
+        }
+
+        if (!hints.isEmpty()) result.add("");
+        for (Hint hint : hints) {
+            result.add(color(hint.prefix()) + hint.action());
+        }
+        result.add("");
+        return result;
     }
 
     List<String> lore(String description, String parameter, String value,
@@ -188,12 +259,13 @@ final class MachineItemFactory {
                                    String leftAction, String rightAction) {
         List<String> result = new ArrayList<>();
         result.add("");
-        for (String line : description) result.add(DESCRIPTION_COLOR + line);
+        for (String line : description) result.add(color(DESCRIPTION_COLOR) + line);
 
         if (!description.isEmpty() && !parameters.isEmpty()) result.add("");
         for (int index = 0; index + 1 < parameters.size(); index += 2) {
-            result.add(PARAMETER_COLOR + parameters.get(index));
-            result.add(VALUE_PREFIX + parameters.get(index + 1));
+            result.add(color(PARAMETER_COLOR) + parameters.get(index));
+            // Parse the prefix before appending digits; otherwise RGB + "0.12" can become RGBA.
+            result.add(color(VALUE_PREFIX) + parameters.get(index + 1));
         }
 
         if (leftAction != null || rightAction != null) result.add("");
@@ -271,7 +343,7 @@ final class MachineItemFactory {
         return item;
     }
 
-    private static void addGlow(ItemStack item) {
+    static void addGlow(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return;
         var unbreaking = EnchantmentCompat.unbreaking();

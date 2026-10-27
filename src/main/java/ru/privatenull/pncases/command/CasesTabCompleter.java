@@ -24,18 +24,39 @@ public final class CasesTabCompleter implements TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        boolean canGift = sender instanceof Player && sender.hasPermission(caseManager.getPlugin().giftPermission());
+        if (args.length == 1 && !sender.hasPermission("pncases.admin")) {
+            return canGift ? filter(List.of("gift"), args[0]) : List.of();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("gift") && canGift) {
+            List<String> players = new ArrayList<>();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (!player.getName().equalsIgnoreCase(sender.getName())) players.add(player.getName());
+            }
+            return filter(players, args[1]);
+        }
         if (!sender.hasPermission("pncases.admin")) {
             return List.of();
         }
         if (args.length == 1) {
-            return filter(List.of("createcase", "setcase", "delcase", "machine",
-                    "givekey", "takekey", "reload"), args[0]);
+            List<String> commands = new ArrayList<>(List.of("createcase", "copycase", "setcase", "delcase", "machine",
+                    "givekey", "takekey", "giftlimit", "workbench", "reload"));
+            if (canGift) commands.add("gift");
+            return filter(commands, args[0]);
         }
 
         String subcommand = args[0].toLowerCase(Locale.ROOT);
-        if (args.length == 2 && (subcommand.equals("setcase")
-                || subcommand.equals("delcase") || subcommand.equals("machine"))) {
+        if (args.length == 2 && (subcommand.equals("setcase") || subcommand.equals("copycase")
+                || subcommand.equals("delcase") || subcommand.equals("machine") || subcommand.equals("workbench"))) {
             return filter(caseManager.getConfiguredCaseNames(), args[1]);
+        }
+        if (subcommand.equals("giftlimit")) {
+            if (args.length == 2) {
+                List<String> players = new ArrayList<>();
+                for (Player player : Bukkit.getOnlinePlayers()) players.add(player.getName());
+                return filter(players, args[1]);
+            }
+            return args.length == 3 ? filter(List.of("reset"), args[2]) : List.of();
         }
         if (!subcommand.equals("givekey") && !subcommand.equals("takekey")) {
             return List.of();

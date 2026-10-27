@@ -19,6 +19,17 @@ public final class BundledConfigurationResources {
     private BundledConfigurationResources() {
     }
 
+    /** Sample cases shipped in the jar; they go to a separate folder, so the server never loads them. */
+    public static final List<String> EXAMPLES = List.of("README.txt", "01-items.yml", "02-economy.yml",
+            "03-luckperms.yml", "04-console.yml", "05-full.yml", "06-bundle.yml", "07-proximity.yml",
+            "08-placeholders.yml", "PLACEHOLDERS.txt");
+
+    public static void installExamples(JavaPlugin plugin) {
+        for (String name : EXAMPLES) {
+            copyIfMissing(plugin, "examples/" + name, new java.io.File(plugin.getDataFolder(), "examples/" + name));
+        }
+    }
+
     public static void capture(JavaPlugin plugin) {
         for (String document : DOCUMENTS) {
             byte[] content = readDirect(plugin, document);

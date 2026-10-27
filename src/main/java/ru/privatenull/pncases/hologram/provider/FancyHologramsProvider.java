@@ -13,17 +13,31 @@ import org.joml.Vector3f;
 import ru.privatenull.pncases.hologram.HologramDefinition;
 import ru.privatenull.pncases.hologram.HologramVector;
 
-import java.lang.reflect.Method;
+import com.comphenix.protocol.PacketType;
+import com.comphenix.protocol.ProtocolLibrary;
+import com.comphenix.protocol.events.ListenerPriority;
+import com.comphenix.protocol.events.PacketAdapter;
+import com.comphenix.protocol.events.PacketEvent;
+import com.comphenix.protocol.wrappers.WrappedDataValue;
+import com.comphenix.protocol.wrappers.WrappedDataWatcher;
+import org.bukkit.plugin.Plugin;
+import ru.privatenull.pncases.support.compat.ServerVersion;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Locale;
 
-public final class FancyHologramsProvider implements HologramProvider {
+public final class FancyHologramsProvider extends PacketAdapter implements HologramProvider {
 
     private final HologramManager manager;
-    private final Method displayAccessor;
+    private final Map<Integer, Integer> movementDurations = new ConcurrentHashMap<>();
 
-    public FancyHologramsProvider() {
+    public FancyHologramsProvider(Plugin plugin) {
+        super(plugin, ListenerPriority.HIGHEST, PacketType.Play.Server.ENTITY_METADATA);
         this.manager = FancyHologramsPlugin.get().getHologramManager();
-        this.displayAccessor = findDisplayAccessor();
+        if (ServerVersion.current().isAtLeast(1, 20, 2)) {
+            ProtocolLibrary.getProtocolManager().addPacketListener(this);
+        }
     }
 
     @Override
@@ -48,6 +62,9 @@ public final class FancyHologramsProvider implements HologramProvider {
         applyDisplayStyles(data, spec);
 
         Hologram hologram = manager.create(data);
+        if ("animation".equals(spec.caseName())) {
+            movementDurations.put(hologram.getEntityId(), 1);
+        }
         manager.addHologram(hologram);
     }
 
@@ -57,17 +74,19 @@ public final class FancyHologramsProvider implements HologramProvider {
             return;
         }
 
-        manager.getHologram(name).ifPresent(manager::removeHologram);
+        manager.getHologram(name).ifPresent(hologram -> {
+            movementDurations.remove(hologram.getEntityId());
+            manager.removeHologram(hologram);
+        });
     }
 
     @Override
     public void move(String name, org.bukkit.Location location, int movementTicks) {
         if (manager == null || name == null || location == null) return;
         manager.getHologram(name).ifPresent(hologram -> {
-            hologram.getData().setLocation(location);
-            if (!moveDisplay(hologram, location, movementTicks)) {
-                hologram.forceUpdate();
-            }
+            movementDurations.put(hologram.getEntityId(), Math.max(0, Math.min(59, movementTicks)));
+            hologram.getData().setLocation(location.clone());
+            refresh(hologram);
         });
     }
 
@@ -77,7 +96,7 @@ public final class FancyHologramsProvider implements HologramProvider {
         manager.getHologram(name).ifPresent(hologram -> {
             if (hologram.getData() instanceof TextHologramData text) {
                 text.setText(lines);
-                hologram.forceUpdate();
+                refresh(hologram);
             }
         });
     }
@@ -182,25 +201,32 @@ public final class FancyHologramsProvider implements HologramProvider {
         return new Vector3f(vector.x(), vector.y(), vector.z());
     }
 
-    /** Uses the transitional FancyHolograms display accessor when available. */
-    private boolean moveDisplay(Hologram hologram, Location location, int movementTicks) {
-        if (hologram == null || location == null || displayAccessor == null) return false;
-        try {
-            Object value = displayAccessor.invoke(hologram);
-            if (!(value instanceof Display display) || !display.isValid()) return false;
-            display.setTeleportDuration(Math.max(0, Math.min(59, movementTicks)));
-            display.teleport(location);
-            return true;
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
-            return false;
-        }
+    private static void refresh(Hologram hologram) {
+        // forceUpdate only rebuilds provider data; it does not send it to viewers.
+        hologram.forceUpdate();
+        hologram.refreshForViewersInWorld();
+        hologram.getData().setHasChanges(false);
     }
 
-    private static Method findDisplayAccessor() {
-        try {
-            return Hologram.class.getMethod("getDisplayEntity");
-        } catch (NoSuchMethodException exception) {
-            return null;
-        }
+    @Override
+    public void onPacketSending(PacketEvent event) {
+        Integer duration = movementDurations.get(event.getPacket().getIntegers().read(0));
+        if (duration == null) return;
+        var current = event.getPacket().getDataValueCollectionModifier().read(0);
+        if (current == null) return;
+        var values = new ArrayList<>(current);
+        // Display position/rotation interpolation, introduced in 1.20.2. This is
+        // distinct from transformation interpolation. Only our provider IDs are changed.
+        values.removeIf(value -> value.getIndex() == 10);
+        values.add(new WrappedDataValue(10, WrappedDataWatcher.Registry.get(Integer.class), duration));
+        var packet = event.getPacket().shallowClone();
+        packet.getDataValueCollectionModifier().write(0, values);
+        event.setPacket(packet);
+    }
+
+    @Override
+    public void close() {
+        ProtocolLibrary.getProtocolManager().removePacketListener(this);
+        movementDurations.clear();
     }
 }

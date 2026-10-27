@@ -2,9 +2,9 @@ package ru.privatenull.pncases.storage;
 
 import ru.privatenull.pncases.cases.model.AnimationType;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.database.DatabaseType;
-import ru.privatenull.pnlibrary.database.JdbcDatabase;
-import ru.privatenull.pnlibrary.database.JdbcMigration;
+import ru.privatenull.pncases.support.database.DatabaseType;
+import ru.privatenull.pncases.support.database.JdbcDatabase;
+import ru.privatenull.pncases.support.database.JdbcMigration;
 import ru.privatenull.pncases.storage.CasesDatabase.HistoryEntry;
 
 import java.sql.*;
@@ -45,16 +45,21 @@ public final class JdbcCasesDatabase implements CasesDatabase {
 
     @Override
     public int getKeys(UUID uuid, String keyId) {
-        try (Connection connection = database.connection();
-             PreparedStatement statement = connection.prepareStatement(
+        try (Connection connection = database.connection()) {
+            return getKeys(connection, uuid, keyId);
+        } catch (Exception exception) {
+            throw failure("read keys", exception);
+        }
+    }
+
+    private int getKeys(Connection connection, UUID uuid, String keyId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
                      "SELECT amount FROM player_keys WHERE player_uuid=? AND key_id=?")) {
             statement.setString(1, uuid.toString());
             statement.setString(2, normalize(keyId));
             try (ResultSet result = statement.executeQuery()) {
                 return result.next() ? Math.max(0, result.getInt(1)) : 0;
             }
-        } catch (Exception exception) {
-            throw failure("read keys", exception);
         }
     }
 
@@ -109,6 +114,55 @@ public final class JdbcCasesDatabase implements CasesDatabase {
     }
 
     @Override
+    public boolean transferKeys(UUID sender, UUID receiver, String keyId, int amount) {
+        if (sender == null || receiver == null || sender.equals(receiver) || amount <= 0) return false;
+        String normalized = normalize(keyId);
+        try (Connection connection = database.connection()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement debit = connection.prepareStatement(
+                        "UPDATE player_keys SET amount=amount-? WHERE player_uuid=? AND key_id=? AND amount>=?")) {
+                    debit.setInt(1, amount);
+                    debit.setString(2, sender.toString());
+                    debit.setString(3, normalized);
+                    debit.setInt(4, amount);
+                    if (debit.executeUpdate() == 0) {
+                        connection.rollback();
+                        return false;
+                    }
+                }
+                String lock = type == DatabaseType.MYSQL ? " FOR UPDATE" : "";
+                try (PreparedStatement read = connection.prepareStatement(
+                        "SELECT amount FROM player_keys WHERE player_uuid=? AND key_id=?" + lock)) {
+                    read.setString(1, receiver.toString());
+                    read.setString(2, normalized);
+                    try (ResultSet rows = read.executeQuery()) {
+                        if (rows.next() && rows.getLong(1) > Integer.MAX_VALUE - (long) amount) {
+                            throw new IllegalStateException("Receiver key balance would overflow");
+                        }
+                    }
+                }
+                String creditSql = type == DatabaseType.MYSQL
+                        ? "INSERT INTO player_keys(player_uuid,key_id,amount) VALUES (?,?,?) ON DUPLICATE KEY UPDATE amount=amount+VALUES(amount)"
+                        : "INSERT INTO player_keys(player_uuid,key_id,amount) VALUES (?,?,?) ON CONFLICT(player_uuid,key_id) DO UPDATE SET amount=player_keys.amount+excluded.amount";
+                try (PreparedStatement credit = connection.prepareStatement(creditSql)) {
+                    credit.setString(1, receiver.toString());
+                    credit.setString(2, normalized);
+                    credit.setInt(3, amount);
+                    credit.executeUpdate();
+                }
+                connection.commit();
+                return true;
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        } catch (Exception exception) {
+            throw failure("transfer keys", exception);
+        }
+    }
+
+    @Override
     public AnimationType getAnimation(UUID uuid, String caseId) {
         try (Connection connection = database.connection();
              PreparedStatement statement = connection.prepareStatement(
@@ -134,6 +188,93 @@ public final class JdbcCasesDatabase implements CasesDatabase {
             statement.setString(2, normalize(caseId));
             statement.setString(3, animation.name());
         }, "save player case animation");
+    }
+
+    @Override
+    public Set<AnimationType> getFavoriteAnimations(UUID uuid, String caseId) {
+        List<String> result = new ArrayList<>();
+        try (Connection connection = database.connection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT animation FROM player_animation_favorites WHERE player_uuid=? AND case_id=?")) {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, normalize(caseId));
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    result.add(rows.getString(1));
+                }
+            }
+            return CasesDatabase.parseFavoriteAnimations(result);
+        } catch (Exception exception) {
+            throw failure("read favorite animations", exception);
+        }
+    }
+
+    @Override
+    public void setFavoriteAnimations(UUID uuid, String caseId, Set<AnimationType> types) {
+        try (Connection connection = database.connection()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement delete = connection.prepareStatement(
+                        "DELETE FROM player_animation_favorites WHERE player_uuid=? AND case_id=?")) {
+                    delete.setString(1, uuid.toString());
+                    delete.setString(2, normalize(caseId));
+                    delete.executeUpdate();
+                }
+                if (types != null && !types.isEmpty()) {
+                    try (PreparedStatement insert = connection.prepareStatement(
+                            "INSERT INTO player_animation_favorites(player_uuid,case_id,animation) VALUES (?,?,?)")) {
+                        for (AnimationType type : types) {
+                            insert.setString(1, uuid.toString());
+                            insert.setString(2, normalize(caseId));
+                            insert.setString(3, type.name());
+                            insert.addBatch();
+                        }
+                        insert.executeBatch();
+                    }
+                }
+                connection.commit();
+            } catch (Exception failure) {
+                connection.rollback();
+                throw failure;
+            }
+        } catch (Exception exception) {
+            throw failure("save favorite animations", exception);
+        }
+    }
+
+    @Override
+    public int getGuaranteeProgress(UUID uuid, String caseId) {
+        try (Connection connection = database.connection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT openings FROM guarantee_progress WHERE player_uuid=? AND case_id=?")) {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, normalize(caseId));
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? Math.max(0, result.getInt(1)) : 0;
+            }
+        } catch (Exception exception) {
+            throw failure("read guarantee progress", exception);
+        }
+    }
+
+    @Override
+    public void setGuaranteeProgress(UUID uuid, String caseId, int openings) {
+        String normalizedCase = normalize(caseId);
+        if (openings <= 0) {
+            execute("DELETE FROM guarantee_progress WHERE player_uuid=? AND case_id=?", statement -> {
+                statement.setString(1, uuid.toString());
+                statement.setString(2, normalizedCase);
+            }, "reset guarantee progress");
+            return;
+        }
+        String sql = type == DatabaseType.MYSQL
+                ? "INSERT INTO guarantee_progress(player_uuid,case_id,openings) VALUES (?,?,?) ON DUPLICATE KEY UPDATE openings=VALUES(openings)"
+                : "INSERT INTO guarantee_progress(player_uuid,case_id,openings) VALUES (?,?,?) ON CONFLICT(player_uuid,case_id) DO UPDATE SET openings=excluded.openings";
+        execute(sql, statement -> {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, normalizedCase);
+            statement.setInt(3, openings);
+        }, "save guarantee progress");
     }
 
     @Override
@@ -196,6 +337,10 @@ public final class JdbcCasesDatabase implements CasesDatabase {
              Statement statement = connection.createStatement();
              ResultSet rows = statement.executeQuery("SELECT player_uuid FROM pending_rewards")) {
             while (rows.next()) addUuid(result, rows.getString(1));
+            try (Statement batches = connection.createStatement();
+                 ResultSet batchRows = batches.executeQuery("SELECT player_uuid FROM pending_batches")) {
+                while (batchRows.next()) addUuid(result, batchRows.getString(1));
+            }
             return result;
         } catch (Exception exception) {
             throw failure("read pending players", exception);
@@ -209,6 +354,11 @@ public final class JdbcCasesDatabase implements CasesDatabase {
             connection.setAutoCommit(false);
             try {
                 Reward existing = loadPending(connection, uuid);
+                PendingBatch batch = loadBatch(connection, uuid);
+                if (batch != null) {
+                    connection.rollback();
+                    return OpeningReservation.pending(batch.rewards().get(0));
+                }
                 if (existing != null) {
                     connection.rollback();
                     return OpeningReservation.pending(existing);
@@ -226,7 +376,7 @@ public final class JdbcCasesDatabase implements CasesDatabase {
                 }
                 if (changed == 0) {
                     connection.rollback();
-                    return OpeningReservation.insufficient(getKeys(uuid, normalizedKey));
+                    return OpeningReservation.insufficient(getKeys(connection, uuid, normalizedKey));
                 }
                 try (PreparedStatement statement = connection.prepareStatement(
                         "DELETE FROM player_keys WHERE player_uuid=? AND key_id=? AND amount<=0")) {
@@ -239,7 +389,7 @@ public final class JdbcCasesDatabase implements CasesDatabase {
             } catch (SQLException exception) {
                 connection.rollback();
                 if (isConstraintViolation(exception)) {
-                    Reward existing = loadPending(uuid);
+                    Reward existing = loadPending(connection, uuid);
                     if (existing != null) return OpeningReservation.pending(existing);
                 }
                 throw exception;
@@ -249,6 +399,107 @@ public final class JdbcCasesDatabase implements CasesDatabase {
             }
         } catch (Exception exception) {
             throw failure("reserve case opening", exception);
+        }
+    }
+
+    @Override
+    public PendingBatch loadBatch(UUID uuid) {
+        try (Connection connection = database.connection()) {
+            return loadBatch(connection, uuid);
+        } catch (Exception exception) {
+            throw failure("read pending batch", exception);
+        }
+    }
+
+    private PendingBatch loadBatch(Connection connection, UUID uuid) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT payload,next_index FROM pending_batches WHERE player_uuid=?")) {
+            statement.setString(1, uuid.toString());
+            try (ResultSet rows = statement.executeQuery()) {
+                return rows.next() ? PendingBatch.decode(rows.getString(1), rows.getInt(2)) : null;
+            }
+        }
+    }
+
+    @Override
+    public OpeningReservation reserveBatch(UUID uuid, PendingBatch batch) {
+        String payload = batch.encode();
+        try (Connection connection = database.connection()) {
+            connection.setAutoCommit(false);
+            try {
+                Reward old = loadPending(connection, uuid);
+                PendingBatch existing = loadBatch(connection, uuid);
+                if (old != null || existing != null) {
+                    connection.rollback();
+                    return OpeningReservation.pending(old != null ? old : existing.rewards().get(0));
+                }
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO pending_batches(player_uuid,batch_id,payload,next_index,item_count) VALUES (?,?,?,0,?)")) {
+                    statement.setString(1, uuid.toString());
+                    statement.setString(2, batch.id().toString());
+                    statement.setString(3, payload);
+                    statement.setInt(4, batch.rewards().size());
+                    statement.executeUpdate();
+                }
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE player_keys SET amount=amount-? WHERE player_uuid=? AND key_id=? AND amount>=?")) {
+                    statement.setInt(1, batch.rewards().size());
+                    statement.setString(2, uuid.toString());
+                    statement.setString(3, normalize(batch.caseId()));
+                    statement.setInt(4, batch.rewards().size());
+                    if (statement.executeUpdate() == 0) {
+                        connection.rollback();
+                        return OpeningReservation.insufficient(getKeys(connection, uuid, batch.caseId()));
+                    }
+                }
+                if (batch.guaranteeProgress() >= 0) {
+                    String update = type == DatabaseType.MYSQL
+                            ? " ON DUPLICATE KEY UPDATE openings=VALUES(openings)"
+                            : " ON CONFLICT(player_uuid,case_id) DO UPDATE SET openings=excluded.openings";
+                    try (PreparedStatement statement = connection.prepareStatement(
+                            "INSERT INTO guarantee_progress(player_uuid,case_id,openings) VALUES (?,?,?)" + update)) {
+                        statement.setString(1, uuid.toString());
+                        statement.setString(2, normalize(batch.caseId()));
+                        statement.setInt(3, batch.guaranteeProgress());
+                        statement.executeUpdate();
+                    }
+                }
+                connection.commit();
+                return OpeningReservation.success();
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        } catch (Exception exception) {
+            throw failure("reserve batch opening", exception);
+        }
+    }
+
+    @Override
+    public void acknowledgeBatchReward(UUID uuid, UUID batchId, int index) {
+        try (Connection connection = database.connection()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE pending_batches SET next_index=next_index+1 WHERE player_uuid=? AND batch_id=? AND next_index=?")) {
+                    statement.setString(1, uuid.toString());
+                    statement.setString(2, batchId.toString());
+                    statement.setInt(3, index);
+                    statement.executeUpdate();
+                }
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM pending_batches WHERE player_uuid=? AND batch_id=? AND next_index>=item_count")) {
+                    statement.setString(1, uuid.toString());
+                    statement.setString(2, batchId.toString());
+                    statement.executeUpdate();
+                }
+                connection.commit();
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
+        } catch (Exception exception) {
+            throw failure("acknowledge batch reward", exception);
         }
     }
 
@@ -301,7 +552,7 @@ public final class JdbcCasesDatabase implements CasesDatabase {
         statement.setInt(10, reward.playerPointsAmount());
         statement.setString(11, reward.message());
         statement.setString(12, reward.displayName());
-        statement.setString(13, reward.command());
+        statement.setString(13, Reward.serializeCommands(reward.commands()));
     }
 
     private Reward loadPending(Connection connection, UUID uuid) throws SQLException {
@@ -343,11 +594,12 @@ public final class JdbcCasesDatabase implements CasesDatabase {
     }
 
     private Reward readReward(ResultSet result) throws SQLException {
-        return new Reward(result.getInt("chance"), parseType(result.getString("type")),
+        return new Reward(result.getInt("chance"), Reward.Type.fromStored(result.getString("type")),
                 CasesDatabase.decodeItem(result.getString("item_base64")), result.getString("lp_group"),
                 result.getString("lp_node"), result.getString("lp_duration"), result.getDouble("vault_amount"),
                 result.getInt("player_points_amount"), result.getString("message"), result.getString("display_name"),
-                result.getString("rarity"), null, result.getString("command"));
+                result.getString("rarity"), null, null,
+                Reward.deserializeCommands(result.getString("command")));
     }
 
     private void execute(String sql, SqlBinder binder, String action) {
@@ -394,6 +646,18 @@ public final class JdbcCasesDatabase implements CasesDatabase {
                 "CREATE TABLE IF NOT EXISTS player_case_prefs(player_uuid TEXT NOT NULL,case_id TEXT NOT NULL,animation TEXT NOT NULL,PRIMARY KEY(player_uuid,case_id))"
         ), List.of(
                 "CREATE TABLE IF NOT EXISTS player_case_prefs(player_uuid VARCHAR(36) NOT NULL,case_id VARCHAR(191) NOT NULL,animation VARCHAR(64) NOT NULL,PRIMARY KEY(player_uuid,case_id)) ENGINE=InnoDB"
+        )), new JdbcMigration(4, "store per-case guarantee progress", List.of(
+                "CREATE TABLE IF NOT EXISTS guarantee_progress(player_uuid TEXT NOT NULL,case_id TEXT NOT NULL,openings INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(player_uuid,case_id))"
+        ), List.of(
+                "CREATE TABLE IF NOT EXISTS guarantee_progress(player_uuid VARCHAR(36) NOT NULL,case_id VARCHAR(191) NOT NULL,openings INT NOT NULL DEFAULT 0,PRIMARY KEY(player_uuid,case_id)) ENGINE=InnoDB"
+        )), new JdbcMigration(5, "store favorite animations per case", List.of(
+                "CREATE TABLE IF NOT EXISTS player_animation_favorites(player_uuid TEXT NOT NULL,case_id TEXT NOT NULL,animation TEXT NOT NULL,PRIMARY KEY(player_uuid,case_id,animation))"
+        ), List.of(
+                "CREATE TABLE IF NOT EXISTS player_animation_favorites(player_uuid VARCHAR(36) NOT NULL,case_id VARCHAR(191) NOT NULL,animation VARCHAR(64) NOT NULL,PRIMARY KEY(player_uuid,case_id,animation)) ENGINE=InnoDB"
+        )), new JdbcMigration(6, "store durable multi-open rewards", List.of(
+                "CREATE TABLE IF NOT EXISTS pending_batches(player_uuid TEXT PRIMARY KEY,batch_id TEXT NOT NULL,payload TEXT NOT NULL,next_index INTEGER NOT NULL DEFAULT 0,item_count INTEGER NOT NULL)"
+        ), List.of(
+                "CREATE TABLE IF NOT EXISTS pending_batches(player_uuid VARCHAR(36) PRIMARY KEY,batch_id VARCHAR(36) NOT NULL,payload LONGTEXT NOT NULL,next_index INT NOT NULL DEFAULT 0,item_count INT NOT NULL) ENGINE=InnoDB"
         )));
     }
 
@@ -419,13 +683,6 @@ public final class JdbcCasesDatabase implements CasesDatabase {
         }
     }
 
-    private static Reward.Type parseType(String value) {
-        try {
-            return Reward.Type.valueOf(value);
-        } catch (Exception ignored) {
-            return Reward.Type.ITEM;
-        }
-    }
 
     private static void addUuid(Set<UUID> output, String value) {
         try {

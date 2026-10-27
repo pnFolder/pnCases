@@ -2,8 +2,8 @@ package ru.privatenull.pncases.storage;
 
 import ru.privatenull.pncases.cases.model.AnimationType;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.database.DatabaseType;
-import ru.privatenull.pnlibrary.item.ItemStackCodec;
+import ru.privatenull.pncases.support.database.DatabaseType;
+import ru.privatenull.pncases.support.item.ItemStackCodec;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
@@ -28,6 +28,14 @@ public interface CasesDatabase extends AutoCloseable {
 
     void setAnimation(UUID uuid, String caseId, AnimationType type);
 
+    Set<AnimationType> getFavoriteAnimations(UUID uuid, String caseId);
+
+    void setFavoriteAnimations(UUID uuid, String caseId, Set<AnimationType> types);
+
+    int getGuaranteeProgress(UUID uuid, String caseId);
+
+    void setGuaranteeProgress(UUID uuid, String caseId, int openings);
+
     void addHistory(String caseName, String playerName, String rewardName, long openedAt);
 
     List<HistoryEntry> getHistory(String caseName, int limit);
@@ -39,6 +47,17 @@ public interface CasesDatabase extends AutoCloseable {
     void clearPending(UUID uuid);
 
     Set<UUID> getPendingPlayers();
+
+    /** Atomically stores the whole batch and consumes one key per reward. */
+    OpeningReservation reserveBatch(UUID uuid, PendingBatch batch);
+
+    PendingBatch loadBatch(UUID uuid);
+
+    /** Idempotent acknowledgement: retrying an index must not skip the next reward. */
+    void acknowledgeBatchReward(UUID uuid, UUID batchId, int index);
+
+    /** Atomically debits the sender and credits the receiver, or changes neither balance. */
+    boolean transferKeys(UUID sender, UUID receiver, String keyId, int amount);
 
     /**
      * Reserves one key and persists the selected reward before an animation starts.
@@ -67,6 +86,19 @@ public interface CasesDatabase extends AutoCloseable {
 
     static String encodeItem(ItemStack item) {
         return ItemStackCodec.encode(item);
+    }
+
+    static Set<AnimationType> parseFavoriteAnimations(Iterable<String> values) {
+        Set<AnimationType> result = java.util.EnumSet.noneOf(AnimationType.class);
+        for (String value : values) {
+            if (value == null) continue;
+            try {
+                result.add(AnimationType.valueOf(value.trim().toUpperCase(java.util.Locale.ROOT)));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore a removed or unknown animation, rather than adding ANVIL to the set.
+            }
+        }
+        return Set.copyOf(result);
     }
 
     static ItemStack decodeItem(String value) {

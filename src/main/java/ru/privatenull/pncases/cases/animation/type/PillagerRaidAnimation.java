@@ -2,6 +2,7 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.*;
 import org.bukkit.block.Block;
@@ -20,9 +21,10 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Transformation;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.PnCasesPlugin;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 import static ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation.playSound;
 import ru.privatenull.pncases.cases.animation.core.AnimationFrame;
+import ru.privatenull.pncases.cases.animation.core.AnimationMobSpawner;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.core.AnimationTimeline;
 import ru.privatenull.pncases.cases.animation.core.TimelineCaseAnimation;
@@ -143,6 +145,9 @@ public final class PillagerRaidAnimation extends TimelineCaseAnimation {
                 }
 
                 if (broken && timeline.in("reveal", tick)) {
+                    if (tick == timeline.start("reveal")) {
+                        run.protectReward(center.clone().add(0.0, 1.55, 0.0));
+                    }
                     double progress = Math.min(1.0, timeline.progress("reveal", tick) * 58.0 / 42.0);
                     float scale = (float) Math.min(1.0, 0.18 + progress * 0.82);
                     rewardDisplay.teleport(center.clone().add(0.0, 1.25 + progress * 0.90, 0.0));
@@ -156,8 +161,8 @@ public final class PillagerRaidAnimation extends TimelineCaseAnimation {
                         playSound(player, player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.20f, 1.55f);
                     }
                     if (tick % 4 == 0) {
-                        world.spawnParticle(Particle.END_ROD, rewardDisplay.getLocation(), 1, 0.18, 0.18, 0.18, 0.012);
-                        world.spawnParticle(particle(TOTEM), rewardDisplay.getLocation(), 1, 0.22, 0.20, 0.22, 0.025);
+                        spawn(world, Particle.END_ROD, rewardDisplay.getLocation(), 1, 0.18, 0.18, 0.18, 0.012);
+                        spawn(world, particle(TOTEM), rewardDisplay.getLocation(), 1, 0.22, 0.20, 0.22, 0.025);
                     }
                 }
             }
@@ -171,11 +176,11 @@ public final class PillagerRaidAnimation extends TimelineCaseAnimation {
                 float pitch = 0.72f + index * 0.08f;
                 playSound(currentWorld, target, Sound.ENTITY_PILLAGER_AMBIENT, 0.18f, pitch);
                 playSound(currentWorld, target, Sound.BLOCK_WOOD_HIT, 0.36f, 0.72f + index * 0.07f);
-                AnimationParticles.block(currentWorld, particle(BLOCK), target.clone().add(0.0, 0.55, 0.0),
+                AnimationEffects.block(currentWorld, particle(BLOCK), target.clone().add(0.0, 0.55, 0.0),
                         14, 0.34, 0.32, 0.34, 0.03, Material.BARREL.createBlockData());
-                currentWorld.spawnParticle(Particle.CRIT, target.clone().add(0.0, 1.15, 0.0), 8,
+                spawn(currentWorld, Particle.CRIT, target.clone().add(0.0, 1.15, 0.0), 8,
                         0.24, 0.22, 0.24, 0.12);
-                currentWorld.spawnParticle(Particle.SWEEP_ATTACK, target.clone().add(0.0, 1.05, 0.0), 1,
+                spawn(currentWorld, Particle.SWEEP_ATTACK, target.clone().add(0.0, 1.05, 0.0), 1,
                         0.0, 0.0, 0.0, 0.0);
                 if (index < source.size()) {
                     spawnSingleItem(run, target, source.get(index), index, items, currentWorld);
@@ -187,7 +192,7 @@ public final class PillagerRaidAnimation extends TimelineCaseAnimation {
                     return;
                 }
                 pillager.swingMainHand();
-                currentWorld.spawnParticle(Particle.CRIT, target.clone().add(0.0, 1.05, 0.0), 3,
+                spawn(currentWorld, Particle.CRIT, target.clone().add(0.0, 1.05, 0.0), 3,
                         0.18, 0.18, 0.18, 0.05);
                 if (index % 2 == 0) {
                     playSound(currentWorld, target, Sound.BLOCK_WOOD_HIT, 0.10f, 0.82f + index * 0.05f);
@@ -203,7 +208,7 @@ public final class PillagerRaidAnimation extends TimelineCaseAnimation {
             double angle = Math.PI / 4.0 + index * Math.PI / 2.0;
             Location location = center.clone().add(Math.cos(angle) * 2.65, 0.0, Math.sin(angle) * 2.65);
             location = standingLocation(world, location);
-            Pillager pillager = (Pillager) world.spawnEntity(location, EntityType.PILLAGER);
+            Pillager pillager = AnimationMobSpawner.spawn(world, location, Pillager.class);
             pillager.setAI(false);
             pillager.setGravity(true);
             pillager.setSilent(true);
@@ -267,11 +272,11 @@ public final class PillagerRaidAnimation extends TimelineCaseAnimation {
         }
         playSound(world, center, Sound.BLOCK_BARREL_CLOSE, 0.30f, 0.65f);
         playSound(world, center, Sound.BLOCK_WOOD_BREAK, 0.42f, 0.72f);
-        AnimationParticles.block(world, particle(BLOCK), center.clone().add(0.0, 0.65, 0.0), 44,
+        AnimationEffects.block(world, particle(BLOCK), center.clone().add(0.0, 0.65, 0.0), 44,
                 0.50, 0.55, 0.50, 0.08, Material.BARREL.createBlockData());
-        world.spawnParticle(Particle.CLOUD, center.clone().add(0.0, 0.55, 0.0), 20,
+        spawn(world, Particle.CLOUD, center.clone().add(0.0, 0.55, 0.0), 20,
                 0.45, 0.25, 0.45, 0.04);
-        world.spawnParticle(Particle.CRIT, center.clone().add(0.0, 0.70, 0.0), 28,
+        spawn(world, Particle.CRIT, center.clone().add(0.0, 0.70, 0.0), 28,
                 0.55, 0.40, 0.55, 0.16);
     }
 

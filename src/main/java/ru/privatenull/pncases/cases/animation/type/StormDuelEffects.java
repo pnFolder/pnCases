@@ -6,10 +6,11 @@ import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.DUST;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 final class StormDuelEffects {
 
@@ -31,7 +32,7 @@ final class StormDuelEffects {
             );
             dustPoint(world, edge, point % 2 == 0 ? BLUE : VIOLET);
             if (point % 4 == 0) {
-                world.spawnParticle(Particle.ELECTRIC_SPARK, edge,
+                spawn(world, Particle.ELECTRIC_SPARK, edge,
                         1, 0.025, 0.025, 0.025, 0.018);
             }
         }
@@ -46,7 +47,7 @@ final class StormDuelEffects {
         }
 
         int falling = Math.max(1, (int) Math.ceil(formed * 4.0));
-        world.spawnParticle(Particle.END_ROD, center.clone().subtract(0.0, 0.22, 0.0),
+        spawn(world, Particle.END_ROD, center.clone().subtract(0.0, 0.22, 0.0),
                 falling, outerRadius * 0.38, 0.30, outerRadius * 0.38, 0.012);
     }
 
@@ -68,7 +69,7 @@ final class StormDuelEffects {
             Location edge = center.clone().add(Math.cos(angle) * radius, 0.0, Math.sin(angle) * radius);
             dustPoint(world, edge, color);
             if (point % 7 == 0) {
-                world.spawnParticle(Particle.ELECTRIC_SPARK, edge,
+                spawn(world, Particle.ELECTRIC_SPARK, edge,
                         1, 0.01, 0.01, 0.01, 0.008);
             }
         }
@@ -103,7 +104,7 @@ final class StormDuelEffects {
             );
             dustPoint(world, spiral, color);
             if ((tick + point) % 5 == 0) {
-                world.spawnParticle(Particle.ELECTRIC_SPARK, spiral,
+                spawn(world, Particle.ELECTRIC_SPARK, spiral,
                         1, 0.015, 0.025, 0.015, 0.012);
             }
         }
@@ -155,14 +156,14 @@ final class StormDuelEffects {
                 );
             }
             dustLine(world, previous, next, color, 0.16);
-            world.spawnParticle(Particle.ELECTRIC_SPARK, next,
+            spawn(world, Particle.ELECTRIC_SPARK, next,
                     1, 0.018, 0.018, 0.018, 0.018);
             previous = next;
         }
     }
 
     static void dustPoint(World world, Location location, Particle.DustOptions color) {
-        AnimationParticles.dust(world, particle(DUST), location, 1,
+        AnimationEffects.dust(world, particle(DUST), location, 1,
                 0.0, 0.0, 0.0, 0.0, color);
     }
 
@@ -174,17 +175,17 @@ final class StormDuelEffects {
                     Math.sin(angle * 2.0) * 0.10,
                     Math.sin(angle) * radius
             );
-            world.spawnParticle(Particle.ELECTRIC_SPARK, location, 1, 0.01, 0.01, 0.01, 0.01);
+            spawn(world, Particle.ELECTRIC_SPARK, location, 1, 0.01, 0.01, 0.01, 0.01);
             if (point % 3 == 0) {
-                world.spawnParticle(Particle.END_ROD, location, 1, 0.01, 0.01, 0.01, 0.005);
+                spawn(world, Particle.END_ROD, location, 1, 0.01, 0.01, 0.01, 0.005);
             }
-            AnimationParticles.dust(world, particle(DUST), location, 1, 0.0, 0.0, 0.0, 0.0,
+            AnimationEffects.dust(world, particle(DUST), location, 1, 0.0, 0.0, 0.0, 0.0,
                     point % 2 == 0 ? BLUE : VIOLET);
         }
     }
 
     static void dustBurst(World world, Location location, Particle.DustOptions color, int amount) {
-        AnimationParticles.dust(world, particle(DUST), location, amount, 0.34, 0.34, 0.34, 0.02, color);
+        AnimationEffects.dust(world, particle(DUST), location, amount, 0.34, 0.34, 0.34, 0.02, color);
     }
 
     static Location lerp(Location from, Location to, double progress) {
@@ -225,7 +226,7 @@ final class StormDuelEffects {
         int points = Math.max(1, (int) Math.ceil(delta.length() / Math.max(0.08, spacing)));
         for (int point = 0; point <= points; point++) {
             Location location = from.clone().add(delta.clone().multiply(point / (double) points));
-            AnimationParticles.dust(world, particle(DUST), location, 1,
+            AnimationEffects.dust(world, particle(DUST), location, 1,
                     0.0, 0.0, 0.0, 0.0, color);
         }
     }

@@ -75,7 +75,7 @@ final class MachineTextEditor {
 
         event.setCancelled(true);
         String value = event.getMessage() == null ? "" : event.getMessage().trim();
-        Bukkit.getScheduler().runTask(caseManager.getPlugin(), () -> apply(event.getPlayer(), pending, value));
+        caseManager.getPlugin().tasks().run(() -> apply(event.getPlayer(), pending, value));
     }
 
     void cancel(Player player) {

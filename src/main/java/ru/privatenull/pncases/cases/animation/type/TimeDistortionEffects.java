@@ -2,13 +2,14 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.DUST;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.util.Vector;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 
 /** Controlled particle geometry for the Timekeeper cut-scene. */
 final class TimeDistortionEffects {
@@ -35,7 +36,7 @@ final class TimeDistortionEffects {
             Location point = base.clone().add(Math.cos(angle) * radius, 0.05, Math.sin(angle) * radius);
             point(world, point, i % 2 == 0 ? GOLD : VIOLET);
         }
-        if (tick % 4 == 0) world.spawnParticle(Particle.REVERSE_PORTAL,
+        if (tick % 4 == 0) spawn(world, Particle.REVERSE_PORTAL,
                 base.clone().add(0.0, 0.85, 0.0), 3, 0.28, 0.68, 0.28, 0.05);
     }
 
@@ -49,14 +50,14 @@ final class TimeDistortionEffects {
         double hour = rotation * 0.46 - Math.PI / 2.0;
         line(world, center, clockPoint(center, right, minute, radius * 0.68), CYAN, 8);
         line(world, center, clockPoint(center, right, hour, radius * 0.44), GOLD, 6);
-        if (tick % 5 == 0) world.spawnParticle(Particle.ELECTRIC_SPARK,
+        if (tick % 5 == 0) spawn(world, Particle.ELECTRIC_SPARK,
                 center, 2, 0.08, 0.08, 0.08, 0.015);
     }
 
     static void rewindTrail(World world, Location block, int index, int tick) {
         point(world, block, index % 2 == 0 ? GOLD : CYAN);
         if ((tick + index) % 4 == 0) {
-            world.spawnParticle(Particle.REVERSE_PORTAL, block, 1, 0.05, 0.05, 0.05, 0.025);
+            spawn(world, Particle.REVERSE_PORTAL, block, 1, 0.05, 0.05, 0.05, 0.025);
         }
     }
 
@@ -75,9 +76,9 @@ final class TimeDistortionEffects {
     }
 
     static void temporalSkip(World world, Location from, Location to) {
-        AnimationParticles.flash(world, from.clone().add(0.0, 1.0, 0.0),
+        AnimationEffects.flash(world, from.clone().add(0.0, 1.0, 0.0),
                 1, 0.0, 0.0, 0.0, 0.0);
-        AnimationParticles.flash(world, to.clone().add(0.0, 1.0, 0.0),
+        AnimationEffects.flash(world, to.clone().add(0.0, 1.0, 0.0),
                 1, 0.0, 0.0, 0.0, 0.0);
         line(world, from.clone().add(0.0, 1.0, 0.0), to.clone().add(0.0, 1.0, 0.0), VIOLET, 9);
     }
@@ -118,7 +119,7 @@ final class TimeDistortionEffects {
     }
 
     private static void point(World world, Location location, Particle.DustOptions color) {
-        AnimationParticles.dust(world, particle(DUST), location, 1,
+        AnimationEffects.dust(world, particle(DUST), location, 1,
                 0.0, 0.0, 0.0, 0.0, color);
     }
 

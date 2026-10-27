@@ -10,12 +10,13 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import ru.privatenull.pncases.cases.CaseManager;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
-import ru.privatenull.pncases.gui.GuiDesign;
+import ru.privatenull.pncases.gui.machine.MachineItemFactory.Hint;
 
 import java.util.List;
 
 import static ru.privatenull.pncases.gui.machine.MachineGuiSupport.*;
 
+/** Hologram settings. Reached from "Additional"; the back button returns there. */
 final class MachineHologramScreen {
 
     private final CaseManager caseManager;
@@ -39,7 +40,7 @@ final class MachineHologramScreen {
         Inventory inventory = Bukkit.createInventory(
                 GuiSession.machine(GuiSession.Screen.MACHINE_HOLOGRAM, caseName), 54,
                 caseManager.getPlugin().getUi().text(
-                        "machine.titles.hologram", "&0Студия голограммы", items.replacements(definition))
+                        "machine.titles.hologram", "&0Голограмма", items.replacements(definition))
         );
         fill(inventory, definition);
         caseManager.getPlugin().openGui(player, inventory);
@@ -48,11 +49,6 @@ final class MachineHologramScreen {
 
     private void fill(Inventory inventory, CaseDefinition definition) {
         items.fill(inventory, items.pane(Material.BLACK_STAINED_GLASS_PANE, " ", List.of()));
-        inventory.setItem(4, items.configuredButton(
-                "machine.hologram.header", MachineIcon.HOLOGRAM_HEADER,
-                items.name("Голограмма"),
-                items.lore(List.of("Настройка текста над кейсом"),
-                        List.of(), null, null), definition));
         inventory.setItem(SLOT_HOLOGRAM_TOGGLE, toggle(definition));
         inventory.setItem(SLOT_HOLOGRAM_HEIGHT, height(definition));
         inventory.setItem(SLOT_HOLOGRAM_LINES, lines(definition));
@@ -63,20 +59,21 @@ final class MachineHologramScreen {
         boolean enabled = state.hologramEnabled(definition);
         return items.configuredButton("machine.hologram.toggle",
                 enabled ? MachineIcon.HOLOGRAM_TOGGLE_ON : MachineIcon.HOLOGRAM_TOGGLE_OFF,
-                items.name("Видимость"), items.lore(
-                        "Включение и отключение голограммы",
-                        "Состояние", enabled ? "&aВключена" : "&cВыключена",
-                        enabled ? "Выключить" : "Включить", null), definition,
+                items.name("Видимость"), items.hintLore(
+                        List.of("Включение и отключение голограммы"),
+                        List.of("Состояние", enabled ? "&aВключена" : "&cВыключена"),
+                        Hint.left(enabled ? "выключить" : "включить")), definition,
                 "status", enabled ? "&aвключена" : "&cвыключена",
                 "action", enabled ? "выключить" : "включить");
     }
 
     private ItemStack height(CaseDefinition definition) {
         return items.configuredButton("machine.hologram.height", MachineIcon.HOLOGRAM_HEIGHT,
-                items.name("Высота"), items.lore(
-                        List.of("Позиция голограммы над кейсом", "Shift изменяет значение на 1.0"),
+                items.name("Высота"), items.hintLore(
+                        List.of("Позиция голограммы над кейсом"),
                         List.of("Высота", String.valueOf(state.hologramHeight(definition))),
-                        "Поднять на 0.1", "Опустить на 0.1"), definition,
+                        Hint.left("выше на 0.1"), Hint.right("ниже на 0.1"),
+                        Hint.shiftLeft("выше на 1.0"), Hint.shiftRight("ниже на 1.0")), definition,
                 "value", String.valueOf(state.hologramHeight(definition)));
     }
 
@@ -85,9 +82,9 @@ final class MachineHologramScreen {
         List<String> description = configured.isEmpty()
                 ? List.of("Текст голограммы не задан")
                 : configured.stream().map(line -> items.format(definition, line)).toList();
-        List<String> lore = items.lore(description,
+        List<String> lore = items.hintLore(description,
                 List.of("Количество строк", String.valueOf(configured.size())),
-                "Изменить", null);
+                Hint.left("изменить текст"));
         String visible = configured.isEmpty()
                 ? "&8строк нет"
                 : String.join("|", configured.stream()

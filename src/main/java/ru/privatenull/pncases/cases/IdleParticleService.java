@@ -9,7 +9,7 @@ import org.bukkit.entity.Player;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.IdleParticleSettings;
 import ru.privatenull.pncases.PnCasesPlugin;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
+import ru.privatenull.pncases.support.compat.BukkitCompat.ParticleCompat;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,7 +68,7 @@ public final class IdleParticleService {
 
         if (task == null || task.isCancelled()) {
             tick = 0L;
-            task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+            task = plugin.tasks().timer(this::tick, 1L, 1L);
         }
     }
 
@@ -96,7 +96,7 @@ public final class IdleParticleService {
             stop();
         } else if (task == null || task.isCancelled()) {
             tick = 0L;
-            task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+            task = plugin.tasks().timer(this::tick, 1L, 1L);
         }
     }
 

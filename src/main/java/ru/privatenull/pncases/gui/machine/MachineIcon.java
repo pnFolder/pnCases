@@ -1,7 +1,7 @@
 package ru.privatenull.pncases.gui.machine;
 
 import org.bukkit.inventory.ItemStack;
-import ru.privatenull.pnlibrary.item.HeadUtil;
+import ru.privatenull.pncases.support.item.HeadUtil;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -17,6 +17,7 @@ enum MachineIcon {
     MAIN_SHOWCASE("98b30172e4fb11974398c54e6c74560ce30ec1dae8ab492826c24fda2946b786"),
     MAIN_PURCHASE("48b81d8935fc101e35f3e54f537b612822f18faf752a90037cc4215a5dc881ef"),
 
+    ANIMATION_BLOCKED("3ed1aba73f639f4bc42bd48196c715197be2712c3b962c97ebf9e9ed8efa025"),
     ANIMATION_HEADER("76c0d0459c67f2be82fbe5406ab8d1378da1f28f7a3f82f1dfc47615a955a7"),
     ANIMATION_MODE("8426f715b80dd90eb1e1929f6ec4bc3583de8f821bdd4f4c1722e69c98b50506"),
 

@@ -16,10 +16,10 @@ import ru.privatenull.pncases.cases.animation.core.TimelineTask;
 import ru.privatenull.pncases.cases.animation.effect.RewardLabel;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.MaterialCompat;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.SoundCompat;
-import ru.privatenull.pnlibrary.entity.VisualEntity;
+import ru.privatenull.pncases.support.compat.BukkitCompat.MaterialCompat;
+import ru.privatenull.pncases.support.compat.BukkitCompat.ParticleCompat;
+import ru.privatenull.pncases.support.compat.BukkitCompat.SoundCompat;
+import ru.privatenull.pncases.support.entity.VisualEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -182,6 +182,9 @@ public final class LegacyFortuneRingAnimation extends TimelineCaseAnimation {
             private void playReveal() {
                 double progress = clamp((tick - SLOW_END) / (double) (REVEAL_END - SLOW_END));
                 double eased = easeOutBack(progress);
+                if (tick == SLOW_END + 1) {
+                    run.protectReward(base.clone().add(0.0, 1.70, 0.0));
+                }
                 rotation += 0.035;
 
                 for (int i = 0; i < orbitItems.size(); i++) {

@@ -7,8 +7,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.pncases.cases.model.*;
 import ru.privatenull.pncases.cases.reward.RewardPresentationService;
-import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.pnlibrary.item.ItemFactory;
+import ru.privatenull.pncases.support.text.ColorUtil;
+import ru.privatenull.pncases.support.item.ItemFactory;
 
 import java.util.*;
 
@@ -35,6 +35,7 @@ public final class CaseDefinitionLoader {
         applyDisplayNameToken(openButton, openItemSection, displayName);
         CaseGuiLayout layout = viewParser.parseLayout(gui);
         IdleParticleSettings idleParticles = viewParser.parseIdleParticles(section.getConfigurationSection("idle-particles"));
+        ProximitySettings proximity = viewParser.parseProximity(section.getConfigurationSection("proximity-animation"));
 
         int buyXpLevels = parseBuyXpLevels(section.getConfigurationSection("cost"));
         Animation animation = parseAnimation(section.getConfigurationSection("animation"));
@@ -43,9 +44,16 @@ public final class CaseDefinitionLoader {
         List<String> broadcastLines = broadcast != null && broadcast.isList("lines")
                 ? broadcast.getStringList("lines")
                 : CaseDefinition.DEFAULT_BROADCAST_LINES;
+        GuaranteeSettings guarantee = parseGuarantee(section.getConfigurationSection("guarantee"));
         List<Reward> rewards = rewardParser.parse(section);
-        if (rewards.isEmpty()) {
+        List<String> children = parseBundle(section.getConfigurationSection("bundle"), caseName, !rewards.isEmpty());
+        if (rewards.isEmpty() && children.isEmpty()) {
             throw new IllegalArgumentException("Кейс '" + caseName + "' не содержит ни одной корректной награды.");
+        }
+
+        if (!children.isEmpty()) {
+            // Several cases share this menu, so its title is the group's, not the title of one case.
+            title = section.getString("bundle.title", "Кейсы");
         }
 
         return new CaseDefinition(
@@ -56,17 +64,33 @@ public final class CaseDefinitionLoader {
                 openButton,
                 layout,
                 idleParticles,
+                proximity,
                 buyXpLevels,
-                animation.durationTicks(),
-                animation.cycleEveryTicks(),
-                animation.riseBlocks(),
-                animation.spinDegreesPerTick(),
                 animation.fixed(),
                 animation.items(),
                 broadcastEnabled,
                 broadcastLines,
-                rewards
+                guarantee,
+                rewards,
+                children
         );
+    }
+
+    /** Names listed under {@code bundle.cases}, lower-cased and without repeats; the case itself may be listed. */
+    private List<String> parseBundle(ConfigurationSection bundle, String caseName, boolean hasOwnRewards) {
+        if (bundle == null) return List.of();
+        List<String> names = new ArrayList<>();
+        for (String raw : bundle.getStringList("cases")) {
+            if (raw == null) continue;
+            String id = raw.trim().toLowerCase(Locale.ROOT);
+            if (!id.isEmpty() && !names.contains(id)) names.add(id);
+        }
+        // A case with its own rewards keeps its own button, first in the row, unless include_self is off.
+        // An empty container has nothing to open itself, so it never gets one.
+        String self = caseName.toLowerCase(Locale.ROOT);
+        names.remove(self);
+        if (!names.isEmpty() && hasOwnRewards && bundle.getBoolean("include_self", true)) names.add(0, self);
+        return names;
     }
 
     static String resolveGuiTitle(String displayName, String configuredTitle) {
@@ -101,11 +125,6 @@ public final class CaseDefinitionLoader {
     }
 
     private Animation parseAnimation(ConfigurationSection section) {
-        int duration = section == null ? 80 : section.getInt("duration_ticks", 80);
-        int cycleEvery = section == null ? 2 : section.getInt("cycle_every_ticks", 2);
-        double rise = section == null ? 1.2 : section.getDouble("rise_blocks", 1.2);
-        float spin = section == null ? 18.0F : (float) section.getDouble("spin_degrees_per_tick", 18.0);
-
         List<ItemStack> items = new ArrayList<>();
         if (section != null && section.isList("items")) {
             for (Object raw : section.getList("items", List.of())) {
@@ -114,7 +133,18 @@ public final class CaseDefinitionLoader {
         }
         items.removeIf(Objects::isNull);
 
-        return new Animation(duration, cycleEvery, rise, spin, fixedAnimation(section), items);
+        return new Animation(fixedAnimation(section), items);
+    }
+
+    private GuaranteeSettings parseGuarantee(ConfigurationSection section) {
+        if (section == null) return GuaranteeSettings.disabled();
+        Reward.Rarity minimum = Reward.Rarity.parseKnown(section.getString("minimum-rarity"));
+        return new GuaranteeSettings(
+                section.getBoolean("enabled", false),
+                section.getInt("openings", 50),
+                minimum == null ? Reward.Rarity.LEGENDARY : minimum,
+                section.getBoolean("reset-after-win", true)
+        );
     }
 
     private AnimationType fixedAnimation(ConfigurationSection section) {
@@ -133,10 +163,6 @@ public final class CaseDefinitionLoader {
     }
 
     private record Animation(
-            int durationTicks,
-            int cycleEveryTicks,
-            double riseBlocks,
-            float spinDegreesPerTick,
             AnimationType fixed,
             List<ItemStack> items
     ) {

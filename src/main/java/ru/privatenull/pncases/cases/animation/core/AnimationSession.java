@@ -16,7 +16,7 @@ import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
 import ru.privatenull.pncases.cases.animation.effect.DisplayAnimator;
 import ru.privatenull.pncases.hologram.CaseHologramManager;
-import ru.privatenull.pnlibrary.compat.ServerCapabilities;
+import ru.privatenull.pncases.support.compat.ServerCapabilities;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,6 +85,12 @@ public final class AnimationSession {
 
     public PnCasesPlugin plugin() {
         return plugin;
+    }
+
+    public void protectReward(Location center) {
+        if (plugin.getRewardVisibility() == null || player == null || center == null) return;
+        plugin.getRewardVisibility().protect(player, center);
+        onClose(() -> plugin.getRewardVisibility().clear(player.getUniqueId()));
     }
 
     /** Stable callback passed into old-style scenario bodies and used as run identity. */

@@ -11,8 +11,8 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import ru.privatenull.pncases.cases.model.AnimationType;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.database.DatabaseType;
-import ru.privatenull.pnlibrary.database.MongoDatabaseManager;
+import ru.privatenull.pncases.support.database.DatabaseType;
+import ru.privatenull.pncases.support.database.MongoDatabaseManager;
 import ru.privatenull.pncases.storage.CasesDatabase.HistoryEntry;
 
 import java.util.*;
@@ -28,8 +28,11 @@ public final class MongoCasesDatabase implements CasesDatabase {
     private MongoCollection<Document> keys;
     private MongoCollection<Document> preferences;
     private MongoCollection<Document> casePreferences;
+    private MongoCollection<Document> favoriteAnimations;
     private MongoCollection<Document> history;
     private MongoCollection<Document> pending;
+    private MongoCollection<Document> batches;
+    private MongoCollection<Document> guaranteeProgress;
 
     public MongoCasesDatabase(MongoDatabaseManager manager) {
         this.manager = Objects.requireNonNull(manager, "manager");
@@ -47,16 +50,26 @@ public final class MongoCasesDatabase implements CasesDatabase {
         keys = database.getCollection(prefix + "_keys");
         preferences = database.getCollection(prefix + "_preferences");
         casePreferences = database.getCollection(prefix + "_case_preferences");
+        favoriteAnimations = database.getCollection(prefix + "_animation_favorites");
         history = database.getCollection(prefix + "_history");
         pending = database.getCollection(prefix + "_pending_rewards");
+        batches = database.getCollection(prefix + "_pending_batches");
+        guaranteeProgress = database.getCollection(prefix + "_guarantee_progress");
         keys.createIndex(compoundIndex(ascending("player_uuid"), ascending("key_id")), new IndexOptions().unique(true));
         preferences.createIndex(ascending("player_uuid"), new IndexOptions().unique(true));
         casePreferences.createIndex(
                 compoundIndex(ascending("player_uuid"), ascending("case_id")),
                 new IndexOptions().unique(true)
         );
+        favoriteAnimations.createIndex(
+                compoundIndex(ascending("player_uuid"), ascending("case_id")),
+                new IndexOptions().unique(true)
+        );
         history.createIndex(compoundIndex(ascending("case_name"), descending("opened_at")));
         pending.createIndex(ascending("player_uuid"), new IndexOptions().unique(true));
+        guaranteeProgress.createIndex(
+                compoundIndex(ascending("player_uuid"), ascending("case_id")),
+                new IndexOptions().unique(true));
     }
 
     @Override
@@ -83,7 +96,7 @@ public final class MongoCasesDatabase implements CasesDatabase {
         if (changed == null) return false;
         if (changed.getInteger("amount", 0) <= 0) {
             try {
-                keys.deleteOne(eq("_id", changed.getObjectId("_id")));
+                keys.deleteOne(and(eq("_id", changed.getObjectId("_id")), lte("amount", 0)));
             } catch (RuntimeException ignored) {
                 // The atomic decrement already succeeded. A zero-value row is
                 // harmless and must not turn a paid opening into an ambiguous
@@ -101,6 +114,30 @@ public final class MongoCasesDatabase implements CasesDatabase {
             if (amount > 0) result.put(document.getString("key_id"), amount);
         }
         return result;
+    }
+
+    @Override
+    public boolean transferKeys(UUID sender, UUID receiver, String keyId, int amount) {
+        if (sender == null || receiver == null || sender.equals(receiver) || amount <= 0) return false;
+        try (ClientSession session = manager.client().startSession()) {
+            return Boolean.TRUE.equals(session.withTransaction(() -> {
+                Document changed = keys.findOneAndUpdate(session,
+                        and(keyFilter(sender, keyId), gte("amount", amount)), inc("amount", -amount));
+                if (changed == null) return false;
+                Document target = keys.find(session, keyFilter(receiver, keyId)).first();
+                if (target != null && ((Number) target.getOrDefault("amount", 0)).longValue()
+                        > Integer.MAX_VALUE - (long) amount) {
+                    throw new IllegalStateException("Receiver key balance would overflow");
+                }
+                keys.updateOne(session, keyFilter(receiver, keyId), combine(
+                        setOnInsert("player_uuid", receiver.toString()),
+                        setOnInsert("key_id", normalize(keyId)), inc("amount", amount)),
+                        new UpdateOptions().upsert(true));
+                return true;
+            }));
+        }
+        // A standalone MongoDB rejects the transaction before the debit. Do not
+        // fall back to two writes: a server stop could otherwise destroy keys.
     }
 
     @Override
@@ -125,6 +162,51 @@ public final class MongoCasesDatabase implements CasesDatabase {
                 setOnInsert("player_uuid", uuid.toString()),
                 setOnInsert("case_id", normalize(caseId)),
                 set("animation", type.name())
+        ), new UpdateOptions().upsert(true));
+    }
+
+    @Override
+    public Set<AnimationType> getFavoriteAnimations(UUID uuid, String caseId) {
+        Document document = favoriteAnimations.find(and(
+                eq("player_uuid", uuid.toString()), eq("case_id", normalize(caseId)))).first();
+        if (document == null) return Set.of();
+        return CasesDatabase.parseFavoriteAnimations(document.getList("animations", String.class, List.of()));
+    }
+
+    @Override
+    public void setFavoriteAnimations(UUID uuid, String caseId, Set<AnimationType> types) {
+        Bson filter = and(eq("player_uuid", uuid.toString()), eq("case_id", normalize(caseId)));
+        if (types == null || types.isEmpty()) {
+            favoriteAnimations.deleteOne(filter);
+            return;
+        }
+        List<String> values = types.stream().map(Enum::name).sorted().toList();
+        favoriteAnimations.updateOne(filter, combine(
+                setOnInsert("player_uuid", uuid.toString()),
+                setOnInsert("case_id", normalize(caseId)),
+                set("animations", values)), new UpdateOptions().upsert(true));
+    }
+
+    @Override
+    public int getGuaranteeProgress(UUID uuid, String caseId) {
+        Document document = guaranteeProgress.find(and(
+                eq("player_uuid", uuid.toString()),
+                eq("case_id", normalize(caseId))
+        )).first();
+        return document == null ? 0 : Math.max(0, document.getInteger("openings", 0));
+    }
+
+    @Override
+    public void setGuaranteeProgress(UUID uuid, String caseId, int openings) {
+        Bson filter = and(eq("player_uuid", uuid.toString()), eq("case_id", normalize(caseId)));
+        if (openings <= 0) {
+            guaranteeProgress.deleteOne(filter);
+            return;
+        }
+        guaranteeProgress.updateOne(filter, combine(
+                setOnInsert("player_uuid", uuid.toString()),
+                setOnInsert("case_id", normalize(caseId)),
+                set("openings", openings)
         ), new UpdateOptions().upsert(true));
     }
 
@@ -178,11 +260,16 @@ public final class MongoCasesDatabase implements CasesDatabase {
             } catch (Exception ignored) {
             }
         }
+        for (Document document : batches.find()) {
+            result.add(UUID.fromString(document.getString("_id")));
+        }
         return result;
     }
 
     @Override
     public OpeningReservation reserveOpening(UUID uuid, String keyId, Reward reward) {
+        PendingBatch batch = loadBatch(uuid);
+        if (batch != null) return OpeningReservation.pending(batch.rewards().get(0));
         try (ClientSession session = manager.client().startSession()) {
             session.startTransaction();
             try {
@@ -212,6 +299,59 @@ public final class MongoCasesDatabase implements CasesDatabase {
             // Standalone MongoDB has no cross-collection transactions. The
             // per-player DatabaseExecutor lane remains the safe local fallback.
             return CasesDatabase.super.reserveOpening(uuid, keyId, reward);
+        }
+    }
+
+    @Override
+    public PendingBatch loadBatch(UUID uuid) {
+        Document document = batches.find(eq("_id", uuid.toString())).first();
+        return document == null ? null : PendingBatch.decode(document.getString("payload"),
+                document.getInteger("next_index", 0));
+    }
+
+    @Override
+    public OpeningReservation reserveBatch(UUID uuid, PendingBatch batch) {
+        String payload = batch.encode();
+        try (ClientSession session = manager.client().startSession()) {
+            return session.withTransaction(() -> {
+                Document old = pending.find(session, eq("player_uuid", uuid.toString())).first();
+                Document existing = batches.find(session, eq("_id", uuid.toString())).first();
+                if (old != null) return OpeningReservation.pending(reward(old));
+                if (existing != null) return OpeningReservation.pending(
+                        PendingBatch.decode(existing.getString("payload"), 0).rewards().get(0));
+                Document changed = keys.findOneAndUpdate(session,
+                        and(keyFilter(uuid, batch.caseId()), gte("amount", batch.rewards().size())),
+                        inc("amount", -batch.rewards().size()),
+                        new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
+                if (changed == null) {
+                    Document balance = keys.find(session, keyFilter(uuid, batch.caseId())).first();
+                    return OpeningReservation.insufficient(balance == null ? 0 : balance.getInteger("amount", 0));
+                }
+                batches.insertOne(session, new Document("_id", uuid.toString())
+                        .append("batch_id", batch.id().toString()).append("payload", payload)
+                        .append("next_index", 0).append("item_count", batch.rewards().size()));
+                if (batch.guaranteeProgress() >= 0) {
+                    guaranteeProgress.updateOne(session,
+                            and(eq("player_uuid", uuid.toString()), eq("case_id", normalize(batch.caseId()))),
+                            combine(set("player_uuid", uuid.toString()), set("case_id", normalize(batch.caseId())),
+                                    set("openings", batch.guaranteeProgress())), new UpdateOptions().upsert(true));
+                }
+                return OpeningReservation.success();
+            });
+        }
+        // No standalone fallback: debit and the complete reward snapshot must commit together.
+    }
+
+    @Override
+    public void acknowledgeBatchReward(UUID uuid, UUID batchId, int index) {
+        try (ClientSession session = manager.client().startSession()) {
+            session.withTransaction(() -> {
+                Bson batch = and(eq("_id", uuid.toString()), eq("batch_id", batchId.toString()));
+                batches.updateOne(session, and(batch, eq("next_index", index)), inc("next_index", 1));
+                batches.deleteOne(session, and(batch,
+                        new Document("$expr", new Document("$gte", List.of("$next_index", "$item_count")))));
+                return null;
+            });
         }
     }
 
@@ -253,15 +393,17 @@ public final class MongoCasesDatabase implements CasesDatabase {
                 .append("lp_group", reward.lpGroup()).append("lp_node", reward.lpNode())
                 .append("lp_duration", reward.lpDuration()).append("vault_amount", reward.vaultAmount())
                 .append("player_points_amount", reward.playerPointsAmount()).append("message", reward.message())
-                .append("display_name", reward.displayName()).append("command", reward.command());
+                .append("display_name", reward.displayName())
+                .append("command", Reward.serializeCommands(reward.commands()));
     }
 
     private static Reward reward(Document value) {
-        return new Reward(value.getInteger("chance", 100), parseType(value.getString("type")),
+        return new Reward(value.getInteger("chance", 100), Reward.Type.fromStored(value.getString("type")),
                 CasesDatabase.decodeItem(value.getString("item_base64")), value.getString("lp_group"),
                 value.getString("lp_node"), value.getString("lp_duration"), doubleValue(value, "vault_amount"),
                 value.getInteger("player_points_amount", 0), value.getString("message"),
-                value.getString("display_name"), value.getString("rarity"), null, value.getString("command"));
+                value.getString("display_name"), value.getString("rarity"), null, null,
+                Reward.deserializeCommands(value.getString("command")));
     }
 
     private static boolean transactionUnsupported(MongoException exception) {
@@ -280,13 +422,6 @@ public final class MongoCasesDatabase implements CasesDatabase {
         }
     }
 
-    private static Reward.Type parseType(String value) {
-        try {
-            return Reward.Type.valueOf(value);
-        } catch (Exception ignored) {
-            return Reward.Type.ITEM;
-        }
-    }
 
     private static long longValue(Document document, String key) {
         Number value = document.get(key, Number.class);

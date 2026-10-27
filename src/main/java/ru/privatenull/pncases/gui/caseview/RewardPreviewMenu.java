@@ -10,11 +10,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.pncases.cases.CaseManager;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.text.ColorUtil;
+import ru.privatenull.pncases.support.text.ColorUtil;
 import ru.privatenull.pncases.gui.GuiDesign;
-import ru.privatenull.pnlibrary.item.HeadUtil;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.SoundCompat;
+import ru.privatenull.pncases.support.item.HeadUtil;
+import ru.privatenull.pncases.support.compat.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pncases.support.compat.BukkitCompat.SoundCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -106,7 +106,7 @@ public final class RewardPreviewMenu {
             if (safePage > 0) {
                 inventory.setItem(layout.previousSlot(), navigationButton(GuiDesign.BACK, "&#5FD7FFПредыдущая страница",
                         List.of("", " &#A6B0BAПереход к предыдущим наградам", "",
-                                " &#C2CBD3Страница", " &#69747E↳ &#A7F3D0" + safePage + " / " + pages,
+                                " &#C2CBD3Страница", ColorUtil.paint(" &#69747E↳ &#A7F3D0", safePage) + " / " + pages,
                                 "", " &#FFB347[&#FFA43C Л&#FF9536К&#FF8630М &#FF772A] &fПерейти", "")));
             } else {
                 inventory.setItem(layout.previousSlot(), navigationButton(GuiDesign.DISABLED, "&8Предыдущей страницы нет",
@@ -115,7 +115,7 @@ public final class RewardPreviewMenu {
             if (safePage + 1 < pages) {
                 inventory.setItem(layout.nextSlot(), navigationButton(GuiDesign.NEXT, "&#5FD7FFСледующая страница",
                         List.of("", " &#A6B0BAПереход к следующим наградам", "",
-                                " &#C2CBD3Страница", " &#69747E↳ &#A7F3D0" + (safePage + 2) + " / " + pages,
+                                " &#C2CBD3Страница", ColorUtil.paint(" &#69747E↳ &#A7F3D0", safePage + 2) + " / " + pages,
                                 "", " &#FFB347[&#FFA43C Л&#FF9536К&#FF8630М &#FF772A] &fПерейти", "")));
             } else {
                 inventory.setItem(layout.nextSlot(), navigationButton(GuiDesign.DISABLED, "&8Следующей страницы нет",
@@ -167,8 +167,8 @@ public final class RewardPreviewMenu {
     private ItemStack buildInfoItem(CaseDefinition definition, int page, int pages, int rewardCount) {
         return navigationButton(GuiDesign.CONTENT, "&#5FD7FFСодержимое кейса", List.of(
                 "", " &#A6B0BAНаграды, которые могут выпасть игроку", "",
-                " &#C2CBD3Добавлено наград", " &#69747E↳ &#A7F3D0" + rewardCount,
-                " &#C2CBD3Страница", " &#69747E↳ &#A7F3D0" + (page + 1) + " / " + pages,
+                " &#C2CBD3Добавлено наград", ColorUtil.paint(" &#69747E↳ &#A7F3D0", rewardCount),
+                " &#C2CBD3Страница", ColorUtil.paint(" &#69747E↳ &#A7F3D0", page + 1) + " / " + pages,
                 ""));
     }
 

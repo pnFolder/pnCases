@@ -2,6 +2,7 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.*;
 import org.bukkit.entity.*;
@@ -152,7 +153,7 @@ public final class FortuneRingAnimation extends TimelineCaseAnimation {
                     playSound(world, base, Sound.BLOCK_NOTE_BLOCK_PLING, 0.08f, 1.45f + (float) Math.sin(tick * 0.07) * 0.18f);
                 }
                 if (tick % 6 == 0) {
-                    world.spawnParticle(particle(ENCHANT), center, 3, 0.42, 0.12, 0.42, 0.14);
+                    spawn(world, particle(ENCHANT), center, 3, 0.42, 0.12, 0.42, 0.14);
                 }
             }
 
@@ -166,7 +167,7 @@ public final class FortuneRingAnimation extends TimelineCaseAnimation {
                     drawRing(world, base, rightAxis, radius, 1.60, rotation, Particle.END_ROD);
                 }
                 if (tick % 4 == 0) {
-                    world.spawnParticle(Particle.PORTAL, center, 4, 0.38, 0.14, 0.38, 0.10);
+                    spawn(world, Particle.PORTAL, center, 4, 0.38, 0.14, 0.38, 0.10);
                 }
 
                 if (tick % 10 == 0) {
@@ -233,6 +234,7 @@ public final class FortuneRingAnimation extends TimelineCaseAnimation {
                 if (rewardLabel != null) rewardLabel.showAbove(rewardLoc, 0.88);
 
                 if (tick == timeline.start("reveal")) {
+                    run.protectReward(base.clone().add(0.0, 1.83, 0.0));
                     playSound(world, selectedStart, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.18f, 1.35f);
                 }
 
@@ -240,7 +242,7 @@ public final class FortuneRingAnimation extends TimelineCaseAnimation {
                     drawRing(world, base, rightAxis, 0.42 + progress * 0.22, 1.65, -rotation, particle(FIREWORK));
                 }
                 if (tick % 4 == 0) {
-                    world.spawnParticle(Particle.END_ROD, rewardLoc, 1, 0.18, 0.12, 0.18, 0.012);
+                    spawn(world, Particle.END_ROD, rewardLoc, 1, 0.18, 0.12, 0.18, 0.012);
                 }
             }
 
@@ -302,17 +304,17 @@ public final class FortuneRingAnimation extends TimelineCaseAnimation {
         for (int i = 0; i < 12; i++) {
             double angle = angle(i, 12, rotation);
             Location loc = verticalPoint(base, rightAxis, radius, centerY, angle);
-            world.spawnParticle(particle, loc, 1, 0.0, 0.0, 0.0, 0.0);
+            spawn(world, particle, loc, 1, 0.0, 0.0, 0.0, 0.0);
         }
     }
 
     private static void spawnFinalBurst(World world, Location loc) {
-        world.spawnParticle(particle(FIREWORK), loc, 5, 0.34, 0.20, 0.34, 0.02);
-        world.spawnParticle(Particle.END_ROD, loc, 7, 0.30, 0.26, 0.30, 0.018);
-        world.spawnParticle(particle(ENCHANT), loc, 8, 0.42, 0.30, 0.42, 0.12);
+        spawn(world, particle(FIREWORK), loc, 5, 0.34, 0.20, 0.34, 0.02);
+        spawn(world, Particle.END_ROD, loc, 7, 0.30, 0.26, 0.30, 0.018);
+        spawn(world, particle(ENCHANT), loc, 8, 0.42, 0.30, 0.42, 0.12);
         for (int i = 0; i < 6; i++) {
             double angle = angle(i, 6, 0.0);
-            world.spawnParticle(Particle.ELECTRIC_SPARK,
+            spawn(world, Particle.ELECTRIC_SPARK,
                     loc.clone().add(Math.cos(angle) * 0.9, 0.05, Math.sin(angle) * 0.9),
                     1, 0.0, 0.0, 0.0, 0.02);
         }
@@ -322,15 +324,15 @@ public final class FortuneRingAnimation extends TimelineCaseAnimation {
                                          double progress) {
         double pulse = 0.12 + Math.sin(progress * Math.PI * 4.0) * 0.04;
         Location pointer = selected.clone().add(0.0, 0.72 + pulse, 0.0);
-        world.spawnParticle(Particle.END_ROD, selected, 2, 0.18, 0.18, 0.18, 0.01);
-        world.spawnParticle(Particle.ELECTRIC_SPARK, pointer, 3, 0.10, 0.08, 0.10, 0.02);
+        spawn(world, Particle.END_ROD, selected, 2, 0.18, 0.18, 0.18, 0.01);
+        spawn(world, Particle.ELECTRIC_SPARK, pointer, 3, 0.10, 0.08, 0.10, 0.02);
         for (int side : new int[]{-1, 1}) {
             for (int point = 0; point <= 4; point++) {
                 double step = point / 4.0;
                 Location marker = pointer.clone()
                         .add(rightAxis.clone().multiply(side * step * 0.24))
                         .add(0.0, -step * 0.30, 0.0);
-                world.spawnParticle(Particle.END_ROD, marker, 1, 0.0, 0.0, 0.0, 0.0);
+                spawn(world, Particle.END_ROD, marker, 1, 0.0, 0.0, 0.0, 0.0);
             }
         }
     }

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "product": "pncases",
+  "releases": [
+    {
+      "version": "1.5.4-remaster",
+      "channel": "stable",
+      "description": "Сцены у кейса, новые анимации, подарок ключей, серия открытий, переработанный Machine и крафт ключей в верстаке.",
+      "changelogUrl": "https://github.com/PnFolder/pnCases/blob/master/.pnlibrary/changelogs/1.5.4-remaster.md",
+      "publishedAt": "2026-10-27T21:40:28Z",
+      "api": {
+        "minimum": 1,
+        "maximum": 1
+      },
+      "artifacts": [
+        {
+          "file": "pnCases-1.5.4-remaster.jar",
+          "platform": "BUKKIT",
+          "java": {
+            "minimum": 17
+          },
+          "url": "https://github.com/PnFolder/pnCases/releases/download/v1.5.4-remaster/pnCases-1.5.4-remaster.jar",
+          "sha256": "8a20affb7eddaf19a9ac39a6062661e499bfbb8caea2e89e2f69867457310064",
+          "size": 10493169
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+# ПРИМЕР: деньги и поинты. Нужны Vault + плагин экономики и PlayerPoints.
+# Если нужного плагина нет, награда не выдастся, поэтому ставь только то, что установлено.
+blocks: []
+display-name: '&eКейс с деньгами'
+
+gui:
+  title: '{display-name}'
+  size: 27
+  open_slot: 13
+
+rewards:
+  # VAULT: деньги через Vault.
+  - type: VAULT
+    chance: 60
+    rarity: COMMON
+    vault:
+      amount: 500
+      message: '&aВам начислено {money} монет!'
+    visual:               # как награда выглядит в меню и анимации
+      material: SUNFLOWER
+      name: '&a500 монет'
+
+  - type: VAULT
+    chance: 10
+    rarity: LEGENDARY
+    vault:
+      amount: 10000
+      message: '&6Джекпот! {money} монет!'
+    visual:
+      material: GOLD_BLOCK
+      name: '&610 000 монет'
+
+  # PLAYERPOINTS: поинты.
+  - type: PLAYERPOINTS
+    chance: 30
+    rarity: RARE
+    playerpoints:
+      amount: 100
+      message: '&bВам начислено {points} поинтов!'
+    visual:
+      material: AMETHYST_SHARD
+      name: '&b100 поинтов'

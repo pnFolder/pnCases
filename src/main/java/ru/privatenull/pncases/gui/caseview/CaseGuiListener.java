@@ -11,16 +11,18 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.scheduler.BukkitRunnable;
+import ru.privatenull.pncases.support.task.PluginRunnable;
 import ru.privatenull.pncases.cases.CaseManager;
+import ru.privatenull.pncases.cases.model.BundleLayout;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.gui.GuiDesign;
-import ru.privatenull.pnlibrary.item.HeadUtil;
-import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pncases.support.item.HeadUtil;
+import ru.privatenull.pncases.support.text.ColorUtil;
+import ru.privatenull.pncases.support.compat.BukkitCompat.InventoryViewCompat;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,12 +37,14 @@ public final class CaseGuiListener implements Listener {
     private final CaseManager caseManager;
     private final RewardPreviewMenu rewardPreviewMenu;
     private final AnimationSelectionMenu animationMenu;
+    private final BulkOpenMenu bulkOpenMenu;
     private final Set<UUID> clickLock = ConcurrentHashMap.newKeySet();
 
     public CaseGuiListener(CaseManager caseManager) {
         this.caseManager = caseManager;
         this.rewardPreviewMenu = new RewardPreviewMenu(caseManager);
         this.animationMenu = new AnimationSelectionMenu(caseManager);
+        this.bulkOpenMenu = new BulkOpenMenu(caseManager);
     }
 
     @EventHandler
@@ -51,40 +55,57 @@ public final class CaseGuiListener implements Listener {
 
         event.setCancelled(true);
         int slot = event.getRawSlot();
+        if (slot < 0 || slot >= event.getInventory().getSize()) return;
         caseManager.getPlugin().withGuiTransition(player, slot,
                 () -> handleClick(player, event, holder, slot));
     }
 
     private void handleClick(Player player, InventoryClickEvent event, GuiSession holder, int slot) {
+        if (holder.screen() == GuiSession.Screen.BATCH_RESULTS) {
+            if (slot == 49) player.closeInventory();
+            else if (slot == 45 || slot == 53) {
+                BulkOpenMenu.showResults(caseManager, player, holder.caseName(), holder.rewards(),
+                        holder.page() + (slot == 45 ? -1 : 1));
+            }
+            return;
+        }
         if (holder.screen() == GuiSession.Screen.PLAYER_ANIMATIONS) {
-            animationMenu.handleClick(player, holder, slot);
+            animationMenu.handleClick(player, holder, slot, event.getClick());
             return;
         }
         if (holder.screen() == GuiSession.Screen.REWARD_PREVIEW) {
             rewardPreviewMenu.handleClick(player, holder, slot);
             return;
         }
+        if (holder.screen() == GuiSession.Screen.BULK_OPEN) {
+            if (event.isLeftClick()) bulkOpenMenu.handleClick(player, holder, slot);
+            return;
+        }
         if (holder.screen() != GuiSession.Screen.CASE) return;
 
         CaseDefinition definition = caseManager.getCaseByName(holder.caseName());
         if (definition == null) return;
-        if (slot == definition.guiLayout().openSlot()) {
-            if (caseManager.getPlugin().previewEnabled()
-                    && definition.guiLayout().previewEnabled()
-                    && (event.getClick() == ClickType.MIDDLE
-                    || (event.getClick().isLeftClick() && definition.buyKeyWithXpLevels() <= 0))) {
-                rewardPreviewMenu.open(player, holder.caseName(), 0);
-                return;
+        CaseDefinition opened = null;
+        List<CaseDefinition> inside = caseManager.bundleCases(definition);
+        if (inside.isEmpty()) {
+            if (slot == definition.guiLayout().openSlot()) opened = definition;
+        } else {
+            // A case with cases inside has one ordinary open button for each of them.
+            int[] slots = BundleLayout.slots(inside.size(), definition.guiLayout().openSlot(),
+                    event.getInventory().getSize());
+            for (int index = 0; index < slots.length; index++) {
+                if (slots[index] == slot) opened = inside.get(index);
             }
-            if (event.getClick().isLeftClick() || event.getClick().isRightClick()) {
-                openOrBuy(player, event, holder, definition);
-            }
+        }
+        if (opened != null) {
+            handleOpenButton(player, event, holder, opened, slot);
             return;
         }
         if (definition.guiLayout().animationSlot() >= 0
                 && slot == definition.guiLayout().animationSlot()
                 && definition.fixedAnimation() == null) {
             if (event.getClick().isRightClick()) {
+                caseManager.clearPlayerFavoriteAnimations(player.getUniqueId(), holder.caseName());
                 caseManager.setPlayerAnimation(player.getUniqueId(), holder.caseName(),
                         ru.privatenull.pncases.cases.model.AnimationType.ANVIL);
                 caseManager.openCaseGui(player, definition);
@@ -93,6 +114,31 @@ public final class CaseGuiListener implements Listener {
                 animationMenu.open(player, holder.caseName());
             }
         }
+    }
+
+    /** A click on an open button: rewards, quantity or opening of {@code target}, which may sit inside a bundle. */
+    private void handleOpenButton(Player player, InventoryClickEvent event, GuiSession holder,
+                                  CaseDefinition target, int slot) {
+        if (event.getClick() == ClickType.SHIFT_RIGHT) {
+            bulkOpenMenu.open(player, target.name());
+            return;
+        }
+        if (caseManager.getPlugin().previewEnabled()
+                && target.guiLayout().previewEnabled()
+                && (event.getClick() == ClickType.MIDDLE
+                || (event.getClick().isLeftClick() && target.buyKeyWithXpLevels() <= 0))) {
+            rewardPreviewMenu.open(player, target.name(), 0);
+            return;
+        }
+        if (event.getClick().isLeftClick() || event.getClick().isRightClick()) {
+            openOrBuy(player, event, holder, target, slot);
+        }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        bulkOpenMenu.clear(event.getPlayer());
+        clickLock.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
@@ -105,7 +151,8 @@ public final class CaseGuiListener implements Listener {
         }
     }
 
-    private void openOrBuy(Player player, InventoryClickEvent event, GuiSession holder, CaseDefinition definition) {
+    private void openOrBuy(Player player, InventoryClickEvent event, GuiSession holder, CaseDefinition definition,
+                           int slot) {
         UUID playerId = player.getUniqueId();
         if (!clickLock.add(playerId)) return;
 
@@ -129,10 +176,10 @@ public final class CaseGuiListener implements Listener {
                         return;
                     }
                     if (wantsBuy && buyLevels > 0 && player.getLevel() >= buyLevels) {
-                        buyKeys(player, inventory, definition, keyId, need - have, buyLevels);
+                        buyKeys(player, inventory, holder, definition, slot, keyId, need - have, buyLevels);
                     } else {
-                        showInsufficientPayment(player, inventory, definition, wantsBuy, have, need, buyLevels);
-                        scheduleRefresh(player, holder.caseName(), playerId, 30L);
+                        showInsufficientPayment(player, inventory, definition, slot, wantsBuy, have, need, buyLevels);
+                        scheduleRefresh(player, holder.caseName(), definition.name(), slot, playerId, 30L);
                     }
                 },
                 failure -> {
@@ -144,7 +191,9 @@ public final class CaseGuiListener implements Listener {
     private void buyKeys(
             Player player,
             Inventory inventory,
+            GuiSession holder,
             CaseDefinition definition,
+            int slot,
             String keyId,
             int amount,
         int levels
@@ -158,12 +207,12 @@ public final class CaseGuiListener implements Listener {
                 }),
                 balance -> {
                     caseManager.updateCachedKeyBalance(playerId, keyId, balance);
-                    inventory.setItem(definition.guiLayout().openSlot(), pane(
+                    inventory.setItem(slot, pane(
                             Material.LIME_STAINED_GLASS_PANE,
                             "&aПокупка завершена",
                             Collections.emptyList()));
                     player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.28f, 1.2f);
-                    scheduleRefresh(player, definition.name(), playerId, 30L);
+                    scheduleRefresh(player, holder.caseName(), definition.name(), slot, playerId, 30L);
                 },
                 failure -> {
                     player.setLevel(player.getLevel() + levels);
@@ -176,6 +225,7 @@ public final class CaseGuiListener implements Listener {
             Player player,
             Inventory inventory,
             CaseDefinition definition,
+            int slot,
             boolean wantsBuy,
             int have,
             int need,
@@ -224,33 +274,33 @@ public final class CaseGuiListener implements Listener {
                     " &#A6B0BAДля покупки не хватает уровней опыта",
                     "",
                     " &#C2CBD3Уровни",
-                    " &#69747E↳ &#A7F3D0" + player.getLevel() + " / " + buyLevels,
+                    ColorUtil.paint(" &#69747E↳ &#A7F3D0", player.getLevel()) + " / " + buyLevels,
                     ""
             ));
         }
-        inventory.setItem(definition.guiLayout().openSlot(), texturedPane(GuiDesign.NO_KEYS, title, lore));
+        inventory.setItem(slot, texturedPane(GuiDesign.NO_KEYS, title, lore));
         player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.24f, 1.0f);
     }
 
-    private void scheduleRefresh(Player player, String caseName, UUID playerId, long delay) {
-        new BukkitRunnable() {
+    private void scheduleRefresh(Player player, String menuCase, String buttonCase, int slot, UUID playerId, long delay) {
+        new PluginRunnable() {
             @Override
             public void run() {
                 clickLock.remove(playerId);
                 if (!player.isOnline()) return;
                 Inventory top = InventoryViewCompat.topInventory(player);
                 if (top == null || !(top.getHolder() instanceof GuiSession holder)) return;
-                if (holder.screen() != GuiSession.Screen.CASE || !Objects.equals(holder.caseName(), caseName)) return;
-                CaseDefinition current = caseManager.getCaseByName(caseName);
+                if (holder.screen() != GuiSession.Screen.CASE || !Objects.equals(holder.caseName(), menuCase)) return;
+                CaseDefinition current = caseManager.getCaseByName(buttonCase);
                 if (current == null) return;
                 caseManager.getPlugin().getGuiUpdates().setTopSlot(
                         player,
                         top,
-                        current.guiLayout().openSlot(),
+                        slot,
                         caseManager.buildGuiOpenItem(player, current)
                 );
             }
-        }.runTaskLater(caseManager.getPlugin(), delay);
+        }.runTaskLater(caseManager.getPlugin().tasks(), delay);
     }
 
     private static ItemStack pane(Material material, String name, List<String> lore) {

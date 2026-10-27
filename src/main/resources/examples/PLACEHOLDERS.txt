@@ -1,0 +1,65 @@
+Плейсхолдеры pnCases.
+Бывают два вида: PlaceholderAPI (в чужих плагинах) и {фигурные} (внутри файлов pnCases).
+Рабочий пример использования лежит в 08-placeholders.yml.
+
+
+1. PlaceholderAPI: %pncases_...%
+Нужен PlaceholderAPI. Работают в табе, скорборде, голограммах и меню других плагинов.
+
+  %pncases_keys_<ID кейса>%   сколько ключей этого кейса у игрока, например %pncases_keys_donate%
+  %pncases_cases%             сколько кейсов загружено на сервере
+  %pncases_opening%           true, если игрок сейчас открывает кейс, иначе false
+  %pncases_version%           версия pnCases
+
+Если плейсхолдер не раскрывается, проверь, что стоит PlaceholderAPI, и сделай /papi list: pncases должен быть в списке.
+
+
+2. Награды (rewards -> message, commands)
+  {player}     ник игрока
+  {uuid}       UUID игрока
+  {reward}     название награды
+  {amount}     количество предметов
+  {money}      сумма денег (VAULT)
+  {points}     количество поинтов (PLAYERPOINTS)
+  {group}      группа (LUCKPERMS)
+  {permission} право (LUCKPERMS, поле node)
+  {duration}   срок (LUCKPERMS), например 1h
+
+В commands у PERSONAL работают только {player} и {uuid}.
+Сообщение message есть у каждой награды, а у VAULT, PLAYERPOINTS и LUCKPERMS ещё и внутри своего блока (vault.message и т. д.).
+
+
+3. Оповещение всему серверу (broadcast -> lines)
+  {player}   кто открыл
+  {case}     название кейса
+  {case_id}  ID кейса
+  {reward}   что выпало
+
+
+4. Меню кейса (gui)
+  {display-name}   название кейса. В gui.title и в gui.button.name означает "взять display-name"
+  {have}           сколько ключей у игрока
+  {need}           сколько ключей нужно
+  {left_action}    что делает ЛКМ
+  {right_action}   что делает ПКМ
+  {bulk_action}    что делает Shift + ПКМ
+
+В hologram -> lines:
+  {display-name}   название кейса
+  {case}           то же, что {display-name}
+  {case_id}        ID кейса
+  {gui_title}      заголовок меню с цветами
+  {gui_title_plain} заголовок меню без цветов
+  {world} {x} {y} {z}   где стоит блок кейса
+
+
+5. Редкости (config.yml -> rarity)
+  {id}   ID редкости, например "my_rare"
+Так можно написать название для своей редкости: "&f◆ {id}".
+
+
+6. Цвета
+  &a &c &7 ...        обычные цвета
+  &#RRGGBB            HEX-цвет, например &#A7F3D0
+  &x&4&2&9&F&9&1      HEX-цвет старым способом
+  &l жирный, &o курсив, &n подчёркнутый

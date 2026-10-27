@@ -4,8 +4,8 @@ import org.bukkit.inventory.ItemStack;
 import redis.clients.jedis.JedisPooled;
 import ru.privatenull.pncases.cases.model.AnimationType;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.database.DatabaseType;
-import ru.privatenull.pnlibrary.database.RedisDatabaseManager;
+import ru.privatenull.pncases.support.database.DatabaseType;
+import ru.privatenull.pncases.support.database.RedisDatabaseManager;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -53,17 +53,25 @@ public final class RedisCasesDatabase implements CasesDatabase {
     private final JedisPooled redis;
     private final String keyPrefix;
     private final String preferencePrefix;
+    private final String favoritePrefix;
     private final String historyPrefix;
     private final String pendingPrefix;
     private final String pendingPlayers;
+    private final String guaranteePrefix;
+    private final String batchPrefix;
+    private final String batchPlayers;
 
     public RedisCasesDatabase(RedisDatabaseManager database) {
         this.redis = database.client();
         this.keyPrefix = database.key("keys:");
         this.preferencePrefix = database.key("preferences:");
+        this.favoritePrefix = database.key("animation-favorites:");
         this.historyPrefix = database.key("history:");
         this.pendingPrefix = database.key("pending:");
         this.pendingPlayers = database.key("pending:players");
+        this.guaranteePrefix = database.key("guarantee:");
+        this.batchPrefix = database.key("pending-batch:");
+        this.batchPlayers = database.key("pending-batch:players");
     }
 
     @Override
@@ -108,6 +116,22 @@ public final class RedisCasesDatabase implements CasesDatabase {
     }
 
     @Override
+    public boolean transferKeys(UUID sender, UUID receiver, String keyId, int amount) {
+        if (sender == null || receiver == null || sender.equals(receiver) || amount <= 0) return false;
+        Object result = redis.eval("""
+                local source = tonumber(redis.call('HGET', KEYS[1], ARGV[1]) or '0')
+                local target = tonumber(redis.call('HGET', KEYS[2], ARGV[1]) or '0')
+                local amount = tonumber(ARGV[2])
+                if source < amount then return 0 end
+                if target + amount > 2147483647 then return redis.error_reply('Receiver key balance would overflow') end
+                redis.call('HSET', KEYS[1], ARGV[1], source - amount)
+                redis.call('HSET', KEYS[2], ARGV[1], target + amount)
+                return 1
+                """, List.of(keys(sender), keys(receiver)), List.of(normalize(keyId), Integer.toString(amount)));
+        return result instanceof Number number && number.longValue() == 1L;
+    }
+
+    @Override
     public AnimationType getAnimation(UUID uuid, String caseId) {
         return parseAnimation(redis.hget(preferences(uuid), normalize(caseId)));
     }
@@ -116,6 +140,38 @@ public final class RedisCasesDatabase implements CasesDatabase {
     public void setAnimation(UUID uuid, String caseId, AnimationType type) {
         if (uuid == null || type == null) return;
         redis.hset(preferences(uuid), normalize(caseId), type.name());
+    }
+
+    @Override
+    public Set<AnimationType> getFavoriteAnimations(UUID uuid, String caseId) {
+        String value = redis.hget(favorites(uuid), normalize(caseId));
+        if (value == null || value.isBlank()) return Set.of();
+        return CasesDatabase.parseFavoriteAnimations(List.of(value.split(",")));
+    }
+
+    @Override
+    public void setFavoriteAnimations(UUID uuid, String caseId, Set<AnimationType> types) {
+        String field = normalize(caseId);
+        if (types == null || types.isEmpty()) {
+            redis.hdel(favorites(uuid), field);
+            return;
+        }
+        String value = types.stream().map(Enum::name).sorted().collect(java.util.stream.Collectors.joining(","));
+        redis.hset(favorites(uuid), field, value);
+    }
+
+    @Override
+    public int getGuaranteeProgress(UUID uuid, String caseId) {
+        return integer(redis.hget(guarantee(uuid), normalize(caseId)), 0);
+    }
+
+    @Override
+    public void setGuaranteeProgress(UUID uuid, String caseId, int openings) {
+        if (openings <= 0) {
+            redis.hdel(guarantee(uuid), normalize(caseId));
+        } else {
+            redis.hset(guarantee(uuid), normalize(caseId), Integer.toString(openings));
+        }
     }
 
     @Override
@@ -150,7 +206,7 @@ public final class RedisCasesDatabase implements CasesDatabase {
         ItemStack item = CasesDatabase.decodeItem(blankToNull(values.get("item")));
         return new Reward(
                 integer(values.get("chance"), 100),
-                parseType(values.get("type")),
+                Reward.Type.fromStored(values.get("type")),
                 item,
                 blankToNull(values.get("lpGroup")),
                 blankToNull(values.get("lpNode")),
@@ -161,7 +217,8 @@ public final class RedisCasesDatabase implements CasesDatabase {
                 blankToNull(values.get("displayName")),
                 blankToNull(values.get("rarity")),
                 null,
-                blankToNull(values.get("command")));
+                null,
+                Reward.deserializeCommands(blankToNull(values.get("command"))));
     }
 
     @Override
@@ -180,11 +237,14 @@ public final class RedisCasesDatabase implements CasesDatabase {
             } catch (IllegalArgumentException ignored) {
             }
         }
+        for (String value : redis.smembers(batchPlayers)) result.add(UUID.fromString(value));
         return result;
     }
 
     @Override
     public OpeningReservation reserveOpening(UUID uuid, String keyId, Reward reward) {
+        PendingBatch batch = loadBatch(uuid);
+        if (batch != null) return OpeningReservation.pending(batch.rewards().get(0));
         if (uuid == null || reward == null) throw new IllegalArgumentException("uuid and reward are required");
         Map<String, String> values = rewardValues(reward);
         List<String> arguments = new ArrayList<>(3 + values.size() * 2);
@@ -204,6 +264,56 @@ public final class RedisCasesDatabase implements CasesDatabase {
         if (state > 0) return OpeningReservation.success();
         if (state < 0) return OpeningReservation.pending(loadPending(uuid));
         return OpeningReservation.insufficient(((Number) result.get(1)).intValue());
+    }
+
+    @Override
+    public PendingBatch loadBatch(UUID uuid) {
+        Map<String, String> value = redis.hgetAll(batchPrefix + uuid);
+        return value.isEmpty() ? null : PendingBatch.decode(value.get("payload"), integer(value.get("next_index"), 0));
+    }
+
+    @Override
+    public OpeningReservation reserveBatch(UUID uuid, PendingBatch batch) {
+        Object raw = redis.eval("""
+                if redis.call('EXISTS', KEYS[2]) == 1 or redis.call('EXISTS', KEYS[3]) == 1 then return {-1, 0} end
+                local current = tonumber(redis.call('HGET', KEYS[1], ARGV[1]) or '0')
+                local count = tonumber(ARGV[2])
+                if current < count then return {0, current} end
+                redis.call('HSET', KEYS[3], 'batch_id', ARGV[4], 'payload', ARGV[5], 'next_index', 0, 'item_count', count)
+                redis.call('HSET', KEYS[1], ARGV[1], current - count)
+                redis.call('SADD', KEYS[4], ARGV[3])
+                if tonumber(ARGV[6]) >= 0 then redis.call('HSET', KEYS[5], ARGV[1], ARGV[6]) end
+                return {1, current - count}
+                """, List.of(keys(uuid), pending(uuid), batchPrefix + uuid, batchPlayers, guarantee(uuid)),
+                List.of(normalize(batch.caseId()), String.valueOf(batch.rewards().size()), uuid.toString(),
+                        batch.id().toString(), batch.encode(), String.valueOf(batch.guaranteeProgress())));
+        if (!(raw instanceof List<?> result) || result.size() < 2) {
+            throw new IllegalStateException("Unexpected Redis batch response: " + raw);
+        }
+        long state = ((Number) result.get(0)).longValue();
+        if (state > 0) return OpeningReservation.success();
+        if (state < 0) {
+            Reward old = loadPending(uuid);
+            PendingBatch existing = loadBatch(uuid);
+            if (old != null) return OpeningReservation.pending(old);
+            if (existing != null) return OpeningReservation.pending(existing.rewards().get(0));
+            throw new IllegalStateException("Pending reward changed during batch reservation");
+        }
+        return OpeningReservation.insufficient(((Number) result.get(1)).intValue());
+    }
+
+    @Override
+    public void acknowledgeBatchReward(UUID uuid, UUID batchId, int index) {
+        redis.eval("""
+                if redis.call('HGET', KEYS[1], 'batch_id') ~= ARGV[1] then return 0 end
+                local next = tonumber(redis.call('HGET', KEYS[1], 'next_index'))
+                if next == tonumber(ARGV[2]) then next = redis.call('HINCRBY', KEYS[1], 'next_index', 1) end
+                if next >= tonumber(redis.call('HGET', KEYS[1], 'item_count')) then
+                  redis.call('DEL', KEYS[1])
+                  redis.call('SREM', KEYS[2], ARGV[3])
+                end
+                return 1
+                """, List.of(batchPrefix + uuid, batchPlayers), List.of(batchId.toString(), String.valueOf(index), uuid.toString()));
     }
 
     @Override
@@ -231,8 +341,16 @@ public final class RedisCasesDatabase implements CasesDatabase {
         return historyPrefix + normalize(caseName);
     }
 
+    private String favorites(UUID uuid) {
+        return favoritePrefix + uuid;
+    }
+
     private String pending(UUID uuid) {
         return pendingPrefix + uuid;
+    }
+
+    private String guarantee(UUID uuid) {
+        return guaranteePrefix + uuid;
     }
 
     private static Map<String, String> rewardValues(Reward reward) {
@@ -248,7 +366,7 @@ public final class RedisCasesDatabase implements CasesDatabase {
         values.put("playerPointsAmount", Integer.toString(reward.playerPointsAmount()));
         values.put("message", value(reward.message()));
         values.put("displayName", value(reward.displayName()));
-        values.put("command", value(reward.command()));
+        values.put("command", Reward.serializeCommands(reward.commands()));
         return values;
     }
 
@@ -313,11 +431,4 @@ public final class RedisCasesDatabase implements CasesDatabase {
         }
     }
 
-    private static Reward.Type parseType(String value) {
-        try {
-            return Reward.Type.valueOf(value == null ? "" : value);
-        } catch (IllegalArgumentException ignored) {
-            return Reward.Type.ITEM;
-        }
-    }
 }

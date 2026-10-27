@@ -11,9 +11,14 @@ public abstract class TimelineCaseAnimation extends AbstractCaseAnimation {
     }
 
     protected final BukkitTask startTimeline(AnimationSession session, TimelineTask task) {
-        if (session == null || task == null) {
-            throw new IllegalArgumentException("animation session and task are required");
+        return startScene(session, task);
+    }
+
+    /** Starts a composable Cinematic Engine scene inside the current session. */
+    protected final BukkitTask startScene(AnimationSession session, CinematicScene scene) {
+        if (session == null || scene == null) {
+            throw new IllegalArgumentException("animation session and scene are required");
         }
-        return scheduleTask(session, task, 0L, 1L);
+        return scheduleTask(session, scene, 0L, 1L);
     }
 }

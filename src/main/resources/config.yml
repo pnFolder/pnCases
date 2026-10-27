@@ -2,6 +2,35 @@
 features:
   rarity: true
   preview: true
+  # История открытий: запись и показ последних выпавших наград в меню кейса.
+  history: true
+  # Суммы валюты без лишнего ".0": "500 монет" вместо "500.0 монет". Дробные суммы остаются как есть.
+  whole-numbers: true
+
+# Право на /pncases gift <игрок> можно заменить своим permission.
+key-gifts:
+  permission: "pncases.gift"
+  # Лимиты на подарки ключей. -1 или отсутствие значения = без ограничений.
+  # per-gift: сколько ключей за один подарок; per-day: сколько всего за сутки (по дате сервера).
+  # default действует на всех, rules привязаны к праву (например, к группе LuckPerms: group.donate);
+  # если подходит несколько правил, берётся самое щедрое.
+  limits:
+    default:
+      per-gift: 10
+      per-day: 30
+    rules:
+      donate:
+        permission: "group.donate"
+        per-gift: 32
+        per-day: 100
+      unlimited:
+        permission: "pncases.gift.unlimited"
+        per-gift: -1
+        per-day: -1
+
+# До четырёх вариантов от 1 до 64: одна анимация на весь набор наград, Shift + ПКМ.
+bulk-opening:
+  amounts: [1, 3, 5, 10]
 
 # Тип хранилища: SQLITE, MYSQL, MONGODB или REDIS. Смена требует перезапуска.
 database:
@@ -44,8 +73,12 @@ rarity:
   legendary: "&6★ Легендарная"
   mythic: "&d✹ Мифическая"
 
-# Стиль голограммы награды в анимациях.
+# Финальная награда остаётся видимой внутри чистой зоны без частиц.
 animations:
+  reward-visibility:
+    particle-free-radius: 1.25
+    duration-ticks: 120
+  # Стиль текста награды через FancyHolograms или DecentHolograms.
   reward-hologram:
     scale: 1.45
     height-offset: 0.16

@@ -6,6 +6,7 @@ import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kin
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.FIREWORK;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.TOTEM;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 import static ru.privatenull.pncases.cases.animation.type.StormDuelActors.*;
 import static ru.privatenull.pncases.cases.animation.type.StormDuelEffects.*;
 
@@ -27,7 +28,7 @@ import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.PnCasesPlugin;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.core.AnimationFrame;
 import ru.privatenull.pncases.cases.animation.core.AnimationTimeline;
@@ -147,9 +148,9 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
                 if (local == 14) {
                     world.strikeLightningEffect(leftStart);
                     world.strikeLightningEffect(rightStart);
-                    AnimationParticles.flash(world, leftStart.clone().add(0.0, 1.0, 0.0),
+                    AnimationEffects.flash(world, leftStart.clone().add(0.0, 1.0, 0.0),
                             1, 0.02, 0.10, 0.02, 0.0);
-                    AnimationParticles.flash(world, rightStart.clone().add(0.0, 1.0, 0.0),
+                    AnimationEffects.flash(world, rightStart.clone().add(0.0, 1.0, 0.0),
                             1, 0.02, 0.10, 0.02, 0.0);
                     playSound(world, leftStart, Sound.ITEM_TRIDENT_THUNDER, 0.15f, 1.62f);
                     playSound(world, rightStart, Sound.ITEM_TRIDENT_THUNDER, 0.15f, 1.38f);
@@ -160,11 +161,11 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
                     equip(rightWarrior, false);
                     placeWarrior(left, leftStart, rightStart);
                     placeWarrior(rightWarrior, rightStart, leftStart);
-                    world.spawnParticle(Particle.CLOUD, leftStart.clone().add(0.0, 0.8, 0.0), 10, 0.28, 0.55, 0.28, 0.02);
-                    world.spawnParticle(Particle.CLOUD, rightStart.clone().add(0.0, 0.8, 0.0), 10, 0.28, 0.55, 0.28, 0.02);
-                    world.spawnParticle(Particle.SOUL_FIRE_FLAME, leftStart.clone().add(0.0, 0.72, 0.0),
+                    spawn(world, Particle.CLOUD, leftStart.clone().add(0.0, 0.8, 0.0), 10, 0.28, 0.55, 0.28, 0.02);
+                    spawn(world, Particle.CLOUD, rightStart.clone().add(0.0, 0.8, 0.0), 10, 0.28, 0.55, 0.28, 0.02);
+                    spawn(world, Particle.SOUL_FIRE_FLAME, leftStart.clone().add(0.0, 0.72, 0.0),
                             8, 0.24, 0.52, 0.24, 0.015);
-                    world.spawnParticle(Particle.REVERSE_PORTAL, rightStart.clone().add(0.0, 0.82, 0.0),
+                    spawn(world, Particle.REVERSE_PORTAL, rightStart.clone().add(0.0, 0.82, 0.0),
                             10, 0.26, 0.55, 0.26, 0.025);
                     dustBurst(world, leftStart.clone().add(0.0, 1.0, 0.0), BLUE, 12);
                     dustBurst(world, rightStart.clone().add(0.0, 1.0, 0.0), VIOLET, 12);
@@ -200,8 +201,8 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
                 int local = tick - timeline.start("approach");
                 if (local % 8 == 1) {
                     playSound(world, center, Sound.BLOCK_STONE_STEP, 0.10f, 0.75f + (float) progress * 0.15f);
-                    world.spawnParticle(Particle.CLOUD, leftLocation, 2, 0.13, 0.03, 0.13, 0.005);
-                    world.spawnParticle(Particle.CLOUD, rightLocation, 2, 0.13, 0.03, 0.13, 0.005);
+                    spawn(world, Particle.CLOUD, leftLocation, 2, 0.13, 0.03, 0.13, 0.005);
+                    spawn(world, Particle.CLOUD, rightLocation, 2, 0.13, 0.03, 0.13, 0.005);
                 }
             }
 
@@ -284,7 +285,7 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
 
                 if (lunge > 0.72) {
                     Location feet = (leftAttacks ? leftLocation : rightLocation).clone().add(0.0, 0.03, 0.0);
-                    world.spawnParticle(Particle.CLOUD, feet, fast ? 2 : 1, 0.14, 0.02, 0.14, 0.006);
+                    spawn(world, Particle.CLOUD, feet, fast ? 2 : 1, 0.14, 0.02, 0.14, 0.006);
                 }
             }
 
@@ -300,10 +301,10 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
                         .add(forward.clone().multiply(direction * (0.18 - progress * 0.36)))
                         .add(0.0, 0.12 - progress * 0.18, 0.0);
                 dustLine(world, from, to, blue ? BLUE : VIOLET, 0.13);
-                world.spawnParticle(blue ? Particle.SOUL_FIRE_FLAME : particle(ENCHANT), to,
+                spawn(world, blue ? Particle.SOUL_FIRE_FLAME : particle(ENCHANT), to,
                         1, 0.045, 0.045, 0.045, 0.01);
                 if (progress > 0.42 && progress < 0.88) {
-                    world.spawnParticle(Particle.SWEEP_ATTACK, to, 1, 0.03, 0.03, 0.03, 0.0);
+                    spawn(world, Particle.SWEEP_ATTACK, to, 1, 0.03, 0.03, 0.03, 0.0);
                 }
             }
 
@@ -323,8 +324,8 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
                 electricRing(world, impact, 0.28 + progress * 0.68, tick * 2);
                 if (tick == timeline.start("clash")) metalHit(impact, BLUE);
                 if ((tick - timeline.start("clash")) % 6 == 0) {
-                    world.spawnParticle(Particle.ELECTRIC_SPARK, impact, 7, 0.20, 0.18, 0.20, 0.08);
-                    world.spawnParticle(Particle.END_ROD, impact, 3, 0.15, 0.15, 0.15, 0.025);
+                    spawn(world, Particle.ELECTRIC_SPARK, impact, 7, 0.20, 0.18, 0.20, 0.08);
+                    spawn(world, Particle.END_ROD, impact, 3, 0.15, 0.15, 0.15, 0.025);
                     playSound(world, impact, Sound.BLOCK_CHAIN_HIT, 0.15f, 0.92f + (float) progress * 0.46f);
                     playSound(world, impact, Sound.ITEM_SHIELD_BLOCK, 0.10f, 1.18f + (float) progress * 0.35f);
                 }
@@ -336,11 +337,11 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
                     blasted = true;
                     run.hide(rawBase.getBlock(), Material.AIR);
                     world.strikeLightningEffect(center.clone().add(0.0, 0.35, 0.0));
-                    world.spawnParticle(particle(EXPLOSION), center.clone().add(0.0, 1.15, 0.0), 3, 0.32, 0.32, 0.32, 0.02);
-                    AnimationParticles.flash(world, center.clone().add(0.0, 1.20, 0.0),
+                    spawn(world, particle(EXPLOSION), center.clone().add(0.0, 1.15, 0.0), 3, 0.32, 0.32, 0.32, 0.02);
+                    AnimationEffects.flash(world, center.clone().add(0.0, 1.20, 0.0),
                             2, 0.08, 0.08, 0.08, 0.0);
-                    world.spawnParticle(Particle.SONIC_BOOM, center.clone().add(0.0, 1.18, 0.0), 1, 0.0, 0.0, 0.0, 0.0);
-                    world.spawnParticle(particle(TOTEM), center.clone().add(0.0, 1.12, 0.0),
+                    spawn(world, Particle.SONIC_BOOM, center.clone().add(0.0, 1.18, 0.0), 1, 0.0, 0.0, 0.0, 0.0);
+                    spawn(world, particle(TOTEM), center.clone().add(0.0, 1.12, 0.0),
                             22, 0.45, 0.52, 0.45, 0.10);
                     dustBurst(world, center.clone().add(0.0, 1.20, 0.0), BLUE, 20);
                     dustBurst(world, center.clone().add(0.0, 1.20, 0.0), VIOLET, 20);
@@ -381,6 +382,7 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
             private void reveal() {
                 double progress = timeline.progress("reveal", tick);
                 if (tick == timeline.start("reveal")) {
+                    run.protectReward(center.clone().add(0.0, 1.15, 0.0));
                     left.remove();
                     rightWarrior.remove();
                     leftWeapon.remove();
@@ -402,9 +404,9 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
             }
 
             private void metalHit(Location location, Particle.DustOptions color) {
-                world.spawnParticle(Particle.SWEEP_ATTACK, location, 1, 0.03, 0.03, 0.03, 0.0);
-                world.spawnParticle(Particle.ELECTRIC_SPARK, location, 9, 0.22, 0.18, 0.22, 0.12);
-                world.spawnParticle(Particle.END_ROD, location, 4, 0.16, 0.14, 0.16, 0.025);
+                spawn(world, Particle.SWEEP_ATTACK, location, 1, 0.03, 0.03, 0.03, 0.0);
+                spawn(world, Particle.ELECTRIC_SPARK, location, 9, 0.22, 0.18, 0.22, 0.12);
+                spawn(world, Particle.END_ROD, location, 4, 0.16, 0.14, 0.16, 0.025);
                 dustBurst(world, location, color, 8);
                 playSound(world, location, Sound.BLOCK_CHAIN_HIT, 0.18f, 1.34f);
                 playSound(world, location, Sound.ITEM_TRIDENT_HIT, 0.15f, 1.12f);
@@ -413,8 +415,8 @@ public StormDuelAnimation(PnCasesPlugin plugin) {
 
             private void finalBurst() {
                 Location location = rewardDisplay.getLocation();
-                world.spawnParticle(Particle.END_ROD, location, 10, 0.34, 0.32, 0.34, 0.025);
-                world.spawnParticle(particle(FIREWORK), location, 7, 0.30, 0.28, 0.30, 0.025);
+                spawn(world, Particle.END_ROD, location, 10, 0.34, 0.32, 0.34, 0.025);
+                spawn(world, particle(FIREWORK), location, 7, 0.30, 0.28, 0.30, 0.025);
                 playSound(world, location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.22f, 1.20f);
             }
 

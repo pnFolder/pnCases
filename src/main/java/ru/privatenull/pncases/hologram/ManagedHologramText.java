@@ -61,6 +61,7 @@ final class ManagedHologramText implements HologramText {
     }
 
     private boolean sameLocation(Location first, Location second) {
-        return first.getWorld() == second.getWorld() && first.distanceSquared(second) < 0.000001;
+        return first.getWorld() == second.getWorld()
+                && first.toVector().distanceSquared(second.toVector()) < 0.000001;
     }
 }

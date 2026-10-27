@@ -37,6 +37,7 @@ public final class CaseHologramManager {
 
     public void shutdown() {
         clearManaged();
+        closeProvider();
         provider = null;
     }
 
@@ -280,13 +281,22 @@ public final class CaseHologramManager {
                 }
             } catch (Throwable failure) {
                 logProviderFailure("check provider availability", failure);
-                provider = null;
             }
+            closeProvider();
         }
 
         provider = providerResolver.select();
         if (provider != null) {
             missingProviderWarningLogged = false;
+        }
+    }
+
+    private void closeProvider() {
+        if (provider == null) return;
+        try {
+            provider.close();
+        } catch (Throwable failure) {
+            logProviderFailure("close provider", failure);
         }
     }
 

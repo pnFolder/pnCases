@@ -1,0 +1,45 @@
+# ПРИМЕР: привилегии через LuckPerms. Нужен LuckPerms.
+# Группа должна существовать: /lp creategroup vip
+blocks: []
+display-name: '&dКейс привилегий'
+
+gui:
+  title: '{display-name}'
+  size: 27
+  open_slot: 13
+
+rewards:
+  # Группа на время. duration: 30m, 1h, 7d, 30d. Без duration выдаётся навсегда.
+  - type: LUCKPERMS
+    chance: 70
+    rarity: EPIC
+    luckperms:
+      group: vip
+      duration: 1h
+    message: '&aВы получили {group} на {duration}!'
+    visual:
+      material: NETHER_STAR
+      name: '&dVIP на 1 час'
+
+  # Группа навсегда.
+  - type: LUCKPERMS
+    chance: 5
+    rarity: MYTHIC
+    luckperms:
+      group: vip
+    message: '&dВы получили {group} навсегда!'
+    visual:
+      material: DRAGON_EGG
+      name: '&dVIP навсегда'
+
+  # Одно право вместо группы (node). Можно указать и group, и node вместе.
+  - type: LUCKPERMS
+    chance: 25
+    rarity: RARE
+    luckperms:
+      node: essentials.fly
+      duration: 7d
+    message: '&aПолёт на 7 дней!'
+    visual:
+      material: FEATHER
+      name: '&bПолёт на 7 дней'

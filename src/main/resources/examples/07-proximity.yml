@@ -1,0 +1,57 @@
+# ПРИМЕР: сцена вокруг кейса. Когда игрок подходит ближе radius блоков, вокруг кейса
+# появляются украшения, музыка и частицы, а блоки меняются только на экране этого игрока.
+# Это просто декор, награды работают как обычно. Всё настраивается и в Machine -> Дополнительно.
+blocks: []
+display-name: '&bЗимний кейс'
+
+proximity-animation:
+  enabled: true
+  scene: WINTER           # WINTER или AUTUMN (осень: пугало, клёны, тыквы, корзина)
+  radius: 8
+  spread: 1.0
+  rotation: 0             # ракурс сцены: 0, 90, 180 или 270 градусов
+  fade_seconds: 3
+  music:
+    enabled: true
+    volume: 0.3
+    pause_seconds: 4
+  sounds:
+    enabled: true
+    volume: 1.0
+  particles:
+    density: 1.0
+    snowfall: true
+    swirl: true
+    frost_ring: true
+    glints: true
+  decor:
+    mounds: 11
+    trees: 4
+    snowmen: 1
+    crystals: 4
+    garland: 18
+    snowflakes: 10
+    gifts: 4
+  santa:
+    enabled: true
+    coat: BLUE_CONCRETE
+    messages:
+      - '&bХо-хо-хо!'
+      - '&fС наступающим Новым годом!'
+  terrain:
+    enabled: true
+    radius: 7
+    case_style: GIFT      # GIFT, GLOBE, CRYSTAL, BLOCK, NONE (для AUTUMN есть BASKET)
+    case_color: RED_CONCRETE
+    keep_case: true
+    keep_during_opening: false
+    ground:
+      - SNOW_BLOCK:66
+      - WHITE_CONCRETE_POWDER:20
+
+rewards:
+  - type: ITEM
+    chance: 1
+    item:
+      material: SNOWBALL
+      amount: 16

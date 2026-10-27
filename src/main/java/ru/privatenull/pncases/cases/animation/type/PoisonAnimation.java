@@ -2,6 +2,7 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.*;
 import org.bukkit.configuration.ConfigurationSection;
@@ -15,6 +16,7 @@ import org.bukkit.util.Vector;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.PnCasesPlugin;
 import static ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation.playSound;
+import ru.privatenull.pncases.cases.animation.core.AnimationMobSpawner;
 import ru.privatenull.pncases.cases.animation.core.InteractiveAnimationTask;
 import ru.privatenull.pncases.cases.animation.core.InteractiveCaseAnimation;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
@@ -58,19 +60,18 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
         float slimePitch = cubeBase.getPitch();
         ItemStack rewardVisual = buildRewardVisual(reward, def);
 
-        Slime cube = world.spawn(cubeBase, Slime.class, slime -> {
-            slime.setAI(false);
-            slime.setGravity(false);
-            slime.setSilent(true);
-            slime.setCollidable(false);
-            slime.setCanPickupItems(false);
-            slime.setRemoveWhenFarAway(false);
-            slime.setPersistent(false);
-            slime.setSize(1);
-            slime.setHealth(Math.min(slime.getMaxHealth(), 1.0));
-            slime.setGlowing(true);
-            slime.setCustomNameVisible(false);
-        });
+        Slime cube = AnimationMobSpawner.spawn(world, cubeBase, Slime.class);
+        cube.setAI(false);
+        cube.setGravity(false);
+        cube.setSilent(true);
+        cube.setCollidable(false);
+        cube.setCanPickupItems(false);
+        cube.setRemoveWhenFarAway(false);
+        cube.setPersistent(false);
+        cube.setSize(1);
+        cube.setHealth(Math.min(cube.getMaxHealth(), 1.0));
+        cube.setGlowing(true);
+        cube.setCustomNameVisible(false);
         run.track(cube);
 
         ItemDisplay rewardDisplay = (ItemDisplay) world.spawnEntity(base.clone().add(0, 1.1, 0), org.bukkit.entity.EntityType.ITEM_DISPLAY);
@@ -115,9 +116,9 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
                 statusText.update(statusAnchor, buildStatusLines(state.hits));
 
                 Location hitLoc = cube.getLocation().clone().add(0, 0.9, 0);
-                world.spawnParticle(particle(SLIME), hitLoc, 16, 0.35, 0.22, 0.35, 0.05);
-                world.spawnParticle(particle(SLIME), hitLoc, 10, 0.25, 0.18, 0.25, 0.04);
-                world.spawnParticle(particle(WITCH), hitLoc, 8, 0.25, 0.18, 0.25, 0.02);
+                spawn(world, particle(SLIME), hitLoc, 16, 0.35, 0.22, 0.35, 0.05);
+                spawn(world, particle(SLIME), hitLoc, 10, 0.25, 0.18, 0.25, 0.04);
+                spawn(world, particle(WITCH), hitLoc, 8, 0.25, 0.18, 0.25, 0.02);
 
                 playSound(world, cube.getLocation(), Sound.ENTITY_SLIME_HURT, 0.36f, 0.7f + state.hits * 0.08f);
                 playSound(world, cube.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.24f, 1.2f);
@@ -153,8 +154,8 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
 
                     double bob = Math.sin(state.tick * 0.22) * 0.05;
                     cube.teleport(oriented(cubeBase.clone().add(0, bob, 0), slimeYaw, slimePitch));
-                    world.spawnParticle(particle(SLIME), cube.getLocation().clone().add(0, 0.5, 0), 8, 0.30, 0.15, 0.30, 0.03);
-                    world.spawnParticle(particle(SLIME), cube.getLocation().clone().add(0, 0.5, 0), 6, 0.22, 0.10, 0.22, 0.02);
+                    spawn(world, particle(SLIME), cube.getLocation().clone().add(0, 0.5, 0), 8, 0.30, 0.15, 0.30, 0.03);
+                    spawn(world, particle(SLIME), cube.getLocation().clone().add(0, 0.5, 0), 6, 0.22, 0.10, 0.22, 0.02);
 
                     spawnGroundRing(world, base.clone().add(0, 0.02, 0), 0.5 + eased * 0.9, state.tick * 0.08);
 
@@ -175,9 +176,9 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
 
                     double bob = Math.sin(state.tick * 0.18) * 0.08;
                     cube.teleport(oriented(cubeBase.clone().add(0, bob, 0), slimeYaw, slimePitch));
-                    world.spawnParticle(particle(SLIME), cube.getLocation().clone().add(0, 0.75, 0), 5, 0.30, 0.20, 0.30, 0.02);
+                    spawn(world, particle(SLIME), cube.getLocation().clone().add(0, 0.75, 0), 5, 0.30, 0.20, 0.30, 0.02);
                     if (state.tick % 4 == 0) {
-                        world.spawnParticle(particle(WITCH), cube.getLocation().clone().add(0, 0.75, 0), 4, 0.28, 0.18, 0.28, 0.01);
+                        spawn(world, particle(WITCH), cube.getLocation().clone().add(0, 0.75, 0), 4, 0.28, 0.18, 0.28, 0.01);
                     }
 
                     int spitInterval = Math.max(10, 24 - state.hits * 2);
@@ -206,10 +207,10 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
                     cube.teleport(oriented(cubeBase.clone().add(shakeX, 0.05, shakeZ), slimeYaw, slimePitch));
 
                     Location loc = cube.getLocation().clone().add(0, 1.0, 0);
-                    world.spawnParticle(particle(SLIME), loc, 20, 0.45, 0.25, 0.45, 0.05);
-                    world.spawnParticle(particle(SLIME), loc, 14, 0.35, 0.18, 0.35, 0.04);
-                    world.spawnParticle(particle(WITCH), loc, 12, 0.30, 0.22, 0.30, 0.02);
-                    world.spawnParticle(particle(SMOKE), loc, 6, 0.22, 0.12, 0.22, 0.01);
+                    spawn(world, particle(SLIME), loc, 20, 0.45, 0.25, 0.45, 0.05);
+                    spawn(world, particle(SLIME), loc, 14, 0.35, 0.18, 0.35, 0.04);
+                    spawn(world, particle(WITCH), loc, 12, 0.30, 0.22, 0.30, 0.02);
+                    spawn(world, particle(SMOKE), loc, 6, 0.22, 0.12, 0.22, 0.01);
 
                     if (dt % 4 == 0) {
                         playSound(world, cube.getLocation(), Sound.ENTITY_SLIME_SQUISH, 0.30f, 0.45f + dt * 0.03f);
@@ -224,11 +225,11 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
                         }
                         globs.clear();
 
-                        world.spawnParticle(particle(EXPLOSION), explodeLoc, 4, 0.35, 0.25, 0.35, 0.0);
-                        world.spawnParticle(particle(SLIME), explodeLoc, 42, 0.60, 0.35, 0.60, 0.09);
-                        world.spawnParticle(particle(SLIME), explodeLoc, 32, 0.50, 0.28, 0.50, 0.06);
-                        world.spawnParticle(particle(WITCH), explodeLoc, 24, 0.40, 0.24, 0.40, 0.03);
-                        world.spawnParticle(particle(SMOKE), explodeLoc, 18, 0.28, 0.16, 0.28, 0.03);
+                        spawn(world, particle(EXPLOSION), explodeLoc, 4, 0.35, 0.25, 0.35, 0.0);
+                        spawn(world, particle(SLIME), explodeLoc, 42, 0.60, 0.35, 0.60, 0.09);
+                        spawn(world, particle(SLIME), explodeLoc, 32, 0.50, 0.28, 0.50, 0.06);
+                        spawn(world, particle(WITCH), explodeLoc, 24, 0.40, 0.24, 0.40, 0.03);
+                        spawn(world, particle(SMOKE), explodeLoc, 18, 0.28, 0.16, 0.28, 0.03);
 
                         playSound(world, cube.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.28f, 1.2f);
                         playSound(world, cube.getLocation(), Sound.BLOCK_SLIME_BLOCK_BREAK, 0.32f, 0.8f);
@@ -239,6 +240,7 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
 
                         state.phaseStartedAt = state.tick;
                         state.phase = PoisonPhase.REVEAL;
+                        run.protectReward(base.clone().add(0.0, 1.75, 0.0));
                     }
                     return false;
                 }
@@ -269,8 +271,8 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
                     }
 
                     if (dt >= REVEAL_TICKS) {
-                        world.spawnParticle(particle(SLIME), rewardLoc, 5, 0.25, 0.16, 0.25, 0.02);
-                        world.spawnParticle(particle(SLIME), rewardLoc, 4, 0.22, 0.12, 0.22, 0.02);
+                        spawn(world, particle(SLIME), rewardLoc, 5, 0.25, 0.16, 0.25, 0.02);
+                        spawn(world, particle(SLIME), rewardLoc, 4, 0.22, 0.12, 0.22, 0.02);
                         playSound(world, base, Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.32f, 1.0f);
                         playSound(world, base, Sound.ENTITY_PLAYER_LEVELUP, 0.28f, 1.25f);
                         return true;
@@ -285,8 +287,8 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
                            Random random, List<SlimeGlob> globs) {
         int count = 3 + random.nextInt(2);
 
-        world.spawnParticle(particle(SLIME), from, 10, 0.16, 0.12, 0.16, 0.03);
-        world.spawnParticle(particle(SLIME), from, 8, 0.12, 0.10, 0.12, 0.02);
+        spawn(world, particle(SLIME), from, 10, 0.16, 0.12, 0.16, 0.03);
+        spawn(world, particle(SLIME), from, 8, 0.12, 0.10, 0.12, 0.02);
 
         for (int i = 0; i < count; i++) {
             ItemDisplay glob = (ItemDisplay) world.spawnEntity(from, org.bukkit.entity.EntityType.ITEM_DISPLAY);
@@ -324,11 +326,11 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
             float scale = (float) (0.20 + Math.sin(glob.age * 0.30) * 0.03);
             setScale(glob.display, scale);
 
-            world.spawnParticle(particle(SLIME), current, 1, 0.01, 0.01, 0.01, 0.0);
+            spawn(world, particle(SLIME), current, 1, 0.01, 0.01, 0.01, 0.0);
 
             if (glob.age >= glob.maxAge || current.getY() <= base.getY() + 0.18) {
-                world.spawnParticle(particle(SLIME), current, 6, 0.10, 0.06, 0.10, 0.02);
-                world.spawnParticle(particle(SLIME), current, 5, 0.08, 0.05, 0.08, 0.02);
+                spawn(world, particle(SLIME), current, 6, 0.10, 0.06, 0.10, 0.02);
+                spawn(world, particle(SLIME), current, 5, 0.08, 0.05, 0.08, 0.02);
                 playSound(world, current, Sound.BLOCK_SLIME_BLOCK_BREAK, 0.16f, 1.5f);
 
                 safeRemove(glob.display);
@@ -343,7 +345,7 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
             double angle = rotation + (Math.PI * 2D * i) / 18D;
             double x = center.getX() + Math.cos(angle) * radius;
             double z = center.getZ() + Math.sin(angle) * radius;
-            world.spawnParticle(particle(SLIME), x, center.getY(), z, 1, 0, 0, 0, 0.0);
+            spawn(world, particle(SLIME), x, center.getY(), z, 1, 0, 0, 0, 0.0);
         }
     }
 
@@ -356,10 +358,10 @@ public final class PoisonAnimation extends InteractiveCaseAnimation {
             double z = rewardLoc.getZ() + Math.sin(angle) * radius;
             double y = rewardLoc.getY() + Math.sin(angle * 2.0 + tick * 0.12) * 0.10;
 
-            world.spawnParticle(particle(SLIME), x, y, z, 1, 0, 0, 0, 0.0);
+            spawn(world, particle(SLIME), x, y, z, 1, 0, 0, 0, 0.0);
 
             if (i % 3 == 0) {
-                world.spawnParticle(particle(WITCH), x, y, z, 1, 0, 0, 0, 0.0);
+                spawn(world, particle(WITCH), x, y, z, 1, 0, 0, 0, 0.0);
             }
         }
     }

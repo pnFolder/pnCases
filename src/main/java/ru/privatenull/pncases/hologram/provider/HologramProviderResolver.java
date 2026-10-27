@@ -35,7 +35,7 @@ public final class HologramProviderResolver {
 
     public HologramProvider fancy() {
         try {
-            return new FancyHologramsProvider();
+            return new FancyHologramsProvider(plugin);
         } catch (LinkageError | RuntimeException ignored) {
             return null;
         }

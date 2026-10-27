@@ -1,7 +1,6 @@
 package ru.privatenull.pncases.cases;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
@@ -9,37 +8,41 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.Vector;
 import ru.privatenull.pncases.PnCasesPlugin;
+import ru.privatenull.pncases.cases.animation.core.AnimationAvailability;
 import ru.privatenull.pncases.cases.animation.core.AnimationCatalog;
-import ru.privatenull.pncases.cases.animation.core.AnimationSession;
-import ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation;
 import ru.privatenull.pncases.cases.config.CaseBlockCodec;
 import ru.privatenull.pncases.cases.config.CaseConfigRepository;
 import ru.privatenull.pncases.cases.config.CaseDefinitionLoader;
 import ru.privatenull.pncases.cases.model.AnimationType;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
+import ru.privatenull.pncases.cases.opening.CaseBlockKey;
+import ru.privatenull.pncases.cases.opening.CaseOpeningLocks;
+import ru.privatenull.pncases.cases.opening.OpeningCoordinator;
+import ru.privatenull.pncases.cases.opening.OpeningReservationService;
+import ru.privatenull.pncases.cases.player.PlayerAnimationPreferences;
 import ru.privatenull.pncases.cases.reward.RewardDeliveryService;
 import ru.privatenull.pncases.cases.reward.RewardPresentationService;
 import ru.privatenull.pncases.gui.GuiSession;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.InventoryViewCompat;
-import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.pnlibrary.database.DatabaseExecutor;
 import ru.privatenull.pncases.storage.CasesDatabase;
-import ru.privatenull.pnlibrary.compat.ServerVersion;
+import ru.privatenull.pncases.storage.PendingBatch;
+import ru.privatenull.pncases.support.compat.BukkitCompat.InventoryViewCompat;
+import ru.privatenull.pncases.support.database.DatabaseExecutor;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
+/**
+ * Entry point for everything case related. It owns the shared services and delegates:
+ * {@link CaseRegistry} (loaded cases), {@link CaseAdministration} (config changes),
+ * {@link OpeningCoordinator} (openings and reward delivery) and {@link KeyService} (virtual keys).
+ */
 public class CaseManager {
-
-    private static final long ANIMATION_WATCHDOG_TICKS = 20L * 120L;
-    private static final double SPECTATOR_REPEL_RADIUS = 5.0D;
-    private static final double OPENER_REPEL_RADIUS = 3.0D;
 
     public enum UnbindCaseResult {
         REMOVED,
@@ -66,6 +69,15 @@ public class CaseManager {
         RELOAD_FAILED
     }
 
+    public enum CopyCaseResult {
+        COPIED,
+        SOURCE_NOT_FOUND,
+        ALREADY_EXISTS,
+        INVALID_ID,
+        SAVE_FAILED,
+        RELOAD_FAILED
+    }
+
     public enum DeleteCaseResult {
         DELETED,
         NOT_FOUND,
@@ -80,6 +92,8 @@ public class CaseManager {
 
         void updateKeyBalance(UUID playerId, String caseId, int balance);
 
+        void showBatchResults(Player player, String caseId, List<Reward> rewards);
+
         void clearPlayer(UUID playerId);
 
         void clearCase(String caseId);
@@ -88,30 +102,23 @@ public class CaseManager {
     }
 
     private final PnCasesPlugin plugin;
-
-    private final Map<String, CaseDefinition> casesByName = new HashMap<>();
-    private final Map<BlockKey, String> caseByBlock = new HashMap<>();
-    private final Map<String, ConfigurationSection> caseSections = new HashMap<>();
-
-    private final Set<UUID> openingPlayers = ConcurrentHashMap.newKeySet();
-    private final Map<BlockKey, UUID> busyCases = new ConcurrentHashMap<>();
-    private final Map<UUID, BlockKey> selectedCaseBlocks = new ConcurrentHashMap<>();
-    private final Map<PlayerAnimationKey, AnimationType> playerAnimations = new ConcurrentHashMap<>();
-    private final Map<UUID, ActiveOpening> activeOpenings = new ConcurrentHashMap<>();
-    private final Set<UUID> pendingDeliveries = ConcurrentHashMap.newKeySet();
-
+    private final CaseRegistry registry = new CaseRegistry();
+    private final KeyBalanceCache keyBalances = new KeyBalanceCache(10_000L);
     private final AnimationCatalog animationRegistry;
+    private final AnimationAvailability animationAvailability = new AnimationAvailability();
     private final CaseConfigRepository configRepository;
     private final CaseBlockCodec blockCodec;
-    private final CaseDefinitionLoader definitionLoader;
     private final RewardPresentationService rewardPresentation;
     private final RewardDeliveryService rewardDelivery;
-    private View caseView;
     private final IdleParticleService idleParticles;
-    private final CasesDatabase database;
-    private final DatabaseExecutor databaseExecutor;
+    private final ru.privatenull.pncases.cases.proximity.ProximityAnimationService proximityAnimations;
+    private final PlayerAnimationPreferences animationPreferences;
+    private final CaseOpeningLocks openingLocks;
+    private final CaseAdministration administration;
+    private final OpeningCoordinator openings;
+    private final KeyService keys;
     private final BukkitTask openingBarrierTask;
-    private volatile boolean shuttingDown;
+    private View caseView;
 
     public CaseManager(PnCasesPlugin plugin) {
         this.plugin = plugin;
@@ -119,13 +126,32 @@ public class CaseManager {
         this.blockCodec = new CaseBlockCodec();
         this.animationRegistry = new AnimationCatalog(plugin);
         this.rewardPresentation = new RewardPresentationService(plugin);
-        this.definitionLoader = new CaseDefinitionLoader(blockCodec, rewardPresentation);
+        CaseDefinitionLoader definitionLoader = new CaseDefinitionLoader(blockCodec, rewardPresentation);
         this.idleParticles = new IdleParticleService(plugin, this);
-        this.database = plugin.getDatabase();
-        this.databaseExecutor = plugin.getDatabaseExecutor();
+        this.proximityAnimations = new ru.privatenull.pncases.cases.proximity.ProximityAnimationService(plugin, this);
+        CasesDatabase database = plugin.getDatabase();
+        DatabaseExecutor databaseExecutor = plugin.getDatabaseExecutor();
+        this.animationPreferences = new PlayerAnimationPreferences(plugin, database, databaseExecutor);
+        this.openingLocks = new CaseOpeningLocks();
         this.rewardDelivery = new RewardDeliveryService(plugin, database, rewardPresentation);
-        this.openingBarrierTask = plugin.getServer().getScheduler().runTaskTimer(
-                plugin, this::repelPlayersFromActiveCases, 1L, 2L);
+        this.keys = new KeyService(plugin, registry, database, databaseExecutor);
+        this.openings = new OpeningCoordinator(plugin, registry, openingLocks,
+                new OpeningReservationService(database, plugin.getLogger()), rewardDelivery,
+                database, databaseExecutor, animationRegistry, animationAvailability, animationPreferences, this::view);
+        this.administration = new CaseAdministration(plugin, registry, configRepository, blockCodec,
+                definitionLoader, new CaseAdministration.Effects() {
+                    @Override
+                    public void reloaded(CaseRegistry loaded) {
+                        applyReload(loaded);
+                    }
+
+                    @Override
+                    public void refreshed(CaseDefinition previous, CaseDefinition updated,
+                                          boolean refreshHologram, boolean refreshShowcase) {
+                        applyRefresh(previous, updated, refreshHologram, refreshShowcase);
+                    }
+                });
+        this.openingBarrierTask = plugin.tasks().timer(openings::repelPlayersFromActiveCases, 1L, 2L);
     }
 
     public PnCasesPlugin getPlugin() { return plugin; }
@@ -137,31 +163,26 @@ public class CaseManager {
     }
 
     public void shutdown() {
-        shuttingDown = true;
+        openings.markShuttingDown();
         openingBarrierTask.cancel();
         animationRegistry.shutdownAll();
-        for (ActiveOpening opening : new ArrayList<>(activeOpenings.values())) {
-            completeOpening(opening, false, null);
-        }
+        openings.shutdown();
         idleParticles.shutdown();
-        openingPlayers.clear();
-        busyCases.clear();
-        activeOpenings.clear();
-        casesByName.clear();
-        caseByBlock.clear();
-        caseSections.clear();
-        selectedCaseBlocks.clear();
-        playerAnimations.clear();
+        proximityAnimations.shutdown();
+        openingLocks.clear();
+        registry.clear();
+        keyBalances.clear();
+        animationPreferences.clear();
     }
 
     public void onPlayerQuit(Player player) {
         if (player == null) return;
         UUID playerId = player.getUniqueId();
-        ActiveOpening opening = activeOpenings.get(playerId);
-        if (opening != null) cancelAnimationSession(opening, false);
-        BlockKey selected = selectedCaseBlocks.remove(playerId);
-        if (selected != null) unlockCase(selected, playerId);
-        playerAnimations.keySet().removeIf(key -> key.playerId().equals(playerId));
+        openings.onPlayerQuit(playerId);
+        CaseBlockKey selected = openingLocks.clearSelection(playerId);
+        if (selected != null) openingLocks.unlock(playerId, selected);
+        animationPreferences.clearPlayer(playerId);
+        keyBalances.forget(playerId);
         if (caseView != null) caseView.clearPlayer(playerId);
         plugin.clearGuiTransition(playerId);
     }
@@ -169,75 +190,61 @@ public class CaseManager {
     public void onWorldLoad(World world) {
         if (world == null) return;
         String worldName = world.getName();
-        for (String caseName : new ArrayList<>(casesByName.keySet())) {
-            ConfigurationSection section = caseSections.get(caseName);
+        for (String caseName : new ArrayList<>(registry.names())) {
+            ConfigurationSection section = registry.section(caseName);
             if (section == null) continue;
             boolean belongsToWorld = blockCodec.readConfiguredBlocks(section).stream()
                     .map(block -> String.valueOf(block.getOrDefault("world", "")))
                     .anyMatch(worldName::equalsIgnoreCase);
-            if (belongsToWorld) refreshCaseFromConfig(caseName, true, true);
+            if (belongsToWorld) administration.refreshCaseFromConfig(caseName, true, true);
         }
     }
 
-    public List<String> getCaseNames() { return new ArrayList<>(casesByName.keySet()); }
-
-    private void repelPlayersFromActiveCases() {
-        if (activeOpenings.isEmpty()) return;
-        for (ActiveOpening opening : activeOpenings.values()) {
-            if (opening.completed.get() || opening.caseBlockLocation == null) continue;
-            World world = Bukkit.getWorld(opening.worldId);
-            if (world == null) continue;
-
-            Location center = opening.caseBlockLocation.clone().add(0.5D, 0.0D, 0.5D);
-            for (Player target : world.getPlayers()) {
-                if (!target.isOnline() || target.isDead()) continue;
-                double radius = target.getUniqueId().equals(opening.playerId)
-                        ? OPENER_REPEL_RADIUS : SPECTATOR_REPEL_RADIUS;
-                repelIfTooClose(target, center, radius);
-            }
+    public void onWorldUnload(World world) {
+        if (world == null) return;
+        try {
+            openings.onWorldUnload(world);
+        } finally {
+            idleParticles.removeWorldDisplays(world);
+            proximityAnimations.removeWorldDisplays(world);
         }
     }
 
-    private void repelIfTooClose(Player player, Location center, double radius) {
-        Location location = player.getLocation();
-        double dx = location.getX() - center.getX();
-        double dz = location.getZ() - center.getZ();
-        if (dx * dx + dz * dz >= radius * radius) return;
+    // --- registry ---
 
-        Vector outward = new Vector(dx, 0.0D, dz);
-        if (outward.lengthSquared() < 0.0001D) {
-            outward = player.getLocation().getDirection().multiply(-1.0D);
-            outward.setY(0.0D);
-        }
-        if (outward.lengthSquared() < 0.0001D) outward = new Vector(1.0D, 0.0D, 0.0D);
-        outward.normalize().multiply(0.75D).setY(0.12D);
-        player.setVelocity(outward);
-        player.setFallDistance(0.0F);
-    }
-    public List<String> getConfiguredCaseNames() {
-        return configRepository.configuredNames();
-    }
+    public List<String> getCaseNames() { return new ArrayList<>(registry.names()); }
 
-    public List<String> getKeyNames() {
-        return new ArrayList<>(new TreeSet<>(casesByName.keySet()));
-    }
+    public List<CaseDefinition> getCases() { return registry.sorted(); }
 
-    public boolean keyExists(String keyId) {
-        return keyId != null && casesByName.containsKey(keyId.toLowerCase(Locale.ROOT));
-    }
+    public List<String> getConfiguredCaseNames() { return configRepository.configuredNames(); }
 
-    public int getLoadedCaseCount() { return casesByName.size(); }
+    public List<String> getKeyNames() { return new ArrayList<>(registry.sortedNames()); }
+
+    public boolean keyExists(String keyId) { return registry.contains(keyId); }
+
+    public int getLoadedCaseCount() { return registry.size(); }
+
     public int getConfiguredKeyCount() { return getKeyNames().size(); }
 
-    public CaseDefinition getCaseByName(String name) {
-        return name == null ? null : casesByName.get(name.toLowerCase(Locale.ROOT));
-    }
-    public ConfigurationSection getCaseSection(String name) {
-        return name == null ? null : caseSections.get(name.toLowerCase(Locale.ROOT));
+    public CaseDefinition getCaseByName(String name) { return registry.byName(name); }
+
+    public ConfigurationSection getCaseSection(String name) { return registry.section(name); }
+
+    /** Whether the keys of this case may be gifted to other players. Cases are giftable unless turned off. */
+    public boolean giftable(String caseName) {
+        ConfigurationSection root = getCaseSection(caseName);
+        ConfigurationSection gift = root == null ? null : root.getConfigurationSection("gift");
+        return gift == null || gift.getBoolean("enabled", true);
     }
 
+    public CaseDefinition getCaseByBlock(Block block) { return registry.byBlock(CaseBlockKey.of(block)); }
+
+    public boolean caseExists(String caseName) { return configRepository.exists(caseName); }
+
+    // --- administration ---
+
     public boolean updateCaseConfig(String caseName, Consumer<ConfigurationSection> updater) {
-        return updateCaseConfig(caseName, updater, true, true);
+        return administration.updateCaseConfig(caseName, updater, true, true);
     }
 
     public boolean updateCaseConfig(
@@ -246,293 +253,58 @@ public class CaseManager {
             boolean refreshHologram,
             boolean refreshShowcase
     ) {
-        if (caseName == null || caseName.isBlank() || updater == null) {
-            return false;
-        }
-
-        if (!configRepository.update(caseName, updater)) return false;
-        return refreshCaseFromConfig(caseName, refreshHologram, refreshShowcase);
+        return administration.updateCaseConfig(caseName, updater, refreshHologram, refreshShowcase);
     }
 
-    public boolean caseExists(String caseName) {
-        return configRepository.exists(caseName);
-    }
+    public CopyCaseResult copyCase(String fromCase, String toCase) { return administration.copyCase(fromCase, toCase); }
 
-    public CreateCaseResult createCustomCase(String caseName) {
-        if (!CaseConfigRepository.isValidId(caseName)) return CreateCaseResult.INVALID_ID;
-        if (configRepository.exists(caseName)) return CreateCaseResult.ALREADY_EXISTS;
+    /** Number of saved changes of a case that can still be undone. */
+    public int undoDepth(String caseName) { return administration.undoDepth(caseName); }
 
-        CaseConfigRepository.CreateResult result = configRepository.create(caseName);
-        if (result == CaseConfigRepository.CreateResult.CREATED) {
-            return reloadFromConfig() ? CreateCaseResult.CREATED : CreateCaseResult.RELOAD_FAILED;
-        }
-        return CreateCaseResult.valueOf(result.name());
-    }
+    public boolean undoLastCaseChange(String caseName) { return administration.undoLastChange(caseName); }
 
-    public DeleteCaseResult deleteCase(String caseName) {
-        String normalized = CaseConfigRepository.normalizeName(caseName);
-        if (!CaseConfigRepository.isValidId(normalized) || !configRepository.exists(normalized)) {
-            return DeleteCaseResult.NOT_FOUND;
-        }
-        if (!configRepository.delete(normalized)) {
-            return DeleteCaseResult.DELETE_FAILED;
-        }
+    public CreateCaseResult createCustomCase(String caseName) { return administration.createCustomCase(caseName); }
 
-        return reloadFromConfig() ? DeleteCaseResult.DELETED : DeleteCaseResult.RELOAD_FAILED;
-    }
-
-    public CaseDefinition getCaseByBlock(Block block) {
-        String name = caseByBlock.get(BlockKey.of(block));
-        return name == null ? null : casesByName.get(name);
-    }
-
-    public AnimationCatalog getAnimationCatalog() { return animationRegistry; }
-
-    public AnimationType getPlayerAnimation(UUID uuid, String caseId) {
-        if (ServerVersion.current().isReleaseLine(1, 16)) {
-            return AnimationType.FORTUNE_RING;
-        }
-        PlayerAnimationKey key = new PlayerAnimationKey(uuid, caseId);
-        AnimationType cached = playerAnimations.putIfAbsent(key, AnimationType.ANVIL);
-        if (cached == null) {
-            databaseExecutor.completeSync(
-                    databaseExecutor.supply(uuid, () -> database.getAnimation(uuid, key.caseId())),
-                    loaded -> playerAnimations.replace(key, AnimationType.ANVIL, loaded),
-                    failure -> plugin.getLogger().log(Level.WARNING,
-                            "Не удалось загрузить выбранную анимацию игрока " + uuid + ".", failure));
-            return AnimationType.ANVIL;
-        }
-        return cached;
-    }
-
-    public void setPlayerAnimation(UUID uuid, String caseId, AnimationType type) {
-        if (type == null) return;
-        if (ServerVersion.current().isReleaseLine(1, 16)) {
-            type = AnimationType.FORTUNE_RING;
-        }
-        PlayerAnimationKey key = new PlayerAnimationKey(uuid, caseId);
-        playerAnimations.put(key, type);
-        AnimationType selected = type;
-        databaseExecutor.completeSync(
-                databaseExecutor.run(uuid, () -> database.setAnimation(uuid, key.caseId(), selected)),
-                ignored -> { },
-                failure -> plugin.getLogger().log(Level.SEVERE,
-                        "Не удалось сохранить выбранную анимацию игрока " + uuid + ".", failure));
-    }
-
-    public void warnAboutMobAnimation(Player player, AnimationType type) {
-        if (player == null || !player.hasPermission("pncases.admin")) return;
-        if (type != AnimationType.MOB_HUNT && type != AnimationType.PILLAGER_RAID) return;
-        player.sendMessage(plugin.getUi().get("animation-mob-warning-self"));
-    }
+    public DeleteCaseResult deleteCase(String caseName) { return administration.deleteCase(caseName); }
 
     public BindCaseResult bindCaseToBlock(String caseName, Block target) {
-        String normalized = CaseConfigRepository.normalizeName(caseName);
-        if (target == null || !configRepository.exists(normalized)) return BindCaseResult.NOT_FOUND;
-
-        BlockKey targetKey = BlockKey.of(target);
-        String owner;
-        try {
-            owner = configuredOwner(targetKey, normalized);
-        } catch (IllegalStateException ex) {
-            plugin.getLogger().severe(ex.getMessage());
-            return BindCaseResult.REFRESH_FAILED;
-        }
-        if (owner != null && !owner.equals(normalized)) return BindCaseResult.BLOCK_OCCUPIED;
-        if (normalized.equals(owner)) return BindCaseResult.ALREADY_BOUND;
-
-        boolean saved = configRepository.update(normalized, cs -> {
-            List<Map<String, Object>> blocks = blockCodec.readConfiguredBlocks(cs);
-            blockCodec.addBlock(blocks, Map.of(
-                    "world", target.getWorld().getName(),
-                    "x", target.getX(),
-                    "y", target.getY(),
-                    "z", target.getZ()
-            ));
-            cs.set("block", null);
-            cs.set("blocks", blocks);
-        });
-        if (!saved) return BindCaseResult.SAVE_FAILED;
-        return refreshCaseFromConfig(normalized, true, true)
-                ? BindCaseResult.BOUND
-                : BindCaseResult.REFRESH_FAILED;
-    }
-
-    private String configuredOwner(BlockKey target, String requestedCase) {
-        CaseConfigRepository.LoadResult loadResult = configRepository.loadAll();
-        if (!loadResult.successful()) {
-            throw new IllegalStateException("Нельзя привязать блок: в конфигах кейсов есть ошибки id, дубликаты или повреждённый YAML.");
-        }
-
-        String requestedOwner = null;
-        for (CaseConfigRepository.Source source : loadResult.sources()) {
-            for (Map<String, Object> configured : blockCodec.readConfiguredBlocks(source.section())) {
-                BlockKey configuredKey = blockKey(configured);
-                if (!target.equals(configuredKey)) continue;
-                if (!source.name().equals(requestedCase)) return source.name();
-                requestedOwner = source.name();
-            }
-        }
-        return requestedOwner;
-    }
-
-    private BlockKey blockKey(Map<String, Object> configured) {
-        if (configured == null) return null;
-        return new BlockKey(
-                String.valueOf(configured.getOrDefault("world", "")),
-                integer(configured.get("x")),
-                integer(configured.get("y")),
-                integer(configured.get("z"))
-        );
-    }
-
-    private int integer(Object value) {
-        if (value instanceof Number number) return number.intValue();
-        try {
-            return Integer.parseInt(String.valueOf(value));
-        } catch (RuntimeException ignored) {
-            return 0;
-        }
+        return administration.bindCaseToBlock(caseName, target);
     }
 
     public UnbindCaseResult unbindCaseFromBlock(String caseName) {
-        if (caseName == null || caseName.isBlank()) {
-            return UnbindCaseResult.NOT_FOUND;
-        }
-
-        String normalized = CaseConfigRepository.normalizeName(caseName);
-        CaseConfigRepository.Source source = configRepository.findSource(normalized);
-        if (source == null || source.section() == null) {
-            return UnbindCaseResult.NOT_FOUND;
-        }
-
-        if (blockCodec.readConfiguredBlocks(source.section()).isEmpty()) {
-            return UnbindCaseResult.NOT_BOUND;
-        }
-
-        boolean saved = configRepository.update(normalized, section -> {
-            section.set("block", null);
-            section.set("blocks", null);
-        });
-        if (!saved) return UnbindCaseResult.SAVE_FAILED;
-        return refreshCaseFromConfig(normalized, true, true)
-                ? UnbindCaseResult.REMOVED
-                : UnbindCaseResult.REFRESH_FAILED;
+        return administration.unbindCaseFromBlock(caseName);
     }
 
-    public boolean reloadFromConfig() {
-        Map<String, CaseDefinition> loadedCases = new HashMap<>();
-        Map<BlockKey, String> loadedBlocks = new HashMap<>();
-        Map<BlockKey, String> configuredBlocks = new HashMap<>();
-        Map<String, ConfigurationSection> loadedSections = new HashMap<>();
+    public boolean reloadFromConfig() { return administration.reloadFromConfig(); }
 
-        CaseConfigRepository.LoadResult loadResult = configRepository.loadAll();
-        if (!loadResult.successful()) {
-            plugin.getLogger().severe("Reload кейсов отменён: исправьте ошибки id, дубликаты или повреждённые YAML. Старые кейсы продолжают работать.");
-            return false;
-        }
-        try {
-            for (CaseConfigRepository.Source source : loadResult.sources()) {
-                ConfigurationSection section = source.section();
-                if (section == null) throw new IllegalStateException("Пустая секция кейса " + source.name());
-                CaseDefinition definition = definitionLoader.load(source.name(), section);
-                if (loadedCases.putIfAbsent(definition.name(), definition) != null) {
-                    throw new IllegalStateException("Дубликат id кейса '" + definition.name() + "'.");
-                }
-                loadedSections.put(definition.name(), section);
-                for (Map<String, Object> configured : blockCodec.readConfiguredBlocks(section)) {
-                    BlockKey blockKey = blockKey(configured);
-                    String previousOwner = configuredBlocks.putIfAbsent(blockKey, definition.name());
-                    if (previousOwner != null && !previousOwner.equals(definition.name())) {
-                        throw new IllegalStateException("Блок " + blockKey + " одновременно принадлежит кейсам '"
-                                + previousOwner + "' и '" + definition.name() + "'.");
-                    }
-                }
-                for (Location location : definition.blockLocations()) {
-                    BlockKey blockKey = BlockKey.of(location);
-                    String previousOwner = loadedBlocks.putIfAbsent(blockKey, definition.name());
-                    if (previousOwner != null && !previousOwner.equals(definition.name())) {
-                        throw new IllegalStateException("Блок " + blockKey + " одновременно принадлежит кейсам '"
-                                + previousOwner + "' и '" + definition.name() + "'.");
-                    }
-                }
-            }
-        } catch (RuntimeException ex) {
-            plugin.getLogger().severe("Reload кейсов отменён: " + ex.getMessage() + " Старые кейсы продолжают работать.");
-            return false;
-        }
-
-        casesByName.clear();
-        casesByName.putAll(loadedCases);
-        caseByBlock.clear();
-        caseByBlock.putAll(loadedBlocks);
-        caseSections.clear();
-        caseSections.putAll(loadedSections);
-
+    private void applyReload(CaseRegistry loaded) {
         var holograms = plugin.getHolograms();
         if (holograms != null) {
-            holograms.syncCases(casesByName.values());
-            hideActiveOpeningHolograms(holograms, null);
+            holograms.syncCases(loaded.all());
+            openings.hideActiveOpeningHolograms(holograms, null);
         }
-        idleParticles.syncCases(casesByName.values());
+        idleParticles.syncCases(loaded.all());
+        proximityAnimations.syncCases(loaded.all());
         if (caseView != null) caseView.clearAll();
         closePnCasesGuis(null, true);
-        plugin.getLogger().info("Loaded cases: " + casesByName.size() + ", active blocks: " + caseByBlock.size()
-                + ", virtual keys: " + casesByName.size());
-        return true;
     }
 
-    /**
-     * Applies an edit made through the machine GUI without rebuilding visuals of
-     * unrelated cases.  A full reload is reserved for /pncases reload and world
-     * discovery, where rebuilding the complete registry is intentional.
-     */
-    private boolean refreshCaseFromConfig(String caseName, boolean refreshHologram, boolean refreshShowcase) {
-        String normalized = CaseConfigRepository.normalizeName(caseName);
-        CaseConfigRepository.Source source = configRepository.findSource(normalized);
-        if (source == null || source.section() == null) {
-            return false;
-        }
-
-        CaseDefinition previous = casesByName.get(normalized);
-        CaseDefinition updated;
-        try {
-            updated = definitionLoader.load(source.name(), source.section());
-        } catch (RuntimeException ex) {
-            plugin.getLogger().severe("Не удалось обновить кейс '" + normalized + "': " + ex.getMessage());
-            return false;
-        }
-
-        List<BlockKey> previousBlocks = previous == null
-                ? List.of()
-                : previous.blockLocations().stream().map(BlockKey::of).toList();
-        List<BlockKey> newBlocks = updated.blockLocations().stream().map(BlockKey::of).toList();
-        Map<BlockKey, String> updatedBlockMap = replaceOwnedBlocks(
-                caseByBlock, normalized, previousBlocks, newBlocks);
-        if (updatedBlockMap == null) {
-            plugin.getLogger().severe("Кейс '" + normalized
-                    + "' не обновлён: один из его блоков уже принадлежит другому кейсу.");
-            return false;
-        }
-
-        caseByBlock.clear();
-        caseByBlock.putAll(updatedBlockMap);
-        casesByName.put(updated.name(), updated);
-        caseSections.put(updated.name(), source.section());
-        if (caseView != null) caseView.clearCase(normalized);
-
+    private void applyRefresh(CaseDefinition previous, CaseDefinition updated,
+                              boolean refreshHologram, boolean refreshShowcase) {
+        String name = updated.name();
+        if (caseView != null) caseView.clearCase(name);
         if (refreshHologram) {
             var holograms = plugin.getHolograms();
             if (holograms != null) {
                 holograms.refreshCase(previous, updated);
-                hideActiveOpeningHolograms(holograms, normalized);
+                openings.hideActiveOpeningHolograms(holograms, name);
             }
         }
         if (refreshShowcase) {
             idleParticles.refreshCase(previous, updated);
+            proximityAnimations.refreshCase(previous, updated);
         }
-        closePnCasesGuis(normalized, false);
-        return true;
+        closePnCasesGuis(name, false);
     }
 
     private void closePnCasesGuis(String caseName, boolean includeMachine) {
@@ -542,467 +314,133 @@ public class CaseManager {
             boolean matchingSession = holder instanceof GuiSession session
                     && (caseName == null || caseName.equalsIgnoreCase(session.caseName()))
                     && (includeMachine || !session.machine());
-            if (matchingSession) {
+            if (matchingSession || includeMachine && ru.privatenull.pncases.gui.gift.KeyGiftMenu.owns(holder)) {
                 if (plugin.getGuiOpenAnimations() != null) plugin.getGuiOpenAnimations().cancel(player);
                 player.closeInventory();
             }
         }
     }
 
-    static Map<BlockKey, String> replaceOwnedBlocks(
-            Map<BlockKey, String> current,
-            String caseName,
-            Collection<BlockKey> previous,
-            Collection<BlockKey> updated
+    // --- animations ---
+
+    public AnimationCatalog getAnimationCatalog() { return animationRegistry; }
+
+    public AnimationType getPlayerAnimation(UUID uuid, String caseId) {
+        return animationPreferences.get(uuid, caseId);
+    }
+
+    /** The case itself and, for a bundle, every case inside it: they share one animation choice. */
+    private List<String> animationTargets(String caseId) {
+        List<String> targets = new ArrayList<>();
+        targets.add(caseId);
+        CaseDefinition definition = registry.byName(caseId);
+        if (definition != null) {
+            for (CaseDefinition child : bundleCases(definition)) targets.add(child.name());
+        }
+        return targets;
+    }
+
+    public void setPlayerAnimation(UUID uuid, String caseId, AnimationType type) {
+        for (String target : animationTargets(caseId)) animationPreferences.set(uuid, target, type);
+    }
+
+    public Set<AnimationType> getPlayerFavoriteAnimations(UUID uuid, String caseId) {
+        return animationPreferences.favorites(uuid, caseId);
+    }
+
+    public void cacheAnimationPreferences(
+            UUID uuid,
+            String caseId,
+            AnimationType selected,
+            Set<AnimationType> favorites
     ) {
-        Map<BlockKey, String> candidate = new HashMap<>(current);
-        for (BlockKey block : previous) candidate.remove(block, caseName);
-        for (BlockKey block : updated) {
-            String owner = candidate.putIfAbsent(block, caseName);
-            if (owner != null && !owner.equals(caseName)) return null;
-        }
-        return candidate;
+        animationPreferences.cache(uuid, caseId, selected, favorites);
     }
 
-    public void onWorldUnload(World world) {
-        if (world == null) return;
-        UUID unloadingWorldId = world.getUID();
-
-        try {
-            // Animation instances are shared across worlds. Cleanup is therefore
-            // scoped by the tracked world instead of cancelling the whole type.
-            animationRegistry.cancelWorld(world);
-            for (ActiveOpening opening : new ArrayList<>(activeOpenings.values())) {
-                if (belongsToWorld(opening.worldId, unloadingWorldId)) {
-                    completeOpening(opening, true, unloadingWorldId);
-                }
+    public boolean togglePlayerFavoriteAnimation(UUID uuid, String caseId, AnimationType type) {
+        boolean result = animationPreferences.toggleFavorite(uuid, caseId, type);
+        List<String> targets = animationTargets(caseId);
+        for (String target : targets.subList(1, targets.size())) {
+            // The cases inside follow the bundle: the same type ends up in the same state.
+            if (animationPreferences.favorites(uuid, target).contains(type) != result) {
+                animationPreferences.toggleFavorite(uuid, target, type);
             }
-        } finally {
-            idleParticles.removeWorldDisplays(world);
         }
+        return result;
     }
+
+    public void clearPlayerFavoriteAnimations(UUID uuid, String caseId) {
+        for (String target : animationTargets(caseId)) animationPreferences.clearFavorites(uuid, target);
+    }
+
+    /**
+     * Whether {@code type} can run where the case stands: animations with real mobs need a world that is not on
+     * Peaceful and a point where mobs may appear. Other animations always can.
+     */
+    public AnimationAvailability.Availability animationAvailability(CaseDefinition definition, AnimationType type) {
+        if (definition == null) return AnimationAvailability.Availability.OK;
+        return animationAvailability.check(type, definition.blockLocation());
+    }
+
+    // --- GUI ---
 
     public ItemStack buildGuiOpenItem(Player p, CaseDefinition def) {
         return view().buildOpenButton(p, def);
     }
 
     public void updateCachedKeyBalance(UUID playerId, String caseId, int balance) {
+        keyBalances.put(playerId, caseId, balance);
         view().updateKeyBalance(playerId, caseId, Math.max(0, balance));
     }
 
+    /** Last known key balances, also used by the PlaceholderAPI placeholders. */
+    public KeyBalanceCache getKeyBalances() { return keyBalances; }
+
     public void openCaseGui(Player p, CaseDefinition def) {
-        BlockKey selected = selectedCaseBlocks.get(p.getUniqueId());
-        if (selected == null || !def.name().equals(caseByBlock.get(selected))) {
-            BlockKey fallback = def.blockLocation() == null ? null : BlockKey.of(def.blockLocation());
-            if (fallback != null && def.name().equals(caseByBlock.get(fallback))) {
-                selectedCaseBlocks.put(p.getUniqueId(), fallback);
+        CaseBlockKey selected = openingLocks.selected(p.getUniqueId());
+        if (selected == null || !registry.serves(selected, def.name())) {
+            CaseBlockKey fallback = def.blockLocation() == null ? null : CaseBlockKey.of(def.blockLocation());
+            if (fallback != null && registry.serves(fallback, def.name())) {
+                openingLocks.select(p.getUniqueId(), fallback);
             } else {
-                selectedCaseBlocks.remove(p.getUniqueId());
+                openingLocks.clearSelection(p.getUniqueId());
             }
         }
-        view().open(p, def);
+        view().open(p, menuCase(p, def));
+    }
+
+    /**
+     * The case whose menu shows {@code def}: a case inside a bundle is picked in the menu of the bundle, so
+     * "back" from its rewards, quantity and animation screens returns there. Otherwise it is {@code def}.
+     */
+    private CaseDefinition menuCase(Player p, CaseDefinition def) {
+        CaseBlockKey selected = openingLocks.selected(p.getUniqueId());
+        String owner = selected == null ? null : registry.ownerOf(selected);
+        if (owner == null || owner.equals(def.name()) || !registry.serves(selected, def.name())) return def;
+        CaseDefinition bundle = registry.byName(owner);
+        return bundle == null || bundleCases(bundle).isEmpty() ? def : bundle;
     }
 
     public void openCaseGui(Player p, CaseDefinition def, Block sourceBlock) {
         if (sourceBlock != null) {
-            BlockKey source = BlockKey.of(sourceBlock);
-            if (def.name().equals(caseByBlock.get(source))) {
-                selectedCaseBlocks.put(p.getUniqueId(), source);
+            CaseBlockKey source = CaseBlockKey.of(sourceBlock);
+            if (registry.serves(source, def.name())) {
+                openingLocks.select(p.getUniqueId(), source);
             }
         }
         openCaseGui(p, def);
     }
 
-    public void tryOpenCase(Player p, CaseDefinition def) {
-        UUID playerId = p.getUniqueId();
-        if (openingPlayers.contains(playerId) || pendingDeliveries.contains(playerId)) {
-            p.sendMessage(plugin.getUi().get("already-opening"));
-            return;
+    // --- bundle cases ---
+
+    /** The cases a bundle lists that are loaded right now, in the order of the bundle. */
+    public List<CaseDefinition> bundleCases(CaseDefinition bundle) {
+        List<CaseDefinition> cases = new ArrayList<>();
+        for (String child : bundle.children()) {
+            CaseDefinition definition = registry.byName(child);
+            if (definition != null) cases.add(definition);
         }
-        BlockKey sourceBlock = selectedBlockKey(p, def);
-        PreparedOpening prepared = prepareOpening(p, def, sourceBlock);
-        if (prepared == null) {
-            releaseOpeningState(p.getUniqueId(), sourceBlock);
-            return;
-        }
-        if (!tryLockCase(p, sourceBlock)) {
-            p.sendMessage(plugin.getUi().get("case-busy"));
-            return;
-        }
-        openingPlayers.add(playerId);
-        databaseExecutor.completeSync(
-                databaseExecutor.supply(playerId,
-                        () -> database.reserveOpening(playerId, def.name(), prepared.reward)),
-                result -> finishOpeningReservation(p, def, sourceBlock, prepared, result),
-                failure -> {
-                    releaseOpeningState(playerId, sourceBlock);
-                    plugin.getLogger().log(Level.SEVERE,
-                            "Не удалось подготовить storage для открытия игрока " + p.getName() + ".", failure);
-                    if (p.isOnline()) p.sendMessage(plugin.getUi().get("case-open-storage-error"));
-                });
-    }
-
-    private void finishOpeningReservation(
-            Player player,
-            CaseDefinition definition,
-            BlockKey sourceBlock,
-            PreparedOpening prepared,
-            CasesDatabase.OpeningReservation reservation
-    ) {
-        UUID playerId = player.getUniqueId();
-        if (!player.isOnline() || shuttingDown || !plugin.isEnabled()) {
-            // A ready reservation already owns a durable pending reward. Keep it
-            // for the join recovery path instead of refunding the consumed key.
-            releaseOpeningState(playerId, sourceBlock);
-            return;
-        }
-        if (reservation.pendingReward() != null) {
-            releaseOpeningState(playerId, sourceBlock);
-            player.sendMessage(plugin.getUi().get("pending-reward-wait"));
-            deliverPendingRewardAsync(player, ignored -> { });
-            return;
-        }
-        if (!reservation.reserved()) {
-            releaseOpeningState(playerId, sourceBlock);
-            player.sendMessage(plugin.getUi().get("not-enough-keys",
-                    "need", "1", "have", String.valueOf(reservation.balance())));
-            return;
-        }
-        CostReceipt cost = CostReceipt.key(definition.name());
-        try {
-            player.closeInventory();
-        } catch (RuntimeException exception) {
-            cancelReservationAsync(playerId, cost);
-            releaseOpeningState(playerId, sourceBlock);
-            plugin.getLogger().log(Level.WARNING,
-                    "Не удалось закрыть GUI перед открытием кейса игроку " + player.getName() + ".", exception);
-            return;
-        }
-        startAnimationAndReward(player, definition, sourceBlock, prepared, cost);
-    }
-
-    private PreparedOpening prepareOpening(Player p, CaseDefinition def, BlockKey sourceBlock) {
-        UUID playerId = p.getUniqueId();
-        if (sourceBlock == null || !def.name().equals(caseByBlock.get(sourceBlock))) {
-            return null;
-        }
-        Location sourceLocation = locationFromBlockKey(sourceBlock);
-        if (sourceLocation == null) {
-            return null;
-        }
-
-        Location caseBlockLocation = sourceLocation.clone();
-        Location base = sourceLocation.clone().add(0.5, 0.0, 0.5);
-        World w = base.getWorld();
-        if (w == null) {
-            return null;
-        }
-
-        Reward finalReward;
-        AbstractCaseAnimation animation;
-        try {
-            finalReward = Reward.select(def.rewards());
-            AnimationType animationType = def.fixedAnimation() == null
-                    ? getPlayerAnimation(playerId, def.name())
-                    : def.fixedAnimation();
-            if (ServerVersion.current().isReleaseLine(1, 16)) {
-                animationType = AnimationType.FORTUNE_RING;
-            }
-            animation = animationRegistry.get(animationType);
-            if (animation == null) {
-                throw new IllegalStateException("Animation is not registered: " + animationType);
-            }
-        } catch (RuntimeException | LinkageError exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "Не удалось подготовить анимацию кейса '" + def.name() + "'.", exception);
-            return null;
-        }
-
-        return new PreparedOpening(finalReward, animation, base, caseBlockLocation, w.getUID());
-    }
-
-    private boolean startAnimationAndReward(
-            Player p,
-            CaseDefinition def,
-            BlockKey sourceBlock,
-            PreparedOpening prepared,
-            CostReceipt cost
-    ) {
-        UUID playerId = p.getUniqueId();
-        ActiveOpening opening = new ActiveOpening(
-                playerId,
-                p,
-                def,
-                prepared.reward,
-                sourceBlock,
-                prepared.caseBlockLocation,
-                prepared.worldId
-        );
-        ActiveOpening previous = activeOpenings.putIfAbsent(playerId, opening);
-        if (previous != null) {
-            plugin.getLogger().severe("Повторный активный сеанс открытия для игрока " + p.getName()
-                    + " был отклонён.");
-            cancelReservationAsync(playerId, cost);
-            if (!Objects.equals(previous.sourceBlock, sourceBlock)) {
-                selectedCaseBlocks.remove(playerId, sourceBlock);
-                unlockCase(sourceBlock, playerId);
-            }
-            p.sendMessage(plugin.getUi().get("already-opening"));
-            return false;
-        }
-        openingPlayers.add(playerId);
-        opening.pendingStored = true;
-        Runnable completion = () -> completeOpening(opening, true, null);
-
-        try {
-            var holograms = plugin.getHolograms();
-            if (holograms != null) {
-                holograms.hideCase(def, prepared.caseBlockLocation);
-                opening.hologramHidden = true;
-            }
-            opening.watchdog = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                if (opening.completed.get()) return;
-                plugin.getLogger().warning("Анимация кейса '" + opening.caseName
-                        + "' не завершилась вовремя; выполняется безопасная отмена.");
-                cancelAnimationSession(opening, true);
-            }, ANIMATION_WATCHDOG_TICKS);
-        } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "Не удалось запустить окружение анимации кейса '" + def.name() + "'.", exception);
-            completeOpening(opening, true, null);
-            return true;
-        }
-
-        try {
-            opening.animationRun = prepared.animation.play(
-                    p, def, prepared.reward, prepared.base, completion);
-        } catch (RuntimeException | LinkageError exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "Анимация кейса '" + def.name() + "' аварийно остановлена.", exception);
-            cancelAnimationSession(opening, true);
-        }
-        return true;
-    }
-
-    /**
-     * Delivers a reward left by a previous interrupted opening. A new opening
-     * must never overwrite that single pending-reward slot.
-     */
-    public void deliverPendingRewardAsync(Player player, Consumer<Boolean> completion) {
-        if (player == null || !player.isOnline() || shuttingDown || !plugin.isEnabled()) {
-            completion.accept(false);
-            return;
-        }
-        UUID playerId = player.getUniqueId();
-        if (pendingDeliveryBlocked(activeOpenings.containsKey(playerId), openingPlayers.contains(playerId))
-                || !pendingDeliveries.add(playerId)) {
-            completion.accept(false);
-            return;
-        }
-        databaseExecutor.completeSync(
-                databaseExecutor.supply(playerId, () -> database.loadPending(playerId)),
-                pending -> {
-                    if (pending == null) {
-                        pendingDeliveries.remove(playerId);
-                        completion.accept(true);
-                        return;
-                    }
-                    boolean delivered;
-                    try {
-                        delivered = player.isOnline() && giveReward(player, pending);
-                    } catch (RuntimeException exception) {
-                        delivered = false;
-                        plugin.getLogger().log(Level.SEVERE,
-                                "Не удалось выдать отложенную награду игроку " + player.getName() + ".", exception);
-                    }
-                    if (!delivered) {
-                        pendingDeliveries.remove(playerId);
-                        completion.accept(false);
-                        return;
-                    }
-                    clearDeliveredPending(playerId, player.getName(),
-                            () -> completion.accept(true),
-                            () -> completion.accept(false), 0);
-                },
-                failure -> {
-                    pendingDeliveries.remove(playerId);
-                    plugin.getLogger().log(Level.SEVERE,
-                            "Не удалось проверить отложенную награду игрока " + player.getName() + ".", failure);
-                    completion.accept(false);
-                });
-    }
-
-    static boolean pendingDeliveryBlocked(boolean activeOpening, boolean markedOpening) {
-        return activeOpening || markedOpening;
-    }
-
-    static boolean belongsToWorld(UUID sessionWorldId, UUID targetWorldId) {
-        return sessionWorldId != null && sessionWorldId.equals(targetWorldId);
-    }
-
-    private void cancelAnimationSession(ActiveOpening opening, boolean deliverReward) {
-        if (opening == null) return;
-        try {
-            if (opening.animationRun != null) opening.animationRun.cancel();
-        } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Не удалось полностью отменить анимацию кейса.", exception);
-        }
-        completeOpening(opening, deliverReward, null);
-    }
-
-    private void completeOpening(ActiveOpening opening, boolean deliverReward, UUID unloadingWorldId) {
-        if (opening == null || !opening.completed.compareAndSet(false, true)) return;
-
-        boolean delivered = false;
-        try {
-            boolean mayDeliver = deliverReward
-                    && !shuttingDown
-                    && plugin.isEnabled()
-                    && opening.player.isOnline();
-            delivered = mayDeliver && giveReward(opening.player, opening.definition, opening.reward);
-        } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "Не удалось завершить выдачу награды игроку " + opening.player.getName()
-                            + "; награда оставлена в pending storage.", exception);
-        }
-        if (delivered && opening.pendingStored && !shuttingDown && plugin.isEnabled()) {
-            pendingDeliveries.add(opening.playerId);
-            clearDeliveredPending(opening.playerId, opening.player.getName(),
-                    () -> finalizeOpening(opening, unloadingWorldId),
-                    () -> finalizeOpening(opening, unloadingWorldId), 0);
-            return;
-        }
-        finalizeOpening(opening, unloadingWorldId);
-    }
-
-    /**
-     * A delivered reward must not become deliverable again just because the
-     * database had a short outage while acknowledging it. The player remains
-     * locked until the acknowledgement succeeds or the plugin is restarted.
-     */
-    private void clearDeliveredPending(
-            UUID playerId,
-            String playerName,
-            Runnable success,
-            Runnable exhausted,
-            int attempt
-    ) {
-        databaseExecutor.completeSync(
-                databaseExecutor.run(playerId, () -> database.clearPending(playerId)),
-                ignored -> {
-                    pendingDeliveries.remove(playerId);
-                    success.run();
-                },
-                failure -> {
-                    int nextAttempt = attempt + 1;
-                    if (nextAttempt < 4 && !shuttingDown && plugin.isEnabled()) {
-                        long delay = switch (nextAttempt) {
-                            case 1 -> 20L;
-                            case 2 -> 60L;
-                            default -> 200L;
-                        };
-                        plugin.getServer().getScheduler().runTaskLater(plugin,
-                                () -> clearDeliveredPending(playerId, playerName, success, exhausted, nextAttempt),
-                                delay);
-                        return;
-                    }
-                    plugin.getLogger().log(Level.SEVERE,
-                            "Награда уже выдана, но pending-запись не удалось очистить для "
-                                    + playerName + " после " + (attempt + 1) + " попыток. "
-                                    + "Повторная выдача заблокирована до перезапуска.", failure);
-                    exhausted.run();
-                });
-    }
-
-    private void finalizeOpening(ActiveOpening opening, UUID unloadingWorldId) {
-        BukkitTask watchdog = opening.watchdog;
-        if (watchdog != null) {
-            try {
-                watchdog.cancel();
-            } catch (RuntimeException ignored) {
-            }
-        }
-        activeOpenings.remove(opening.playerId, opening);
-        releaseOpeningState(opening.playerId, opening.sourceBlock);
-        restoreOpeningHologram(opening, unloadingWorldId);
-    }
-
-    private void restoreOpeningHologram(ActiveOpening opening, UUID unloadingWorldId) {
-        if (!opening.hologramHidden || shuttingDown) return;
-        if (unloadingWorldId != null && unloadingWorldId.equals(opening.worldId)) return;
-        World loadedWorld = Bukkit.getWorld(opening.worldId);
-        if (loadedWorld == null) return;
-
-        CaseDefinition current = getCaseByName(opening.caseName);
-        if (current == null || !opening.caseName.equals(caseByBlock.get(opening.sourceBlock))) return;
-
-        var holograms = plugin.getHolograms();
-        if (holograms == null) return;
-        try {
-            Location currentLocation = new Location(loadedWorld,
-                    opening.sourceBlock.x(), opening.sourceBlock.y(), opening.sourceBlock.z());
-            holograms.showCase(current, currentLocation);
-        } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.WARNING,
-                    "Не удалось восстановить голограмму кейса '" + opening.caseName + "'.", exception);
-        }
-    }
-
-    private void hideActiveOpeningHolograms(
-            ru.privatenull.pncases.hologram.CaseHologramManager holograms,
-            String onlyCaseName
-    ) {
-        if (holograms == null) return;
-        for (ActiveOpening opening : new ArrayList<>(activeOpenings.values())) {
-            if (opening.completed.get() || !opening.hologramHidden) continue;
-            if (onlyCaseName != null && !onlyCaseName.equals(opening.caseName)) continue;
-            if (!opening.caseName.equals(caseByBlock.get(opening.sourceBlock))) continue;
-
-            CaseDefinition current = getCaseByName(opening.caseName);
-            World world = Bukkit.getWorld(opening.worldId);
-            if (current == null || world == null) continue;
-            Location location = new Location(world,
-                    opening.sourceBlock.x(), opening.sourceBlock.y(), opening.sourceBlock.z());
-            holograms.hideCase(current, location);
-        }
-    }
-
-    public void giveKey(Player p, String keyId, int amount) {
-        if (amount <= 0) return;
-        UUID playerId = p.getUniqueId();
-        String normalizedKey = keyId.toLowerCase(Locale.ROOT);
-        databaseExecutor.completeSync(
-                databaseExecutor.supply(playerId, () -> {
-                    database.addKeys(playerId, normalizedKey, amount);
-                    return database.getKeys(playerId, normalizedKey);
-                }),
-                balance -> updateCachedKeyBalance(playerId, normalizedKey, balance),
-                failure -> plugin.getLogger().log(Level.SEVERE,
-                        "Не удалось выдать ключи игроку " + p.getName() + ".", failure));
-    }
-
-    public String getKeyDisplayName(String keyId) {
-        if (keyId == null || keyId.isBlank()) {
-            return "";
-        }
-        String normalized = keyId.toLowerCase(Locale.ROOT);
-        CaseDefinition matchingCase = casesByName.get(normalized);
-        if (matchingCase != null) {
-            return color(matchingCase.displayName());
-        }
-        return humanizeKeyName(keyId);
-    }
-
-    public boolean giveReward(Player p, Reward reward) {
-        return rewardDelivery.deliver(p, null, reward);
-    }
-
-    public boolean giveReward(Player p, CaseDefinition def, Reward reward) {
-        return rewardDelivery.deliver(p, def, reward);
-    }
-
-    private String color(String s) {
-        return ColorUtil.colorize(s);
+        return cases;
     }
 
     private View view() {
@@ -1012,162 +450,68 @@ public class CaseManager {
         return caseView;
     }
 
-    private String humanizeKeyName(String keyId) {
-        return keyId == null || keyId.isBlank() ? "" : "&f" + keyId.replace('_', ' ');
+    // --- openings and rewards ---
+
+    public void tryOpenCase(Player p, CaseDefinition def) { openings.tryOpenCases(p, def, 1); }
+
+    public void tryOpenCases(Player player, CaseDefinition definition, int amount) {
+        openings.tryOpenCases(player, definition, amount);
     }
 
-    public boolean isOpening(UUID playerId) { return openingPlayers.contains(playerId); }
+    static PendingBatch selectBatch(CaseDefinition definition, int progress, int amount) {
+        return OpeningReservationService.selectBatch(definition, progress, amount);
+    }
+
+    public void deliverPendingRewardAsync(Player player, Consumer<Boolean> completion) {
+        openings.deliverPendingRewardAsync(player, completion);
+    }
+
+    public boolean giveReward(Player p, Reward reward) { return rewardDelivery.deliver(p, null, reward); }
+
+    public boolean giveReward(Player p, CaseDefinition def, Reward reward) {
+        return rewardDelivery.deliver(p, def, reward);
+    }
+
+    // --- keys ---
+
+    public void giveKey(Player p, String keyId, int amount) {
+        keys.give(p, keyId, amount, balance -> updateCachedKeyBalance(p.getUniqueId(), keyId.toLowerCase(java.util.Locale.ROOT), balance));
+    }
+
+    /** Gives keys and runs {@code onDone} on the main thread when they are stored, or {@code onFailure} when not. */
+    public void giveKey(Player p, String keyId, int amount, Runnable onDone,
+                        java.util.function.Consumer<Throwable> onFailure) {
+        String id = keyId.toLowerCase(java.util.Locale.ROOT);
+        keys.give(p, id, amount, balance -> {
+            updateCachedKeyBalance(p.getUniqueId(), id, balance);
+            onDone.run();
+        }, onFailure);
+    }
+
+    public String getKeyDisplayName(String keyId) { return keys.displayName(keyId); }
+
+    /** All key recipes of a case, in the order they are written; empty when the case has none. */
+    public java.util.List<ru.privatenull.pncases.workbench.WorkbenchRecipe> workbenchRecipes(String caseName) {
+        ConfigurationSection root = getCaseSection(caseName);
+        return ru.privatenull.pncases.workbench.WorkbenchRecipe.readAll(
+                root == null ? null : root.getConfigurationSection("workbench"));
+    }
+
+    // --- busy state ---
+
+    public boolean isOpening(UUID playerId) { return openingLocks.isOpening(playerId); }
 
     public boolean isCaseBusy(CaseDefinition def, UUID viewer) {
-        BlockKey key = def.blockLocation() == null ? null : BlockKey.of(def.blockLocation());
-        return isCaseBusy(key, viewer);
+        CaseBlockKey key = def.blockLocation() == null ? null : CaseBlockKey.of(def.blockLocation());
+        return openingLocks.isBusy(key, viewer);
     }
 
     public boolean isCaseBusy(CaseDefinition def, UUID viewer, Block block) {
-        BlockKey key = block == null ? null : BlockKey.of(block);
-        return isCaseBusy(key, viewer);
+        CaseBlockKey key = block == null ? null : CaseBlockKey.of(block);
+        return openingLocks.isBusy(key, viewer);
     }
 
-    public boolean isCaseBlockBusy(Location blockLocation) {
-        return blockLocation != null && busyCases.containsKey(BlockKey.of(blockLocation));
-    }
-
-    private boolean isCaseBusy(BlockKey key, UUID viewer) {
-        if (key == null) return false;
-        UUID who = busyCases.get(key);
-        return who != null && !who.equals(viewer);
-    }
-
-    private boolean tryLockCase(Player p, BlockKey key) {
-        if (key == null) return false;
-        UUID prev = busyCases.putIfAbsent(key, p.getUniqueId());
-        return prev == null || prev.equals(p.getUniqueId());
-    }
-
-    private void unlockCase(BlockKey key, UUID owner) {
-        if (key != null && owner != null) {
-            busyCases.remove(key, owner);
-        }
-    }
-
-    private void releaseOpeningState(UUID playerId, BlockKey sourceBlock) {
-        openingPlayers.remove(playerId);
-        if (sourceBlock != null) {
-            selectedCaseBlocks.remove(playerId, sourceBlock);
-            unlockCase(sourceBlock, playerId);
-        } else {
-            selectedCaseBlocks.remove(playerId);
-        }
-    }
-
-    private BlockKey selectedBlockKey(Player player, CaseDefinition def) {
-        BlockKey selected = selectedCaseBlocks.get(player.getUniqueId());
-        if (selected != null && def.name().equals(caseByBlock.get(selected))) {
-            return selected;
-        }
-        if (selected != null) selectedCaseBlocks.remove(player.getUniqueId(), selected);
-        BlockKey fallback = def.blockLocation() == null ? null : BlockKey.of(def.blockLocation());
-        return fallback != null && def.name().equals(caseByBlock.get(fallback)) ? fallback : null;
-    }
-
-    private Location locationFromBlockKey(BlockKey key) {
-        if (key == null) {
-            return null;
-        }
-        World world = Bukkit.getWorld(key.world());
-        return world == null ? null : new Location(world, key.x(), key.y(), key.z());
-    }
-
-    private void refundCostAsync(UUID playerId, CostReceipt receipt) {
-        if (playerId == null || receipt == null || !receipt.refunded.compareAndSet(false, true)) return;
-        databaseExecutor.completeSync(
-                databaseExecutor.run(playerId, () -> database.addKeys(playerId, receipt.keyId, 1)),
-                ignored -> { },
-                failure -> plugin.getLogger().log(Level.SEVERE,
-                        "Не удалось вернуть стоимость открытия игроку " + playerId + ".", failure));
-    }
-
-    private void cancelReservationAsync(UUID playerId, CostReceipt receipt) {
-        if (playerId == null || receipt == null || !receipt.refunded.compareAndSet(false, true)) return;
-        databaseExecutor.completeSync(
-                databaseExecutor.run(playerId, () -> {
-                    database.cancelOpening(playerId, receipt.keyId);
-                }),
-                ignored -> { },
-                failure -> plugin.getLogger().log(Level.SEVERE,
-                        "Не удалось отменить резерв открытия игрока " + playerId + ".", failure));
-    }
-
-    private record PreparedOpening(
-            Reward reward,
-            AbstractCaseAnimation animation,
-            Location base,
-            Location caseBlockLocation,
-            UUID worldId
-    ) {
-    }
-
-    private record PlayerAnimationKey(UUID playerId, String caseId) {
-        private PlayerAnimationKey {
-            Objects.requireNonNull(playerId, "playerId");
-            caseId = CaseConfigRepository.normalizeName(caseId);
-        }
-    }
-
-    private static final class CostReceipt {
-        private final String keyId;
-        private final AtomicBoolean refunded = new AtomicBoolean();
-
-        private CostReceipt(String keyId) {
-            this.keyId = keyId;
-        }
-
-        private static CostReceipt key(String keyId) {
-            return new CostReceipt(keyId);
-        }
-    }
-
-    private static final class ActiveOpening {
-        private final UUID playerId;
-        private final Player player;
-        private final CaseDefinition definition;
-        private final String caseName;
-        private final Reward reward;
-        private final BlockKey sourceBlock;
-        private final Location caseBlockLocation;
-        private final UUID worldId;
-        private final AtomicBoolean completed = new AtomicBoolean();
-        private volatile BukkitTask watchdog;
-        private volatile AnimationSession animationRun;
-        private volatile boolean pendingStored;
-        private volatile boolean hologramHidden;
-
-        private ActiveOpening(
-                UUID playerId,
-                Player player,
-                CaseDefinition definition,
-                Reward reward,
-                BlockKey sourceBlock,
-                Location caseBlockLocation,
-                UUID worldId
-        ) {
-            this.playerId = playerId;
-            this.player = player;
-            this.definition = definition;
-            this.caseName = definition.name();
-            this.reward = reward;
-            this.sourceBlock = sourceBlock;
-            this.caseBlockLocation = caseBlockLocation;
-            this.worldId = worldId;
-        }
-    }
-
-    public record BlockKey(String world, int x, int y, int z) {
-        public BlockKey {
-            world = world == null ? "" : world.toLowerCase(Locale.ROOT);
-        }
-
-        public static BlockKey of(Block b) { return new BlockKey(b.getWorld().getName(), b.getX(), b.getY(), b.getZ()); }
-        public static BlockKey of(Location l) { return new BlockKey(l.getWorld().getName(), l.getBlockX(), l.getBlockY(), l.getBlockZ()); }
+    public boolean isCaseBlockBusy(org.bukkit.Location blockLocation) {
+        return blockLocation != null && openingLocks.isBusy(CaseBlockKey.of(blockLocation));
     }
 }

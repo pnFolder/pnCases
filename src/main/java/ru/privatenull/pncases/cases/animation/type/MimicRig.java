@@ -15,7 +15,7 @@ import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -299,7 +299,7 @@ final class MimicRig {
     }
 
     private static void dust(World world, Location location, Particle.DustOptions color) {
-        AnimationParticles.dust(world, particle(DUST), location, 1,
+        AnimationEffects.dust(world, particle(DUST), location, 1,
                 0.0, 0.0, 0.0, 0.0, color);
     }
 

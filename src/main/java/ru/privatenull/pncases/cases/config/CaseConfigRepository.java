@@ -6,7 +6,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import ru.privatenull.pncases.PnCasesPlugin;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
-import ru.privatenull.pnlibrary.config.AtomicYamlStore;
+import ru.privatenull.pncases.support.config.AtomicYamlStore;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,13 +33,16 @@ public final class CaseConfigRepository {
             "# {levels} — цена покупки ключа в уровнях опыта.",
             "# {left-click} — актуальное действие при нажатии ЛКМ.",
             "# {right-click} — актуальное действие при нажатии ПКМ.",
-            "# {left_action}, {right_action} — короткие названия этих действий.",
+            "# {bulk-click} — актуальное действие при Shift + ПКМ.",
+            "# {left_action}, {right_action}, {bulk_action} — короткие названия этих действий.",
             "#",
             "# Плейсхолдеры наград, сообщений и команд:",
             "# {player} — имя игрока, открывшего кейс.",
             "# {uuid} — UUID игрока, открывшего кейс.",
             "# {reward} — отображаемое название выпавшей награды.",
             "# {amount} — количество валюты, поинтов или предметов в награде.",
+            "# {money}, {points} — сумма Vault или PlayerPoints.",
+            "# {group}, {permission}, {duration} — данные награды LuckPerms.",
             "# {player}, {case}, {case_id}, {reward} также доступны в broadcast.lines.",
             "#",
             "# Доступные редкости rewards[].rarity:",
@@ -65,7 +68,16 @@ public final class CaseConfigRepository {
         SAVE_FAILED
     }
 
+    public enum CopyResult {
+        COPIED,
+        SOURCE_NOT_FOUND,
+        ALREADY_EXISTS,
+        INVALID_ID,
+        SAVE_FAILED
+    }
+
     private final PnCasesPlugin plugin;
+    private final ConfigHistory history = new ConfigHistory(10);
 
     public CaseConfigRepository(PnCasesPlugin plugin) {
         this.plugin = plugin;
@@ -100,8 +112,35 @@ public final class CaseConfigRepository {
             plugin.getLogger().severe("Не удалось изменить конфиг кейса '" + normalizeName(caseName) + "': " + ex.getMessage());
             return false;
         }
-        if (save(writable)) return true;
+        if (save(writable)) {
+            history.push(normalizeName(caseName), before);
+            return true;
+        }
         restoreSection(writable.section(), before);
+        return false;
+    }
+
+    /** How many saved changes of the case can be undone. */
+    public int undoDepth(String caseName) {
+        return history.depth(normalizeName(caseName));
+    }
+
+    /**
+     * Restores the case file to the state before its last saved change. Returns false when there is
+     * nothing to undo or the file could not be written; in that case the history is left unchanged.
+     */
+    public boolean undo(String caseName) {
+        String normalized = normalizeName(caseName);
+        Map<String, Object> snapshot = history.pop(normalized);
+        if (snapshot == null) return false;
+        Writable writable = writable(normalized);
+        if (writable == null || writable.section() == null) {
+            history.push(normalized, snapshot);
+            return false;
+        }
+        restoreSection(writable.section(), snapshot);
+        if (save(writable)) return true;
+        history.push(normalized, snapshot);
         return false;
     }
 
@@ -119,6 +158,30 @@ public final class CaseConfigRepository {
         File target = file(normalized);
         YamlConfiguration yaml = defaultConfiguration(normalized);
         return saveYamlAtomically(yaml, target) ? CreateResult.CREATED : CreateResult.SAVE_FAILED;
+    }
+
+    /** Copies the settings of a case into a new case that is not bound to any block yet. */
+    public CopyResult copy(String fromCase, String toCase) {
+        String target = normalizeName(toCase);
+        if (!isValidId(target)) return CopyResult.INVALID_ID;
+        if (exists(target)) return CopyResult.ALREADY_EXISTS;
+        Source source = findSource(fromCase);
+        if (source == null || source.section() == null) return CopyResult.SOURCE_NOT_FOUND;
+
+        File directory = directory();
+        if (!directory.exists() && !directory.mkdirs()) return CopyResult.SAVE_FAILED;
+        YamlConfiguration yaml = new YamlConfiguration();
+        restoreSection(yaml, copiedValues(snapshotSection(source.section()), target));
+        return saveYamlAtomically(yaml, file(target)) ? CopyResult.COPIED : CopyResult.SAVE_FAILED;
+    }
+
+    /** Settings of a copy: everything except the bound blocks, with the id of the new case. */
+    static Map<String, Object> copiedValues(Map<String, Object> source, String targetId) {
+        Map<String, Object> values = new LinkedHashMap<>(source);
+        values.remove("block");
+        values.put("blocks", new ArrayList<>());
+        if (values.containsKey("id")) values.put("id", targetId);
+        return values;
     }
 
     public List<Source> loadSources() {
@@ -195,6 +258,7 @@ public final class CaseConfigRepository {
     public boolean delete(String caseName) {
         File caseFile = existingCaseFile(normalizeName(caseName));
         if (caseFile == null) return false;
+        history.clear(normalizeName(caseName));
         try {
             return Files.deleteIfExists(caseFile.toPath());
         } catch (IOException ex) {
@@ -514,6 +578,7 @@ public final class CaseConfigRepository {
                 "",
                 " &#FFB347[&#FFA43C Л&#FF9536К&#FF8630М &#FF772A] &f{left_action}",
                 " &#FF8A8A[&#FF7979 П&#F96868К&#F25757М &#EB4646] &f{right_action}",
+                " &#FFB347[&#FFA43C SHIFT + ПКМ &#FF772A] &f{bulk_action}",
                 ""
         ));
         ConfigurationSection insufficientKeys = gui.createSection("insufficient-keys");

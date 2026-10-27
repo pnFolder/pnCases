@@ -8,7 +8,19 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class Reward {
 
-    public enum Type { ITEM, LUCKPERMS, VAULT, PLAYERPOINTS, PERSONAL }
+    public enum Type {
+        ITEM, LUCKPERMS, VAULT, PLAYERPOINTS, PERSONAL;
+
+        /** Type read from storage; a missing or unknown value falls back to ITEM. */
+        public static Type fromStored(String value) {
+            if (value == null) return ITEM;
+            try {
+                return valueOf(value);
+            } catch (IllegalArgumentException ignored) {
+                return ITEM;
+            }
+        }
+    }
 
     public enum Rarity {
         COMMON("Обычная", "§7"),
@@ -70,6 +82,7 @@ public class Reward {
     private final double vaultAmount;
     private final int playerPointsAmount;
     private final String command;
+    private final List<String> commands;
     private final String message;
     private final String displayName;
     private final Rarity rarity;
@@ -113,7 +126,7 @@ public class Reward {
             Rarity rarity
     ) {
         this(chance, type, item, lpGroup, lpNode, lpDuration, vaultAmount, playerPointsAmount,
-                message, displayName, rarity, rarity == null ? null : rarity.name(), item, null);
+                message, displayName, rarity, rarity == null ? null : rarity.name(), item, null, null);
     }
 
     public Reward(
@@ -130,7 +143,7 @@ public class Reward {
             String rarityId
     ) {
         this(chance, type, item, lpGroup, lpNode, lpDuration, vaultAmount, playerPointsAmount,
-                message, displayName, Rarity.parse(rarityId, chance), rarityId, item, null);
+                message, displayName, Rarity.parse(rarityId, chance), rarityId, item, null, null);
     }
 
     public Reward(
@@ -167,7 +180,27 @@ public class Reward {
             String command
     ) {
         this(chance, type, item, lpGroup, lpNode, lpDuration, vaultAmount, playerPointsAmount,
-                message, displayName, Rarity.parse(rarityId, chance), rarityId, visualItem, command);
+                message, displayName, Rarity.parse(rarityId, chance), rarityId, visualItem, command, null);
+    }
+
+    public Reward(
+            int chance,
+            Type type,
+            ItemStack item,
+            String lpGroup,
+            String lpNode,
+            String lpDuration,
+            double vaultAmount,
+            int playerPointsAmount,
+            String message,
+            String displayName,
+            String rarityId,
+            ItemStack visualItem,
+            String command,
+            List<String> commands
+    ) {
+        this(chance, type, item, lpGroup, lpNode, lpDuration, vaultAmount, playerPointsAmount,
+                message, displayName, Rarity.parse(rarityId, chance), rarityId, visualItem, command, commands);
     }
 
     private Reward(
@@ -184,7 +217,8 @@ public class Reward {
             Rarity rarity,
             String rarityId,
             ItemStack visualItem,
-            String command
+            String command,
+            List<String> commands
     ) {
         this.chance = chance;
         this.type = type;
@@ -195,7 +229,8 @@ public class Reward {
         this.lpDuration = lpDuration;
         this.vaultAmount = vaultAmount;
         this.playerPointsAmount = playerPointsAmount;
-        this.command = command;
+        this.commands = normalizeCommands(command, commands);
+        this.command = this.commands.isEmpty() ? null : this.commands.get(0);
         this.message = message;
         this.displayName = displayName;
         this.rarity = rarity == null ? Rarity.fromChance(chance) : rarity;
@@ -214,6 +249,32 @@ public class Reward {
                 .replaceAll("[^\\p{L}\\p{N}_-]", "_")
                 .replaceAll("_+", "_");
         return normalized.isBlank() ? Rarity.fromChance(chance).name().toLowerCase(Locale.ROOT) : normalized;
+    }
+
+    public static String serializeCommands(List<String> commands) {
+        return String.join("\n", normalizeCommands(null, commands));
+    }
+
+    public static List<String> deserializeCommands(String value) {
+        if (value == null || value.isBlank()) return List.of();
+        return normalizeCommands(null, List.of(value.split("\\R")));
+    }
+
+    private static List<String> normalizeCommands(String legacyCommand, List<String> configuredCommands) {
+        List<String> result = new java.util.ArrayList<>();
+        if (configuredCommands != null) {
+            for (String configured : configuredCommands) {
+                addCommand(result, configured);
+            }
+        }
+        if (result.isEmpty()) addCommand(result, legacyCommand);
+        return List.copyOf(result);
+    }
+
+    private static void addCommand(List<String> output, String value) {
+        if (value == null) return;
+        String normalized = value.trim().replaceFirst("^/", "");
+        if (!normalized.isBlank() && !output.contains(normalized)) output.add(normalized);
     }
 
     public static Reward select(List<Reward> rewards) {
@@ -244,6 +305,7 @@ public class Reward {
     public double vaultAmount() { return vaultAmount; }
     public int playerPointsAmount() { return playerPointsAmount; }
     public String command() { return command; }
+    public List<String> commands() { return commands; }
     public String message() { return message; }
     public String displayName() { return displayName; }
     public Rarity rarity() { return rarity; }

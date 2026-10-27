@@ -1,8 +1,10 @@
 package ru.privatenull.pncases.listener;
 
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -11,6 +13,7 @@ import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import ru.privatenull.pncases.PnCasesPlugin;
 import ru.privatenull.pncases.cases.CaseManager;
+import ru.privatenull.pncases.cases.animation.core.AnimationMobSpawner;
 import ru.privatenull.pncases.storage.CasesDatabase;
 
 import java.util.logging.Level;
@@ -20,12 +23,14 @@ public final class RuntimeListener implements Listener {
     private final PnCasesPlugin plugin;
     private final CaseManager caseManager;
     private final CasesDatabase database;
+    private final NewYearNotice newYearNotice;
 
     public RuntimeListener(PnCasesPlugin plugin, CaseManager caseManager,
                            CasesDatabase database) {
         this.plugin = plugin;
         this.caseManager = caseManager;
         this.database = database;
+        this.newYearNotice = new NewYearNotice(plugin, caseManager);
     }
 
     public void deliverPendingToOnlinePlayers() {
@@ -41,6 +46,13 @@ public final class RuntimeListener implements Listener {
                 }),
                 failure -> plugin.getLogger().log(Level.SEVERE,
                         "Не удалось прочитать отложенные награды.", failure));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void allowWorldGuardAnimationMob(CreatureSpawnEvent event) {
+        if (!event.isCancelled() || !AnimationMobSpawner.owns(event)) return;
+        if (!plugin.getServer().getPluginManager().isPluginEnabled("WorldGuard")) return;
+        event.setCancelled(false);
     }
 
     @EventHandler
@@ -68,8 +80,7 @@ public final class RuntimeListener implements Listener {
 
     @EventHandler
     public void onWorldLoad(WorldLoadEvent event) {
-        plugin.getServer().getScheduler().runTaskLater(plugin,
-                () -> caseManager.onWorldLoad(event.getWorld()), 20L);
+        plugin.tasks().later(() -> caseManager.onWorldLoad(event.getWorld()), 20L);
     }
 
     @EventHandler
@@ -79,9 +90,10 @@ public final class RuntimeListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+        plugin.tasks().later(() -> {
             if (!event.getPlayer().isOnline()) return;
             caseManager.deliverPendingRewardAsync(event.getPlayer(), ignored -> { });
+            newYearNotice.notifyIfNeeded(event.getPlayer());
         }, 20L);
     }
 

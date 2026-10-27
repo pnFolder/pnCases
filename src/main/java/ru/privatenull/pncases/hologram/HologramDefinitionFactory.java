@@ -8,8 +8,8 @@ import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
-import ru.privatenull.pnlibrary.item.ItemFactory;
-import ru.privatenull.pnlibrary.text.ColorUtil;
+import ru.privatenull.pncases.support.item.ItemFactory;
+import ru.privatenull.pncases.support.text.ColorUtil;
 
 import java.util.ArrayList;
 import java.util.List;

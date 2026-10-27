@@ -30,6 +30,66 @@ idle-particles:
   speed: 0.14
   view_distance: 28
 
+
+# Анимация вокруг кейса: включается, когда игрок подходит ближе radius блоков.
+# Все числа и переключатели можно менять в игре (Machine → Дополнительно → Анимация у кейса)
+# или здесь, затем /pncases reload.
+proximity-animation:
+  enabled: false
+  scene: WINTER         # WINTER (зимняя сказка) или AUTUMN (осенняя: пугало, клёны, тыквы, корзина с урожаем)
+  # Для AUTUMN можно писать свои названия: leaf_piles, maples, pumpkins, mushrooms, lanterns, leaves, hay,
+  # scarecrow вместо santa и leaf_layer вместо snow_layer. Заготовки сцены ставит кнопка в Machine.
+  radius: 8             # на каком расстоянии начинается анимация
+  spread: 1.0           # масштаб сцены: насколько далеко от кейса стоят украшения (0.6–2.0)
+  fade_seconds: 3       # за сколько секунд сцена появляется и исчезает
+  music:
+    enabled: true       # новогодняя музыка по кругу
+    volume: 0.3         # 0..1, тихий фон
+    pause_seconds: 4    # пауза между мелодиями
+  sounds:
+    enabled: true       # звуки появления сугробов, ёлок, льдинок, Деда Мороза
+    volume: 1.0
+  particles:
+    density: 1.0        # множитель частиц, 0 — без частиц
+    snowfall: true      # снегопад
+    swirl: true         # вихрь ветра
+    frost_ring: true    # кольцо инея при появлении
+    glints: true        # искры на льдинках, снежинках и кейсе
+  decor:                # сколько чего показывать, 0 — убрать совсем
+    mounds: 11          # сугробы
+    trees: 4            # ёлки
+    snowmen: 1          # снеговики
+    crystals: 4         # кучки ледяных кристаллов
+    garland: 18         # лампочки гирлянды
+    snowflakes: 10      # кружащиеся снежинки
+    gifts: 4            # подарки
+  santa:                # Дед Мороз, машет рукой и говорит фразы
+    enabled: true
+    coat: BLUE_CONCRETE # цвет шубы: BLUE_CONCRETE, RED_CONCRETE, ...
+    messages:
+      - '&bХо-хо-хо!'
+      - '&fС наступающим Новым годом!'
+      - '&eСкоро Новый год!'
+      - '&aГотовь подарки!'
+  terrain:              # блоки меняются только на экране игрока, мир не трогается
+    enabled: true
+    radius: 7           # радиус зимнего пейзажа вокруг кейса, 0–12
+    case_style: GIFT    # вид кейса: GIFT, GLOBE, CRYSTAL, BLOCK, NONE
+    case_color: RED_CONCRETE  # цвет обёртки для GIFT
+    case_block: BLUE_ICE      # блок для стиля BLOCK
+    case_scale: 1.0         # размер модели кейса, 0.5–2.0; украшения сдвигаются вместе с ней
+    keep_case: true         # модель кейса остаётся, когда игрок отходит (false — исчезает вместе со сценой)
+    keep_during_opening: false # false — на время открытия сцена плавно уходит; true — остаётся на месте
+    snow_layer: true          # тонкий снег сверху
+    replace_all_blocks: true  # false — менять только землю, траву, песок, камень
+    morph_shapes: true        # ступени, плиты, стены, заборы и листва становятся зимними
+    side_coverage: 0.35       # какая часть стен покрывается снегом, 0–1
+    ground:                   # блоки пола с весом (лёд не использовать: он скользкий)
+      - SNOW_BLOCK:66
+      - WHITE_CONCRETE_POWDER:20
+      - CALCITE:8
+      - LIGHT_BLUE_CONCRETE_POWDER:6
+
 gui:
   title: '{display-name}'
   size: 54
@@ -56,6 +116,7 @@ gui:
       - ''
       - ' &#FFB347[&#FFA43C Л&#FF9536К&#FF8630М &#FF772A] &f{left_action}'
       - ' &#FF8A8A[&#FF7979 П&#F96868К&#F25757М &#EB4646] &f{right_action}'
+      - ' &#FFB347[&#FFA43C SHIFT + ПКМ &#FF772A] &f{bulk_action}'
       - ''
   insufficient-keys:
     name: '&#FF5A64Недостаточно ключей'
@@ -83,6 +144,13 @@ cost:
     enabled: false
     levels: 0
 
+# Необязательный гарант редкой награды для каждого игрока отдельно.
+guarantee:
+  enabled: false
+  openings: 50
+  minimum-rarity: LEGENDARY
+  reset-after-win: true
+
 animation:
   items:
     # Кастомная голова в анимации: вместо material указывается base64.
@@ -104,6 +172,7 @@ rewards:
   - type: ITEM
     chance: 20
     rarity: COMMON
+    message: '&aВы получили {reward} в количестве {amount}!'
     item:
       base64: 'eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNTExM2VlNjEwODQxZGVkMjE1YWNkMmI0Y2FhZWVmODdkZmQ2ZTNkNDc2OGU3YWI0ZTE5ZWI3NmIzZDgxMjFjZiJ9fX0='
       name: '&bКастомная голова'
@@ -119,6 +188,7 @@ rewards:
     rarity: UNCOMMON
     vault:
       amount: 500
+      message: '&aВам начислено {money} монет!'
     visual:
       material: SUNFLOWER
       name: '&a500 монет'
@@ -129,12 +199,13 @@ rewards:
     rarity: RARE
     playerpoints:
       amount: 100
+      message: '&bВам начислено {points} поинтов!'
     visual:
       material: AMETHYST_SHARD
       name: '&b100 поинтов'
 
   # LUCKPERMS — выдаёт группу или право. Нужен LuckPerms.
-  # Можно указать group, node или оба поля; duration необязательно.
+  # Можно указать group, node или оба поля. Без duration награда постоянная.
   - type: LUCKPERMS
     chance: 20
     rarity: EPIC
@@ -147,13 +218,16 @@ rewards:
       material: NETHER_STAR
       name: '&dVIP на 1 час'
 
-  # PERSONAL — выполняет консольную команду.
+  # PERSONAL — выполняет одну или несколько консольных команд по порядку.
   # Доступны плейсхолдеры {player} и {uuid}; слеш в начале не нужен.
   - type: PERSONAL
     chance: 20
     rarity: LEGENDARY
-    command: 'give {player} golden_apple 1'
+    commands:
+      - 'give {player} golden_apple 1'
+      - 'tell {player} Награда выдана'
     name: '&eЗолотое яблоко'
+    message: '&eВы получили {reward}!'
     visual:
       material: GOLDEN_APPLE
       name: '&eЗолотое яблоко'

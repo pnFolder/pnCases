@@ -6,3 +6,6 @@
 /.idea/
 /.vscode/
 *.iml
+
+# Server logs copied into the project
+/logs/

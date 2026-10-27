@@ -7,8 +7,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.pncases.PnCasesPlugin;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.MaterialCompat;
+import ru.privatenull.pncases.support.text.ColorUtil;
+import ru.privatenull.pncases.support.compat.BukkitCompat.MaterialCompat;
 import ru.privatenull.pncases.gui.GuiDesign;
 
 import java.util.ArrayList;
@@ -144,11 +144,28 @@ public final class RewardPresentationService {
     }
 
     public String formatVaultAmount(double amount) {
-        return plugin.getEconomies().vault().format(amount);
+        String formatted = plugin.getEconomies().vault().format(amount);
+        return plugin.wholeNumbers() ? ru.privatenull.pncases.support.economy.MoneyText.stripZeroFraction(formatted)
+                : formatted;
     }
 
     public String formatPlayerPointsAmount(int amount) {
         return plugin.getEconomies().playerPoints().format(amount);
+    }
+
+    /**
+     * The name of an item reward that has no custom name: the localized item name ("Дёрн"), never the raw
+     * material id ("GRASS_BLOCK"). Falls back to the material id only when localization is unavailable.
+     */
+    public String defaultItemName(ItemStack item) {
+        String localized = null;
+        try {
+            var localization = plugin.getItemLocalization();
+            if (localization != null) localized = localization.getPlainName(item);
+        } catch (RuntimeException | LinkageError ignored) {
+            // Handled by the fallback below.
+        }
+        return "&f" + (localized == null || localized.isBlank() ? item.getType().name() : localized);
     }
 
     public String formattedRarity(Reward reward) {

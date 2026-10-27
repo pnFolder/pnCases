@@ -2,13 +2,14 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.*;
 import org.bukkit.entity.*;
 import org.bukkit.inventory.ItemStack;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.PnCasesPlugin;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 import static ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation.playSound;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.core.AnimationFrame;
@@ -94,9 +95,9 @@ public final class AnvilAnimation extends TimelineCaseAnimation {
                     playSound(w, base, Sound.BLOCK_ANVIL_LAND, 0.55f, 0.8f);
                     playSound(w, base, Sound.ENTITY_GENERIC_EXPLODE, 0.16f, 1.8f);
                     playSound(w, base, Sound.BLOCK_STONE_BREAK, 0.32f, 0.6f);
-                    AnimationParticles.block(w, particle(BLOCK), base.clone().add(0, ANVIL_LAND_Y, 0),
+                    AnimationEffects.block(w, particle(BLOCK), base.clone().add(0, ANVIL_LAND_Y, 0),
                             60, 0.4, 0.1, 0.4, 0.15, Material.STONE.createBlockData());
-                    w.spawnParticle(Particle.CLOUD, base.clone().add(0, ANVIL_LAND_Y, 0),
+                    spawn(w, Particle.CLOUD, base.clone().add(0, ANVIL_LAND_Y, 0),
                             20, 0.5, 0.1, 0.5, 0.05);
                     playSound(player, player.getLocation(), Sound.BLOCK_ANVIL_LAND, 0.38f, 0.7f);
                 }
@@ -105,15 +106,15 @@ public final class AnvilAnimation extends TimelineCaseAnimation {
                     Location anvilTop = base.clone().add(0, ANVIL_LAND_Y + 0.5, 0);
                     if (hitTicks.contains(t)) {
                         playSound(w, base, Sound.BLOCK_ANVIL_USE, 0.28f, 0.9f + rng.nextFloat() * 0.3f);
-                        w.spawnParticle(Particle.LAVA, anvilTop, 8, 0.3, 0.1, 0.3, 0.0);
-                        w.spawnParticle(Particle.ELECTRIC_SPARK, anvilTop, 15, 0.25, 0.15, 0.25, 0.05);
-                        w.spawnParticle(Particle.CRIT, anvilTop, 10, 0.3, 0.2, 0.3, 0.1);
+                        spawn(w, Particle.LAVA, anvilTop, 8, 0.3, 0.1, 0.3, 0.0);
+                        spawn(w, Particle.ELECTRIC_SPARK, anvilTop, 15, 0.25, 0.15, 0.25, 0.05);
+                        spawn(w, Particle.CRIT, anvilTop, 10, 0.3, 0.2, 0.3, 0.1);
                         double jitter = (rng.nextDouble() - 0.5) * 0.018;
                         anvil.teleport(base.clone().add(jitter, ANVIL_LAND_Y, jitter));
                     } else {
                         anvil.teleport(base.clone().add(0, ANVIL_LAND_Y, 0));
                     }
-                    if (t % 3 == 0) w.spawnParticle(particle(SMOKE), anvilTop, 2, 0.15, 0.05, 0.15, 0.01);
+                    if (t % 3 == 0) spawn(w, particle(SMOKE), anvilTop, 2, 0.15, 0.05, 0.15, 0.01);
 
                     if (t > timeline.end("forge") - 8) {
                         float glowScale = (float)(t - (timeline.end("forge") - 8)) / 8f * 0.4f;
@@ -123,11 +124,14 @@ public final class AnvilAnimation extends TimelineCaseAnimation {
                                 new Vector3f(glowScale, glowScale, glowScale),
                                 gt.getRightRotation()
                         ));
-                        w.spawnParticle(particle(ENCHANT), anvilTop, 5, 0.1, 0.1, 0.1, 0.3);
+                        spawn(w, particle(ENCHANT), anvilTop, 5, 0.1, 0.1, 0.1, 0.3);
                     }
                 }
 
                 if (timeline.in("reveal", t)) {
+                    if (t == timeline.start("reveal")) {
+                        run.protectReward(base.clone().add(0.0, 1.35, 0.0));
+                    }
                     double phaseProgress = timeline.progress("reveal", t);
                     double eased = 1.0 - Math.pow(1.0 - phaseProgress, 2);
                     double rewardY = ANVIL_LAND_Y + 0.3 + eased * 1.5;
@@ -148,8 +152,8 @@ public final class AnvilAnimation extends TimelineCaseAnimation {
                     ));
 
                     if (t % 4 == 0) {
-                        w.spawnParticle(particle(ENCHANT), rewardLoc, 2, 0.1, 0.1, 0.1, 0.12);
-                        w.spawnParticle(Particle.ELECTRIC_SPARK, rewardLoc, 1, 0.15, 0.1, 0.15, 0.015);
+                        spawn(w, particle(ENCHANT), rewardLoc, 2, 0.1, 0.1, 0.1, 0.12);
+                        spawn(w, Particle.ELECTRIC_SPARK, rewardLoc, 1, 0.15, 0.1, 0.15, 0.015);
                     }
                     if (t % 10 == 0) playSound(w, base, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.22f, 0.8f + (float) eased * 0.6f);
                 }
@@ -167,14 +171,14 @@ public final class AnvilAnimation extends TimelineCaseAnimation {
     }
 
     private static void spawnFinalParticles(World w, Location loc) {
-        w.spawnParticle(Particle.LAVA, loc, 6, 0.4, 0.3, 0.4, 0.0);
-        w.spawnParticle(Particle.ELECTRIC_SPARK, loc, 12, 0.4, 0.3, 0.4, 0.04);
-        w.spawnParticle(Particle.END_ROD, loc, 8, 0.3, 0.3, 0.3, 0.025);
-        w.spawnParticle(particle(ENCHANT), loc, 10, 0.5, 0.4, 0.5, 0.18);
-        w.spawnParticle(particle(FIREWORK), loc, 5, 0.3, 0.3, 0.3, 0.02);
+        spawn(w, Particle.LAVA, loc, 6, 0.4, 0.3, 0.4, 0.0);
+        spawn(w, Particle.ELECTRIC_SPARK, loc, 12, 0.4, 0.3, 0.4, 0.04);
+        spawn(w, Particle.END_ROD, loc, 8, 0.3, 0.3, 0.3, 0.025);
+        spawn(w, particle(ENCHANT), loc, 10, 0.5, 0.4, 0.5, 0.18);
+        spawn(w, particle(FIREWORK), loc, 5, 0.3, 0.3, 0.3, 0.02);
         for (int ring = 0; ring < 8; ring++) {
             double angle = (2 * Math.PI * ring) / 8;
-            w.spawnParticle(Particle.ELECTRIC_SPARK,
+            spawn(w, Particle.ELECTRIC_SPARK,
                     loc.clone().add(0.6 * Math.cos(angle), 0, 0.6 * Math.sin(angle)), 1, 0, 0, 0, 0.015);
         }
     }

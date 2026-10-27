@@ -37,12 +37,14 @@ public final class HotReloadClassCache {
         if (loaded) return;
 
         List<String> classNames;
+        List<String> wrapperNames = List.of();
         try {
             Path source = Path.of(plugin.getClass().getProtectionDomain()
                     .getCodeSource().getLocation().toURI());
             classNames = Files.isDirectory(source)
                     ? classesFromDirectory(source)
                     : classesFromJar(source);
+            if (!Files.isDirectory(source)) wrapperNames = anvilWrappersFromJar(source);
         } catch (IOException | URISyntaxException | RuntimeException exception) {
             plugin.getLogger().warning("Не удалось подготовить классы для безопасного restart: "
                     + message(exception));
@@ -64,9 +66,35 @@ public final class HotReloadClassCache {
                 skipped++;
             }
         }
+        // The AnvilGUI wrapper for this server version (and its AnvilContainer) is picked and loaded only when the
+        // first input window opens. If the JAR was replaced or the classloader restarted by then, that load fails
+        // and no window can open. Wrappers of other versions cannot be loaded here and are skipped quietly.
+        int wrappers = 0;
+        for (String className : wrapperNames) {
+            try {
+                Class.forName(className, false, loader);
+                wrappers++;
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                // A wrapper for another Minecraft version: its server classes do not exist here.
+            }
+        }
         loaded = true;
         plugin.getLogger().info("Классы подготовлены для безопасного restart: "
-                + prepared + (skipped == 0 ? "" : ", пропущено необязательных: " + skipped));
+                + prepared + (skipped == 0 ? "" : ", пропущено необязательных: " + skipped)
+                + ", классов окна ввода для этой версии сервера: " + wrappers);
+    }
+
+    private static List<String> anvilWrappersFromJar(Path source) throws IOException {
+        List<String> names = new ArrayList<>();
+        try (JarFile jar = new JarFile(source.toFile())) {
+            jar.stream()
+                    .map(entry -> entry.getName())
+                    .filter(path -> path.startsWith(ANVIL_GUI_WRAPPER_PATH_PREFIX) && path.endsWith(".class"))
+                    .map(HotReloadClassCache::toClassName)
+                    .forEach(names::add);
+        }
+        names.sort(Comparator.naturalOrder());
+        return names;
     }
 
     private static List<String> classesFromJar(Path source) throws IOException {

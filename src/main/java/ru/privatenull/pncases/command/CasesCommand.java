@@ -8,9 +8,11 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import ru.privatenull.pncases.PnCasesPlugin;
+import ru.privatenull.pncases.support.text.ColorUtil;
 import ru.privatenull.pncases.cases.CaseManager;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.gui.machine.MachineGuiListener;
+import ru.privatenull.pncases.gui.gift.KeyGiftMenu;
 
 import java.util.Locale;
 import java.util.UUID;
@@ -21,16 +23,22 @@ public final class CasesCommand implements CommandExecutor {
     private final CaseManager caseManager;
     private final MachineGuiListener machineGui;
     private final CasesCommandMenu menu;
+    private final KeyGiftMenu giftMenu;
 
-    public CasesCommand(PnCasesPlugin plugin, CaseManager caseManager, MachineGuiListener machineGui) {
+    public CasesCommand(PnCasesPlugin plugin, CaseManager caseManager, MachineGuiListener machineGui,
+                        KeyGiftMenu giftMenu) {
         this.plugin = plugin;
         this.caseManager = caseManager;
         this.machineGui = machineGui;
+        this.giftMenu = giftMenu;
         this.menu = new CasesCommandMenu(plugin);
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length > 0 && args[0].equalsIgnoreCase("gift")) {
+            return gift(sender, args);
+        }
         if (!sender.hasPermission("pncases.admin")) {
             sender.sendMessage(plugin.getUi().get("no-permission"));
             return true;
@@ -46,8 +54,11 @@ public final class CasesCommand implements CommandExecutor {
             case "takekey" -> takeKey(sender, args);
             case "delcase" -> deleteCase(sender, args);
             case "createcase" -> createCase(sender, args);
+            case "copycase" -> copyCase(sender, args);
             case "machine" -> openMachine(sender, args);
+            case "workbench" -> openWorkbench(sender, args);
             case "setcase" -> setCase(sender, args);
+            case "giftlimit" -> giftLimit(sender, args);
             default -> false;
         };
         if (!known) {
@@ -55,6 +66,74 @@ public final class CasesCommand implements CommandExecutor {
             menu.send(sender);
         }
         return true;
+    }
+
+    private boolean gift(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(plugin.getUi().get("only-player"));
+            return true;
+        }
+        if (!player.hasPermission(plugin.giftPermission())) {
+            player.sendMessage(plugin.getUi().get("no-permission"));
+            return true;
+        }
+        if (args.length < 2) {
+            giftMenu.openPicker(player, 0);
+            return true;
+        }
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target == null || !target.isOnline()) {
+            player.sendMessage(plugin.getUi().get("gift-player-offline"));
+            return true;
+        }
+        if (target.getUniqueId().equals(player.getUniqueId())) {
+            player.sendMessage(plugin.getUi().get("gift-self"));
+            return true;
+        }
+        giftMenu.open(player, target);
+        return true;
+    }
+
+    /**
+     * /pncases giftlimit: opens the gift limits menu (the console gets a text list instead).
+     * /pncases giftlimit [игрок] [reset]: shows a player's gift limits and what is left, or resets today's count.
+     */
+    private boolean giftLimit(CommandSender sender, String[] args) {
+        var limits = plugin.getGiftLimits();
+        if (args.length < 2 && sender instanceof Player player) {
+            machineGui.openGifts(player);
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(ColorUtil.colorize("&#FFE66DЛимиты подарков ключей:"));
+            sender.sendMessage(ColorUtil.colorize("&#A6B0BA  по умолчанию: &f" + describe(limits.defaultLimit())));
+            for (var rule : limits.rules()) {
+                sender.sendMessage(ColorUtil.colorize("&#A6B0BA  " + rule.id() + " (&f" + rule.permission()
+                        + "&#A6B0BA): &f" + describe(rule.limit())));
+            }
+            sender.sendMessage(ColorUtil.colorize("&#A6B0BAПосмотреть игрока: /pncases giftlimit <игрок> [reset]"));
+            return true;
+        }
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target == null) {
+            sender.sendMessage(plugin.getUi().get("gift-player-offline"));
+            return true;
+        }
+        if (args.length >= 3 && args[2].equalsIgnoreCase("reset")) {
+            limits.reset(target.getUniqueId());
+            sender.sendMessage(ColorUtil.colorize("&#A7F3D0Счётчик подарков игрока &f" + target.getName()
+                    + "&#A7F3D0 за сегодня сброшен."));
+            return true;
+        }
+        var limit = limits.limitFor(target);
+        sender.sendMessage(ColorUtil.colorize("&#FFE66D" + target.getName() + "&#A6B0BA: &f" + describe(limit)
+                + "&#A6B0BA, сегодня отправлено &f" + limits.sentToday(target.getUniqueId())));
+        return true;
+    }
+
+    private static String describe(ru.privatenull.pncases.gift.GiftLimits.Limit limit) {
+        return "за раз " + (limit.perGiftLimited() ? limit.perGift() : "без ограничений")
+                + ", в день " + (limit.perDayLimited() ? limit.perDay() : "без ограничений");
     }
 
     private boolean reload(CommandSender sender) {
@@ -204,6 +283,45 @@ public final class CasesCommand implements CommandExecutor {
         return true;
     }
 
+    private boolean copyCase(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(ColorUtil.colorize("&#FC7165Использование: /pncases copycase <откуда> <куда>"));
+            return true;
+        }
+        String from = normalize(args[1]);
+        String to = normalize(args[2]);
+        String message = switch (caseManager.copyCase(from, to)) {
+            case COPIED -> "&#A7F3D0Кейс &f" + to + "&#A7F3D0 создан как копия &f" + from
+                    + "&#A7F3D0. Привяжите его к блоку: /pncases setcase " + to;
+            case SOURCE_NOT_FOUND -> "&#FC7165Кейс " + from + " не найден.";
+            case ALREADY_EXISTS -> "&#FC7165Кейс " + to + " уже существует.";
+            case INVALID_ID -> "&#FC7165Недопустимый id: только a-z, 0-9, _ и - (до 64 символов).";
+            case SAVE_FAILED -> "&#FC7165Не удалось сохранить копию. Подробности в консоли.";
+            case RELOAD_FAILED -> "&#FC7165Копия сохранена, но перезагрузка кейсов не удалась. Проверьте консоль.";
+        };
+        sender.sendMessage(ColorUtil.colorize(message));
+        return true;
+    }
+
+    /** /pncases workbench [case]: the key recipes made in the crafting table; a case, or a list to pick one. */
+    private boolean openWorkbench(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(plugin.getUi().get("only-player"));
+            return true;
+        }
+        if (args.length < 2) {
+            machineGui.openWorkbench(player, null);
+            return true;
+        }
+        CaseDefinition definition = caseManager.getCaseByName(normalize(args[1]));
+        if (definition == null) {
+            player.sendMessage(plugin.getUi().get("machine-look-at-case"));
+            return true;
+        }
+        machineGui.openWorkbench(player, definition.name());
+        return true;
+    }
+
     private boolean openMachine(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(plugin.getUi().get("only-player"));
@@ -213,7 +331,11 @@ public final class CasesCommand implements CommandExecutor {
                 ? caseManager.getCaseByName(normalize(args[1]))
                 : caseAtTarget(player, 6);
         if (definition == null) {
-            player.sendMessage(plugin.getUi().get("machine-look-at-case"));
+            if (args.length >= 2) {
+                player.sendMessage(plugin.getUi().get("machine-look-at-case"));
+            } else {
+                machineGui.openCases(player);
+            }
             return true;
         }
         machineGui.openMain(player, definition.name());

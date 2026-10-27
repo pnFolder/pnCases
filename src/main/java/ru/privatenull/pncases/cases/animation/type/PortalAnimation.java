@@ -2,6 +2,7 @@ package ru.privatenull.pncases.cases.animation.type;
 
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.Kind.*;
 import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.particle;
+import static ru.privatenull.pncases.cases.animation.effect.AnimationEffects.spawn;
 
 import org.bukkit.*;
 import org.bukkit.entity.*;
@@ -9,7 +10,7 @@ import org.bukkit.inventory.ItemStack;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 import ru.privatenull.pncases.PnCasesPlugin;
-import ru.privatenull.pncases.cases.animation.effect.AnimationParticles;
+import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
 import static ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation.playSound;
 import ru.privatenull.pncases.cases.animation.core.AnimationFrame;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
@@ -116,13 +117,13 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                         }
 
                         Location boom = base.clone().add(0.5, 1.0, 0.5);
-                        w.spawnParticle(particle(EXPLOSION),    boom, 2, 0.1, 0.1, 0.1, 0);
-                        w.spawnParticle(particle(SMOKE),        boom, 55, 0.45, 0.3, 0.45, 0.09);
-                        w.spawnParticle(Particle.LAVA,         boom, 25, 0.3, 0.2, 0.3, 0.0);
-                        w.spawnParticle(Particle.ELECTRIC_SPARK, boom, 40, 0.4, 0.2, 0.4, 0.12);
+                        spawn(w, particle(EXPLOSION),    boom, 2, 0.1, 0.1, 0.1, 0);
+                        spawn(w, particle(SMOKE),        boom, 55, 0.45, 0.3, 0.45, 0.09);
+                        spawn(w, Particle.LAVA,         boom, 25, 0.3, 0.2, 0.3, 0.0);
+                        spawn(w, Particle.ELECTRIC_SPARK, boom, 40, 0.4, 0.2, 0.4, 0.12);
                         for (int ring = 0; ring < 20; ring++) {
                             double a = (2 * Math.PI * ring) / 20;
-                            w.spawnParticle(particle(SMOKE),
+                            spawn(w, particle(SMOKE),
                                     base.getX() + 0.5 + 0.7 * Math.cos(a), base.getY() + 0.5,
                                     base.getZ() + 0.5 + 0.7 * Math.sin(a),
                                     2, 0, 0.05, 0, 0.07);
@@ -143,7 +144,7 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                             vy[i] = -vy[i] * 0.30;
                             vx[i] *= 0.80; vz[i] *= 0.80;
                             if (Math.abs(vy[i]) < 0.015) vy[i] = 0;
-                            AnimationParticles.block(w, particle(BLOCK),
+                            AnimationEffects.block(w, particle(BLOCK),
                                     new Location(w, px[i], floor, pz[i]),
                                     5, 0.1, 0, 0.1, 0.03, Material.GRAVEL.createBlockData());
                         }
@@ -156,7 +157,7 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                     }
 
                     if (t % 4 == 0)
-                        w.spawnParticle(particle(SMOKE), base.clone().add(0.5, 0.8, 0.5), 3, 0.5, 0.1, 0.5, 0.02);
+                        spawn(w, particle(SMOKE), base.clone().add(0.5, 0.8, 0.5), 3, 0.5, 0.1, 0.5, 0.02);
                 }
 
                 if (timeline.in("vortex", t)) {
@@ -170,20 +171,20 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                     for (int i = 0; i < pts; i++) {
                         if (rng.nextInt(2) == 0) continue;
                         double a = (2 * Math.PI * i) / pts + t * 0.28;
-                        w.spawnParticle(Particle.PORTAL,
+                        spawn(w, Particle.PORTAL,
                                 centre.getX() + ringR * Math.cos(a),
                                 centre.getY() + (rng.nextDouble() - 0.5) * 0.12,
                                 centre.getZ() + ringR * Math.sin(a),
                                 1, 0, 0, 0, 0);
                         if (i % 3 == 0)
-                            w.spawnParticle(Particle.REVERSE_PORTAL,
+                            spawn(w, Particle.REVERSE_PORTAL,
                                     centre.getX() + ringR * 0.65 * Math.cos(a + 0.22),
                                     centre.getY() + (rng.nextDouble() - 0.5) * 0.18,
                                     centre.getZ() + ringR * 0.65 * Math.sin(a + 0.22),
                                     1, 0, 0, 0, 0);
                     }
                     if (t % 2 == 0)
-                        w.spawnParticle(particle(SMOKE), centre, 3, 0.12, 0.08, 0.12, 0.015);
+                        spawn(w, particle(SMOKE), centre, 3, 0.12, 0.08, 0.12, 0.015);
 
                     double earthGrav = 0.018 * (1.0 - eased * 0.92);
                     double pullStr   = 0.002 + eased * 0.026;
@@ -239,14 +240,14 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                     for (int i = 0; i < 48; i++) {
                         if (rng.nextInt(2) != 0) continue;
                         double a = (2 * Math.PI * i) / 48 + t * 0.44;
-                        w.spawnParticle(Particle.PORTAL,
+                        spawn(w, Particle.PORTAL,
                                 centre.getX() + vortexR * Math.cos(a),
                                 centre.getY() + (rng.nextDouble() - 0.5) * 0.10,
                                 centre.getZ() + vortexR * Math.sin(a),
                                 1, 0, 0, 0, 0.03);
                     }
                     if (t % 2 == 0)
-                        w.spawnParticle(particle(SMOKE), centre, 4, 0.15, 0.10, 0.15, 0.02);
+                        spawn(w, particle(SMOKE), centre, 4, 0.15, 0.10, 0.15, 0.02);
 
                     for (int i = 0; i < ITEM_COUNT; i++) {
                         if (!alive[i]) continue;
@@ -259,9 +260,9 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                         if (dist < 0.30) {
                             alive[i] = false;
                             safeRemove(items.get(i));
-                            w.spawnParticle(Particle.PORTAL,         centre, 18, 0.12, 0.10, 0.12, 0.18);
-                            w.spawnParticle(Particle.REVERSE_PORTAL, centre, 10, 0.10, 0.08, 0.10, 0.12);
-                            w.spawnParticle(particle(SMOKE),          centre,  6, 0.08, 0.06, 0.08, 0.03);
+                            spawn(w, Particle.PORTAL,         centre, 18, 0.12, 0.10, 0.12, 0.18);
+                            spawn(w, Particle.REVERSE_PORTAL, centre, 10, 0.10, 0.08, 0.10, 0.12);
+                            spawn(w, particle(SMOKE),          centre,  6, 0.08, 0.06, 0.08, 0.03);
                             if (rng.nextInt(3) == 0)
                                 playSound(w, base, Sound.ENTITY_ENDERMAN_TELEPORT,
                                         0.18f, 1.4f + rng.nextFloat() * 0.6f);
@@ -304,14 +305,14 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                         for (int i = 0; i < ITEM_COUNT; i++)
                             if (alive[i]) { safeRemove(items.get(i)); alive[i] = false; }
 
-                        w.spawnParticle(particle(EXPLOSION),      centre, 1, 0, 0, 0, 0);
-                        w.spawnParticle(Particle.PORTAL,         centre, 90, 0.6, 0.4, 0.6, 0.18);
-                        w.spawnParticle(Particle.REVERSE_PORTAL, centre, 65, 0.5, 0.3, 0.5, 0.13);
-                        w.spawnParticle(Particle.END_ROD,        centre, 55, 0.5, 0.4, 0.5, 0.09);
-                        w.spawnParticle(particle(SMOKE),          centre, 45, 0.5, 0.3, 0.5, 0.07);
+                        spawn(w, particle(EXPLOSION),      centre, 1, 0, 0, 0, 0);
+                        spawn(w, Particle.PORTAL,         centre, 90, 0.6, 0.4, 0.6, 0.18);
+                        spawn(w, Particle.REVERSE_PORTAL, centre, 65, 0.5, 0.3, 0.5, 0.13);
+                        spawn(w, Particle.END_ROD,        centre, 55, 0.5, 0.4, 0.5, 0.09);
+                        spawn(w, particle(SMOKE),          centre, 45, 0.5, 0.3, 0.5, 0.07);
                         for (int ring = 0; ring < 36; ring++) {
                             double a = (2 * Math.PI * ring) / 36;
-                            w.spawnParticle(Particle.END_ROD,
+                            spawn(w, Particle.END_ROD,
                                     centre.getX() + 0.9 * Math.cos(a), centre.getY(),
                                     centre.getZ() + 0.9 * Math.sin(a),
                                     3, 0, 0.07, 0, 0.10);
@@ -335,7 +336,7 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                         double r = 0.5 * (1.0 - progress);
                         for (int i = 0; i < 8; i++) {
                             double a = (2 * Math.PI * i) / 8 + t * 0.5;
-                            w.spawnParticle(Particle.PORTAL,
+                            spawn(w, Particle.PORTAL,
                                     centre.getX() + r * Math.cos(a), centre.getY(),
                                     centre.getZ() + r * Math.sin(a),
                                     1, 0, 0, 0, 0.06);
@@ -348,11 +349,12 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                     double eased    = 1.0 - Math.pow(1.0 - progress, 2);
 
                     if (t == timeline.start("reveal")) {
+                        run.protectReward(centre.clone().add(0.0, 1.25, 0.0));
                         safeRemove(singularity);
-                        w.spawnParticle(Particle.END_ROD, centre, 12, 0.4, 0.35, 0.4, 0.045);
+                        spawn(w, Particle.END_ROD, centre, 12, 0.4, 0.35, 0.4, 0.045);
                         for (int ring = 0; ring < 12; ring++) {
                             double a = (2 * Math.PI * ring) / 12;
-                            w.spawnParticle(Particle.REVERSE_PORTAL,
+                            spawn(w, Particle.REVERSE_PORTAL,
                                     centre.getX() + 0.8 * Math.cos(a), centre.getY(),
                                     centre.getZ() + 0.8 * Math.sin(a),
                                     1, 0, 0.03, 0, 0.04);
@@ -381,7 +383,7 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                         for (int i = 0; i < 6; i++) {
                             double a  = (2 * Math.PI * i) / 6 + t * 0.11;
                             double py2 = rewardLoc.getY() + 0.18 * Math.sin(t * 0.17 + i);
-                            w.spawnParticle(Particle.PORTAL,
+                            spawn(w, Particle.PORTAL,
                                     rewardLoc.getX() + auraR * Math.cos(a), py2,
                                     rewardLoc.getZ() + auraR * Math.sin(a),
                                     1, 0, 0, 0, 0);
@@ -391,7 +393,7 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                     if (t % 4 == 0) {
                         for (int i = 0; i < 4; i++) {
                             double a = (2 * Math.PI * i) / 4 - t * 0.09;
-                            w.spawnParticle(Particle.REVERSE_PORTAL,
+                            spawn(w, Particle.REVERSE_PORTAL,
                                     rewardLoc.getX() + outerR * Math.cos(a),
                                     rewardLoc.getY() + 0.1 * Math.sin(t * 0.21 + i),
                                     rewardLoc.getZ() + outerR * Math.sin(a),
@@ -399,7 +401,7 @@ public final class PortalAnimation extends TimelineCaseAnimation {
                         }
                     }
                     if (t % 6 == 0)
-                        w.spawnParticle(Particle.END_ROD, rewardLoc, 1, 0.15, 0.10, 0.15, 0.025);
+                        spawn(w, Particle.END_ROD, rewardLoc, 1, 0.15, 0.10, 0.15, 0.025);
 
                     if (t % 8 == 0)
                         playSound(w, base, Sound.BLOCK_PORTAL_AMBIENT, 0.10f, 1.8f);
@@ -407,9 +409,9 @@ public final class PortalAnimation extends TimelineCaseAnimation {
 
                 if (t >= timeline.duration()) {
                     Location finalLoc = base.clone().add(0, 3.8, 0);
-                    w.spawnParticle(Particle.PORTAL,         finalLoc, 12, 0.45, 0.30, 0.45, 0.06);
-                    w.spawnParticle(Particle.END_ROD,        finalLoc, 8, 0.35, 0.28, 0.35, 0.04);
-                    w.spawnParticle(Particle.REVERSE_PORTAL, finalLoc, 8, 0.40, 0.25, 0.40, 0.045);
+                    spawn(w, Particle.PORTAL,         finalLoc, 12, 0.45, 0.30, 0.45, 0.06);
+                    spawn(w, Particle.END_ROD,        finalLoc, 8, 0.35, 0.28, 0.35, 0.04);
+                    spawn(w, Particle.REVERSE_PORTAL, finalLoc, 8, 0.40, 0.25, 0.40, 0.045);
                     playSound(w, base, Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.32f, 1.0f);
                     playSound(w, base, Sound.ENTITY_PLAYER_LEVELUP, 0.30f, 1.5f);
                     playSound(player, player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.32f, 1.5f);

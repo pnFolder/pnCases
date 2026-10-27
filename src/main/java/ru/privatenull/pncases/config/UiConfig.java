@@ -4,8 +4,8 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
-import ru.privatenull.pnlibrary.text.ColorUtil;
-import ru.privatenull.pnlibrary.config.AtomicYamlStore;
+import ru.privatenull.pncases.support.text.ColorUtil;
+import ru.privatenull.pncases.support.config.AtomicYamlStore;
 
 import java.io.File;
 import java.io.IOException;
@@ -41,13 +41,13 @@ public final class UiConfig {
     }
 
     public String get(String path, String... replacements) {
-        String prefix = messages.getString("prefix", "");
+        String prefix = color(messages.getString("prefix", ""));
         String raw = messages.getString(path, "&c[missing: " + path + "]");
         return color(replace(raw.replace("{prefix}", prefix), replacements));
     }
 
     public List<String> getList(String path, String... replacements) {
-        String prefix = messages.getString("prefix", "");
+        String prefix = color(messages.getString("prefix", ""));
         List<String> result = new ArrayList<>();
         for (String raw : messages.getStringList(path)) {
             result.add(color(replace(raw.replace("{prefix}", prefix), replacements)));
@@ -164,11 +164,12 @@ public final class UiConfig {
         return changed;
     }
 
-    private static String replace(String raw, String... replacements) {
+    static String replace(String raw, String... replacements) {
         if (replacements.length % 2 != 0) {
             throw new IllegalArgumentException("Replacements must be key-value pairs");
         }
-        String value = raw == null ? "" : raw;
+        // Preserve the RGB/RGBA boundary before numeric placeholders are expanded.
+        String value = color(raw);
         for (int index = 0; index < replacements.length; index += 2) {
             value = value.replace("{" + replacements[index] + "}", replacements[index + 1]);
         }

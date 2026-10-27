@@ -11,13 +11,16 @@ import org.bukkit.inventory.meta.ItemMeta;
 import ru.privatenull.pncases.PnCasesPlugin;
 import ru.privatenull.pncases.cases.CaseManager;
 import ru.privatenull.pncases.cases.model.AnimationType;
+import ru.privatenull.pncases.cases.model.BundleLayout;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
+import ru.privatenull.pncases.cases.model.Reward;
 import ru.privatenull.pncases.cases.model.CaseGuiLayout;
 import ru.privatenull.pncases.cases.reward.RewardPresentationService;
 import ru.privatenull.pncases.storage.CasesDatabase.HistoryEntry;
-import ru.privatenull.pnlibrary.text.ColorUtil;
+import ru.privatenull.pncases.support.text.ColorUtil;
 import ru.privatenull.pncases.gui.GuiDesign;
-import ru.privatenull.pnlibrary.compat.ServerVersion;
+import ru.privatenull.pncases.support.compat.ServerVersion;
+import ru.privatenull.pncases.support.compat.BukkitCompat.InventoryViewCompat;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -28,6 +31,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class CaseMenuService implements CaseManager.View {
@@ -38,7 +42,7 @@ public final class CaseMenuService implements CaseManager.View {
     private final CaseManager caseManager;
     private final RewardPresentationService rewardPresentation;
     private final Map<PlayerCase, Integer> keyBalances = new ConcurrentHashMap<>();
-    private final Map<String, List<HistoryEntry>> histories = new ConcurrentHashMap<>();
+    private final Map<String, List<HistoryLine>> histories = new ConcurrentHashMap<>();
 
     public CaseMenuService(
             PnCasesPlugin plugin,
@@ -47,6 +51,11 @@ public final class CaseMenuService implements CaseManager.View {
         this.plugin = plugin;
         this.caseManager = caseManager;
         this.rewardPresentation = caseManager.getRewardPresentation();
+    }
+
+    @Override
+    public void showBatchResults(Player player, String caseId, List<Reward> rewards) {
+        BulkOpenMenu.showResults(caseManager, player, caseId, rewards, 0);
     }
 
     @Override
@@ -73,8 +82,10 @@ public final class CaseMenuService implements CaseManager.View {
                 "have", String.valueOf(have), "need", String.valueOf(need), "levels", String.valueOf(buyExp),
                 "left-click", "&fЛевая кнопка  &#9EFC65" + leftAction,
                 "right-click", "&fПравая кнопка &#9EFC65Открыть кейс",
+                "bulk-click", "&fShift + ПКМ &#9EFC65Выбрать количество",
                 "left_action", leftAction,
-                "right_action", "Открыть кейс"
+                "right_action", "Открыть кейс",
+                "bulk_action", "Выбрать количество"
         };
         meta.setDisplayName(formatText(meta.getDisplayName(), replacements));
         List<String> configured = meta.hasLore() && meta.getLore() != null
@@ -83,7 +94,8 @@ public final class CaseMenuService implements CaseManager.View {
                 "", " &#A6B0BAОткрытие и просмотр содержимого кейса",
                 "", " &#C2CBD3Ключи", " &#69747E↳ &#A7F3D0{have} / {need}",
                 "", " &#FFB347[&#FFA43C Л&#FF9536К&#FF8630М &#FF772A] &f{left_action}",
-                " &#FF8A8A[&#FF7979 П&#F96868К&#F25757М &#EB4646] &f{right_action}", ""
+                " &#FF8A8A[&#FF7979 П&#F96868К&#F25757М &#EB4646] &f{right_action}",
+                " &#FFB347[&#FFA43C SHIFT + ПКМ &#FF772A] &f{bulk_action}", ""
         );
         meta.setLore(formatLore(configured, replacements));
         GuiDesign.hideAttributes(meta);
@@ -119,13 +131,18 @@ public final class CaseMenuService implements CaseManager.View {
     public ItemStack buildAnimationButton(Player player, CaseDefinition definition) {
         AnimationType current = caseManager.getPlayerAnimation(
                 player.getUniqueId(), definition == null ? "" : definition.name());
+        Set<AnimationType> favorites = caseManager.getPlayerFavoriteAnimations(
+                player.getUniqueId(), definition == null ? "" : definition.name());
         ItemStack item = GuiDesign.animation(current);
         item.setAmount(1);
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
         String[] replacements = {
-                "animation", GuiDesign.animationName(current),
+                "animation", favorites.isEmpty()
+                        ? GuiDesign.animationName(current)
+                        : "Случайная из " + favorites.size(),
+                "favorites", String.valueOf(favorites.size()),
                 "case", definition == null ? "" : color(definition.displayName()),
                 "case_id", definition == null ? "" : definition.name()
         };
@@ -159,20 +176,51 @@ public final class CaseMenuService implements CaseManager.View {
         }
         // Opening is the highest-priority action. Keep it last as an additional
         // safety net for CaseGuiLayout instances built outside the YAML parser.
-        inventory.setItem(layout.openSlot(), buildOpenButton(player, definition));
+        List<CaseDefinition> inside = caseManager.bundleCases(definition);
+        if (inside.isEmpty()) {
+            inventory.setItem(layout.openSlot(), buildOpenButton(player, definition));
+            return;
+        }
+        // A case with cases inside shows one ordinary open button for each of them instead.
+        int[] slots = BundleLayout.slots(inside.size(), layout.openSlot(), inventory.getSize());
+        for (int index = 0; index < slots.length; index++) {
+            inventory.setItem(slots[index], buildOpenButton(player, inside.get(index)));
+        }
     }
 
     @Override
     public void open(Player player, CaseDefinition definition) {
         UUID playerId = player.getUniqueId();
+        Inventory previous = InventoryViewCompat.topInventory(player);
+        boolean loadHistory = plugin.historyEnabled();
+        List<CaseDefinition> inside = caseManager.bundleCases(definition);
         plugin.getDatabaseExecutor().completeSync(
-                plugin.getDatabaseExecutor().supply(playerId, () -> new MenuData(
-                        plugin.getDatabase().getKeys(playerId, definition.name()),
-                        plugin.getDatabase().getHistory(definition.name(), 9))),
+                plugin.getDatabaseExecutor().supply(playerId, () -> {
+                    Map<String, Integer> keys = new java.util.HashMap<>();
+                    keys.put(definition.name(), plugin.getDatabase().getKeys(playerId, definition.name()));
+                    List<HistoryLine> history = new ArrayList<>();
+                    if (loadHistory) {
+                        for (CaseDefinition source : inside.isEmpty() ? List.of(definition) : inside) {
+                            for (HistoryEntry entry : plugin.getDatabase().getHistory(source.name(), 9)) {
+                                history.add(new HistoryLine(source.name(), entry));
+                            }
+                        }
+                        history.sort((first, second) -> Long.compare(second.entry().openedAt(), first.entry().openedAt()));
+                    }
+                    for (CaseDefinition child : inside) {
+                        keys.put(child.name(), plugin.getDatabase().getKeys(playerId, child.name()));
+                    }
+                    return new MenuData(keys, history.size() > 9 ? history.subList(0, 9) : history,
+                            plugin.getDatabase().getAnimation(playerId, definition.name()),
+                            plugin.getDatabase().getFavoriteAnimations(playerId, definition.name()));
+                }),
                 data -> {
-                    if (!player.isOnline()) return;
-                    keyBalances.put(new PlayerCase(playerId, definition.name()), data.keys());
+                    if (!player.isOnline() || InventoryViewCompat.topInventory(player) != previous
+                            || caseManager.getCaseByName(definition.name()) != definition) return;
+                    data.keys().forEach((caseId, count) -> keyBalances.put(new PlayerCase(playerId, caseId), count));
                     histories.put(definition.name(), data.history());
+                    caseManager.cacheAnimationPreferences(playerId, definition.name(),
+                            data.animation(), data.favorites());
                     Inventory inventory = Bukkit.createInventory(
                             GuiSession.caseMenu(definition.name()),
                             definition.guiLayout().size(),
@@ -217,7 +265,7 @@ public final class CaseMenuService implements CaseManager.View {
     }
 
     private void fillHistory(Inventory inventory, CaseDefinition definition) {
-        List<HistoryEntry> history = histories.getOrDefault(definition.name(), List.of());
+        List<HistoryLine> history = histories.getOrDefault(definition.name(), List.of());
         List<Integer> slots = new ArrayList<>(definition.guiLayout().historySlots());
         int animationSlot = definition.guiLayout().animationSlot();
         boolean animationSelectionHidden = definition.fixedAnimation() != null
@@ -229,16 +277,30 @@ public final class CaseMenuService implements CaseManager.View {
             slots.add(animationSlot);
             slots.sort(Integer::compareTo);
         }
+        // With the history switched off these slots are plain decoration, not "history is empty" markers.
+        boolean historyOn = plugin.historyEnabled();
+        ItemStack decor = definition.guiLayout().decorItem() == null
+                ? new ItemStack(Material.GRAY_STAINED_GLASS_PANE)
+                : definition.guiLayout().decorItem().clone();
+        hideAttributes(decor);
         for (int index = 0; index < slots.size(); index++) {
             int slot = slots.get(index);
             if (slot < 0 || slot >= inventory.getSize()) continue;
+            if (!historyOn) {
+                inventory.setItem(slot, decor.clone());
+                continue;
+            }
             inventory.setItem(slot, index < history.size()
                     ? historyItem(definition, history.get(index))
                     : emptyHistoryItem(definition));
         }
     }
 
-    private ItemStack historyItem(CaseDefinition definition, HistoryEntry entry) {
+    private ItemStack historyItem(CaseDefinition shown, HistoryLine line) {
+        HistoryEntry entry = line.entry();
+        // In the menu of a bundle every line belongs to the case it was opened from.
+        CaseDefinition definition = caseManager.getCaseByName(line.caseId());
+        if (definition == null) definition = shown;
         ItemStack item = historyRewardItem(definition, entry.rewardName());
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
@@ -274,9 +336,19 @@ public final class CaseMenuService implements CaseManager.View {
     private record PlayerCase(UUID playerId, String caseId) {
     }
 
-    private record MenuData(int keys, List<HistoryEntry> history) {
+    private record HistoryLine(String caseId, HistoryEntry entry) {
+    }
+
+    private record MenuData(
+            Map<String, Integer> keys,
+            List<HistoryLine> history,
+            AnimationType animation,
+            Set<AnimationType> favorites
+    ) {
         private MenuData {
+            keys = Map.copyOf(keys);
             history = List.copyOf(history);
+            favorites = favorites == null ? Set.of() : Set.copyOf(favorites);
         }
     }
 

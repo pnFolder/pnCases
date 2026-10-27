@@ -17,9 +17,9 @@ import ru.privatenull.pncases.cases.animation.effect.RewardLabel;
 import ru.privatenull.pncases.cases.model.AnimationType;
 import ru.privatenull.pncases.cases.model.CaseDefinition;
 import ru.privatenull.pncases.cases.model.Reward;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.MaterialCompat;
-import ru.privatenull.pnlibrary.compat.BukkitCompat.ParticleCompat;
-import ru.privatenull.pnlibrary.entity.VisualEntity;
+import ru.privatenull.pncases.support.compat.BukkitCompat.MaterialCompat;
+import ru.privatenull.pncases.support.compat.BukkitCompat.ParticleCompat;
+import ru.privatenull.pncases.support.entity.VisualEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,6 +68,9 @@ public final class LegacyCaseAnimation extends TimelineCaseAnimation {
             @Override
             protected void render(AnimationFrame frame) {
                 tick = frame.tick();
+                if (tick == 1) {
+                    run.protectReward(centerBase.clone().add(0.0, 1.55, 0.0));
+                }
                 yaw = (yaw + 7.5f) % 360.0f;
 
                 double progress = Math.min(1.0, tick / 92.0);
@@ -105,7 +108,7 @@ public final class LegacyCaseAnimation extends TimelineCaseAnimation {
             case DYNAMITE -> VisualEntity.block(centerBase.clone().add(-1.45, 1.75, -1.45), Material.TNT);
             case PORTAL -> VisualEntity.item(centerBase.clone().add(0.0, 2.05, 0.0), new ItemStack(Material.ENDER_EYE));
             case POISON -> VisualEntity.item(centerBase.clone().add(0.0, 1.65, 0.0), new ItemStack(Material.SLIME_BALL));
-            case FORTUNE_RING, PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION -> VisualEntity.item(centerBase.clone().add(0.0, 2.15, 0.0), new ItemStack(Material.NETHER_STAR));
+            case FORTUNE_RING, PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION, PRISM, STAR_CAROUSEL, NEW_YEAR_TREE, AUTUMN_MAPLE -> VisualEntity.item(centerBase.clone().add(0.0, 2.15, 0.0), new ItemStack(Material.NETHER_STAR));
         };
     }
 
@@ -214,7 +217,7 @@ public final class LegacyCaseAnimation extends TimelineCaseAnimation {
             case DYNAMITE -> new String[]{"FLAME"};
             case PORTAL -> new String[]{"PORTAL"};
             case POISON -> new String[]{"WITCH", "SPELL_WITCH"};
-            case FORTUNE_RING, PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION -> new String[]{"END_ROD"};
+            case FORTUNE_RING, PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION, PRISM, STAR_CAROUSEL, NEW_YEAR_TREE, AUTUMN_MAPLE -> new String[]{"END_ROD"};
             case ANVIL -> new String[]{"CRIT"};
         };
     }
@@ -224,7 +227,7 @@ public final class LegacyCaseAnimation extends TimelineCaseAnimation {
             case DYNAMITE -> new String[]{"SMOKE", "SMOKE_NORMAL"};
             case PORTAL -> new String[]{"REVERSE_PORTAL", "PORTAL"};
             case POISON -> new String[]{"ENCHANT", "ENCHANTMENT_TABLE"};
-            case FORTUNE_RING, PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION -> new String[]{"ELECTRIC_SPARK", "END_ROD"};
+            case FORTUNE_RING, PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION, PRISM, STAR_CAROUSEL, NEW_YEAR_TREE, AUTUMN_MAPLE -> new String[]{"ELECTRIC_SPARK", "END_ROD"};
             case ANVIL -> new String[]{"CLOUD"};
         };
     }
@@ -234,7 +237,7 @@ public final class LegacyCaseAnimation extends TimelineCaseAnimation {
             case DYNAMITE -> Sound.ENTITY_TNT_PRIMED;
             case PORTAL -> Sound.ENTITY_ENDERMAN_TELEPORT;
             case POISON -> Sound.ENTITY_SPIDER_AMBIENT;
-            case FORTUNE_RING, PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION -> Sound.BLOCK_NOTE_BLOCK_PLING;
+            case FORTUNE_RING, PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION, PRISM, STAR_CAROUSEL, NEW_YEAR_TREE, AUTUMN_MAPLE -> Sound.BLOCK_NOTE_BLOCK_PLING;
             case ANVIL -> Sound.BLOCK_ANVIL_USE;
         };
     }
