@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
@@ -109,7 +110,7 @@ public final class CaseAdministration {
         try {
             owner = configuredOwner(targetKey, normalized);
         } catch (IllegalStateException ex) {
-            plugin.getLogger().severe(ex.getMessage());
+            Log.error("Не удалось обработать кейс.", ex);
             return CaseManager.BindCaseResult.REFRESH_FAILED;
         }
         if (owner != null && !owner.equals(normalized)) return CaseManager.BindCaseResult.BLOCK_OCCUPIED;
@@ -165,7 +166,7 @@ public final class CaseAdministration {
 
         CaseConfigRepository.LoadResult loadResult = configRepository.loadAll();
         if (!loadResult.successful()) {
-            plugin.getLogger().severe("Reload кейсов отменён: исправьте ошибки id, дубликаты или повреждённые YAML. Старые кейсы продолжают работать.");
+            Log.error("Reload кейсов отменён: исправьте ошибки id, дубликаты или повреждённые YAML. Старые кейсы продолжают работать.");
             return false;
         }
         try {
@@ -195,13 +196,13 @@ public final class CaseAdministration {
                 }
             }
         } catch (RuntimeException ex) {
-            plugin.getLogger().severe("Reload кейсов отменён: " + ex.getMessage() + " Старые кейсы продолжают работать.");
+            Log.error("Reload кейсов отменён. Старые кейсы продолжают работать.", ex);
             return false;
         }
 
         registry.replaceAll(loadedCases, loadedBlocks, loadedSections);
         effects.reloaded(registry);
-        plugin.getLogger().info("Loaded cases: " + registry.size() + ", active blocks: " + registry.blockCount()
+        Log.info("Loaded cases: " + registry.size() + ", active blocks: " + registry.blockCount()
                 + ", virtual keys: " + registry.size());
         return true;
     }
@@ -223,7 +224,7 @@ public final class CaseAdministration {
         try {
             updated = definitionLoader.load(source.name(), source.section());
         } catch (RuntimeException ex) {
-            plugin.getLogger().severe("Не удалось обновить кейс '" + normalized + "': " + ex.getMessage());
+            Log.error("Не удалось обновить кейс '" + normalized + "'", ex);
             return false;
         }
 
@@ -234,7 +235,7 @@ public final class CaseAdministration {
         Map<CaseBlockKey, String> updatedBlockMap = CaseRegistry.replaceOwnedBlocks(
                 registry.blocks(), normalized, previousBlocks, newBlocks);
         if (updatedBlockMap == null) {
-            plugin.getLogger().severe("Кейс '" + normalized
+            Log.error("Кейс '" + normalized
                     + "' не обновлён: один из его блоков уже принадлежит другому кейсу.");
             return false;
         }

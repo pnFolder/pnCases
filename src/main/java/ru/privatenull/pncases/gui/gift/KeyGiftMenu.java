@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.gui.gift;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -320,8 +321,7 @@ public final class KeyGiftMenu implements Listener {
                 failure -> {
                     transfers.remove(holder.senderId);
                     sender.sendMessage(caseManager.getPlugin().getUi().get("gift-storage-error"));
-                    caseManager.getPlugin().getLogger().log(Level.WARNING,
-                            "Не удалось подтвердить передачу ключей " + keyId + ".", failure);
+                    Log.warning("Не удалось подтвердить передачу ключей " + keyId + ".", failure);
                 });
     }
 
@@ -330,8 +330,7 @@ public final class KeyGiftMenu implements Listener {
                 caseManager.getPlugin().getDatabaseExecutor().supply(playerId,
                         () -> caseManager.getPlugin().getDatabase().getKeys(playerId, keyId)),
                 balance -> caseManager.updateCachedKeyBalance(playerId, keyId, balance),
-                failure -> caseManager.getPlugin().getLogger().log(Level.WARNING,
-                        "Передача выполнена, но кэш баланса ещё не обновлён.", failure));
+                failure -> Log.warning("Передача выполнена, но кэш баланса ещё не обновлён.", failure));
     }
 
     @EventHandler

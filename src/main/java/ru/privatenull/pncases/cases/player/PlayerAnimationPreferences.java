@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases.player;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import ru.privatenull.pncases.PnCasesPlugin;
@@ -107,8 +108,7 @@ public final class PlayerAnimationPreferences {
     }
 
     private void saveFailed(UUID playerId, Throwable failure) {
-        plugin.getLogger().log(Level.SEVERE,
-                "Не удалось сохранить настройки анимации игрока " + playerId + ".", failure);
+        Log.error("Не удалось сохранить настройки анимации игрока " + playerId + ".", failure);
         Player player = Bukkit.getPlayer(playerId);
         if (player != null) player.sendMessage(plugin.getUi().get("animation-save-error"));
     }

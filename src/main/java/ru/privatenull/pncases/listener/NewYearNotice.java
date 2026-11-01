@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.listener;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import ru.privatenull.pncases.PnCasesPlugin;
@@ -56,7 +57,7 @@ public final class NewYearNotice {
         try {
             yaml.save(file);
         } catch (IOException exception) {
-            plugin.getLogger().log(Level.WARNING, "Не удалось сохранить notices.yml", exception);
+            Log.warning("Не удалось сохранить notices.yml", exception);
         }
     }
 }

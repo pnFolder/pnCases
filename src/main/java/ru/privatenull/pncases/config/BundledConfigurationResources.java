@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.config;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.ByteArrayInputStream;
@@ -56,7 +57,7 @@ public final class BundledConfigurationResources {
             Files.copy(input, target.toPath());
             return true;
         } catch (IOException exception) {
-            plugin.getLogger().severe("Не удалось создать " + name + ": " + exception.getMessage());
+            Log.error("Не удалось создать " + name, exception);
             return false;
         }
     }

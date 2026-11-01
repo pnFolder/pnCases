@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.config;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -99,7 +100,7 @@ public final class ConfigurationSyncService {
         }
 
         if (!updated.isEmpty()) {
-            plugin.getLogger().info("YAML sync: обновлены " + String.join(", ", updated)
+            Log.info("YAML sync: обновлены " + String.join(", ", updated)
                     + "; пользовательские значения сохранены.");
         }
         return Result.success(updated);
@@ -262,7 +263,7 @@ public final class ConfigurationSyncService {
             yaml.load(file);
             return yaml;
         } catch (IOException | InvalidConfigurationException exception) {
-            plugin.getLogger().severe("Не удалось прочитать " + file.getName() + ": " + exception.getMessage());
+            Log.error("Не удалось прочитать " + file.getName(), exception);
             return null;
         }
     }
@@ -276,8 +277,7 @@ public final class ConfigurationSyncService {
             }
             return yaml;
         } catch (IOException | InvalidConfigurationException exception) {
-            plugin.getLogger().severe("Не удалось прочитать встроенный " + name + ": "
-                    + exception.getMessage());
+            Log.error("Не удалось прочитать встроенный " + name, exception);
             return null;
         }
     }

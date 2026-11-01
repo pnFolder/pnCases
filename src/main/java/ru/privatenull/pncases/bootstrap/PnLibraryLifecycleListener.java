@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.bootstrap;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -18,7 +19,7 @@ public final class PnLibraryLifecycleListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPluginDisable(PluginDisableEvent event) {
         if (!event.getPlugin().getName().equalsIgnoreCase("pnLibrary") || !plugin.isEnabled()) return;
-        plugin.getLogger().warning("pnLibrary отключается; pnCases будет безопасно остановлен первым.");
+        Log.warning("pnLibrary отключается; pnCases будет безопасно остановлен первым.");
         plugin.getServer().getPluginManager().disablePlugin(plugin);
     }
 }

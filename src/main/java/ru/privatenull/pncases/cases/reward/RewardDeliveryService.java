@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases.reward;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -60,8 +61,7 @@ public final class RewardDeliveryService {
                     plugin.getDatabaseExecutor().run("history:" + caseName, () ->
                             database.addHistory(caseName, playerName, rewardLabel, openedAt)),
                     ignored -> { },
-                    exception -> plugin.getLogger().log(Level.WARNING,
-                            "Награда выдана, но историю открытия сохранить не удалось.", exception));
+                    exception -> Log.warning("Награда выдана, но историю открытия сохранить не удалось.", exception));
         }
         try {
             if (announce) announceReward(player, reward, rewardLabel);
@@ -78,8 +78,7 @@ public final class RewardDeliveryService {
                         online -> broadcast.forEach(online::sendMessage));
             }
         } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.WARNING,
-                    "Награда выдана, но объявление отправить не удалось.", exception);
+            Log.warning("Награда выдана, но объявление отправить не удалось.", exception);
         }
         return true;
     }
@@ -88,7 +87,7 @@ public final class RewardDeliveryService {
         ItemStack item = reward.item();
         if (item == null) {
             player.sendMessage(plugin.getUi().get("reward.invalid"));
-            plugin.getLogger().warning("Не удалось выдать ITEM-награду игроку " + player.getName()
+            Log.warning("Не удалось выдать ITEM-награду игроку " + player.getName()
                     + ": предмет отсутствует.");
             return false;
         }
@@ -100,7 +99,7 @@ public final class RewardDeliveryService {
         if (!Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) {
             player.sendMessage(plugin.getUi().get("reward.provider-missing",
                     "provider", "LuckPerms"));
-            plugin.getLogger().warning("Не удалось выдать LuckPerms-награду игроку " + player.getName()
+            Log.warning("Не удалось выдать LuckPerms-награду игроку " + player.getName()
                     + ": плагин LuckPerms недоступен.");
             return false;
         }
@@ -132,7 +131,7 @@ public final class RewardDeliveryService {
         if (!attempted || !dispatched) {
             player.sendMessage(plugin.getUi().get("reward.provider-missing",
                     "provider", "LuckPerms"));
-            plugin.getLogger().warning("LuckPerms не подтвердил выдачу награды игроку " + player.getName() + ".");
+            Log.warning("LuckPerms не подтвердил выдачу награды игроку " + player.getName() + ".");
             return false;
         }
         return true;
@@ -143,7 +142,7 @@ public final class RewardDeliveryService {
         if (!economy.available() || !economy.deposit(player, reward.vaultAmount())) {
             player.sendMessage(plugin.getUi().get("reward.provider-missing",
                     "provider", "Vault"));
-            plugin.getLogger().warning("Не удалось выдать Vault-награду игроку " + player.getName()
+            Log.warning("Не удалось выдать Vault-награду игроку " + player.getName()
                     + ": " + reward.vaultAmount());
             return false;
         }
@@ -155,7 +154,7 @@ public final class RewardDeliveryService {
         if (!points.available() || !points.deposit(player, reward.playerPointsAmount())) {
             player.sendMessage(plugin.getUi().get("reward.provider-missing",
                     "provider", "PlayerPoints"));
-            plugin.getLogger().warning("Не удалось выдать PlayerPoints-награду игроку " + player.getName()
+            Log.warning("Не удалось выдать PlayerPoints-награду игроку " + player.getName()
                     + ": " + reward.playerPointsAmount());
             return false;
         }
@@ -169,7 +168,7 @@ public final class RewardDeliveryService {
                     .replace("{player}", player.getName())
                     .replace("{uuid}", player.getUniqueId().toString());
             if (!Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command)) {
-                plugin.getLogger().warning("Не удалось выполнить PERSONAL-награду для "
+                Log.warning("Не удалось выполнить PERSONAL-награду для "
                         + player.getName() + ": " + command);
                 return false;
             }
@@ -213,7 +212,7 @@ public final class RewardDeliveryService {
                         .forEach(viewer -> viewer.sendMessage(broadcast));
             }
         } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.WARNING, "Серия выдана, но итоговое уведомление отправить не удалось.", exception);
+            Log.warning("Серия выдана, но итоговое уведомление отправить не удалось.", exception);
         }
     }
 

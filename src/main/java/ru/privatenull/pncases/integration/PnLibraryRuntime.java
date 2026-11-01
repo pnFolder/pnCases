@@ -89,6 +89,7 @@ public final class PnLibraryRuntime implements PnRuntime {
             closeRegistration();
             throw failure;
         }
+        Log.bind(module);
         this.data = runtimeData;
     }
 
@@ -151,8 +152,7 @@ public final class PnLibraryRuntime implements PnRuntime {
                     .publishToPlaceholderApi(PLACEHOLDER_NAMESPACE, "version"));
             return true;
         } catch (RuntimeException | LinkageError failure) {
-            owner.getLogger().log(Level.WARNING,
-                    "Плейсхолдеры pnCases не зарегистрированы; остальные функции работают.", failure);
+            Log.warning("Плейсхолдеры pnCases не зарегистрированы; остальные функции работают.", failure);
             return false;
         }
     }
@@ -196,14 +196,14 @@ public final class PnLibraryRuntime implements PnRuntime {
         try {
             MinecraftVersion version = MinecraftVersion.parse(serverVersion);
             if (!version.getKnown()) {
-                owner.getLogger().info("pnLibrary не знает версию сервера " + serverVersion
+                Log.info("pnLibrary не знает версию сервера " + serverVersion
                         + ", названия предметов берутся из встроенного файла.");
                 return;
             }
             TranslationRequest request = TranslationRequest.builder().version(version).locale(locale).build();
             module.getLocalization().load(request).whenComplete((bundle, failure) -> {
                 if (failure != null || bundle == null) {
-                    owner.getLogger().info("Переводы Minecraft недоступны (нет сети?), "
+                    Log.info("Переводы Minecraft недоступны (нет сети?), "
                             + "названия предметов берутся из встроенного файла.");
                     return;
                 }
@@ -221,6 +221,7 @@ public final class PnLibraryRuntime implements PnRuntime {
 
     @Override
     public void close() {
+        Log.bind((ModuleContext) null);
         module = null;
         closeRegistration();
     }

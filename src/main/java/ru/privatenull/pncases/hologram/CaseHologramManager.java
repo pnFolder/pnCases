@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.hologram;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
@@ -144,7 +145,7 @@ public final class CaseHologramManager {
                     createCaseHologram(def, config, location);
                 }
             } catch (Throwable t) {
-                plugin.getLogger().warning("Holograms: ошибка создания голограммы для кейса '" + def.name() + "': " + t.getMessage());
+                Log.warning("Holograms: ошибка создания голограммы для кейса '" + def.name() + "'", t);
             }
         }
     }
@@ -194,7 +195,7 @@ public final class CaseHologramManager {
                 createCaseHologram(def, config, location);
             }
         } catch (Throwable t) {
-            plugin.getLogger().warning("Holograms: ошибка showCase для '" + def.name() + "': " + t.getMessage());
+            Log.warning("Holograms: ошибка showCase для '" + def.name() + "'", t);
         }
     }
 
@@ -209,7 +210,7 @@ public final class CaseHologramManager {
             }
             createCaseHologram(def, config, blockLocation);
         } catch (Throwable t) {
-            plugin.getLogger().warning("Holograms: showCase error for '" + def.name() + "': " + t.getMessage());
+            Log.warning("Holograms: showCase error for '" + def.name() + "'", t);
         }
     }
 
@@ -305,7 +306,7 @@ public final class CaseHologramManager {
             return;
         }
         missingProviderWarningLogged = true;
-        plugin.getLogger().warning("Голограммы: FancyHolograms или DecentHolograms не найдены. Голограммы кейсов отключены.");
+        Log.warning("Голограммы: FancyHolograms или DecentHolograms не найдены. Голограммы кейсов отключены.");
     }
 
     private ConfigurationSection getHologramSection(CaseDefinition def) {

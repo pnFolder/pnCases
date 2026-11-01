@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.support.compat;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.entity.EntityType;
 import org.bukkit.plugin.Plugin;
 
@@ -26,8 +27,8 @@ public final class ServerCapabilities {
     }
 
     public static void logEnvironment(Plugin plugin) {
-        plugin.getLogger().info("Minecraft server: " + ServerVersion.current());
-        plugin.getLogger().info("Display Entity API: " + (DISPLAY_ENTITIES ? "available" : "unavailable"));
+        Log.info("Minecraft server: " + ServerVersion.current());
+        Log.info("Display Entity API: " + (DISPLAY_ENTITIES ? "available" : "unavailable"));
     }
 
     private static boolean detectDisplayEntities() {
