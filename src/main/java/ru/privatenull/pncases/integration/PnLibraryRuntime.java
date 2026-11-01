@@ -106,7 +106,7 @@ public final class PnLibraryRuntime implements PnRuntime {
         optional(box, "PlayerPoints", "валюта очков");
         optional(box, "LuckPerms", "выдача прав");
         optional(box, "WorldGuard", "регионы");
-        box.ok("Диагностика", "/pndebug " + MODULE_ID).show();
+        box.ok("Диагностика", "/pn debug " + MODULE_ID).show();
     }
 
     @Override
