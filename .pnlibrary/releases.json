@@ -7,7 +7,7 @@
       "channel": "stable",
       "description": "Сцены у кейса, новые анимации, подарок ключей, серия открытий, переработанный Machine и крафт ключей в верстаке.",
       "changelogUrl": "https://github.com/PnFolder/pnCases/blob/master/.pnlibrary/changelogs/1.5.4-remaster.md",
-      "publishedAt": "2026-10-27T21:40:28Z",
+      "publishedAt": "2026-11-01T21:41:52Z",
       "api": {
         "minimum": 1,
         "maximum": 1
@@ -20,7 +20,7 @@
             "minimum": 17
           },
           "url": "https://github.com/PnFolder/pnCases/releases/download/v1.5.4-remaster/pnCases-1.5.4-remaster.jar",
-          "sha256": "9d678eb0bf963961dec4a7583a69398fe4e1330e44425103001254edfd249575",
+          "sha256": "98cac5308e320734224c0c727eaaa501353f00df0ce0e211af8e59ea9f1c876d",
           "size": 3679232
         }
       ]
