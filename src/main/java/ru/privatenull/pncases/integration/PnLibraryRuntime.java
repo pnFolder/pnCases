@@ -30,7 +30,7 @@ import java.util.logging.Level;
 /** Managed pnLibrary integration loaded only after the dependency is enabled. */
 public final class PnLibraryRuntime implements PnRuntime {
 
-    public static final String MINIMUM_VERSION = "0.0.1-dev.5";
+    public static final String MINIMUM_VERSION = "0.0.1-dev.6";
     private static final String MODULE_ID = "pncases";
     private static final int BSTATS_PROJECT_ID = 32592;
     private static final String POLICY_SOURCE =
