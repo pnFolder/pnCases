@@ -6,6 +6,7 @@ import org.pnfolder.pnlibrary.localization.TranslationRequest;
 import org.pnfolder.pnlibrary.api.placeholders.PlaceholderService;
 import org.pnfolder.pnlibrary.api.diagnostics.DiagnosticConfiguration;
 import org.pnfolder.pnlibrary.api.diagnostics.DiagnosticContainer;
+import org.pnfolder.pnlibrary.api.logging.MessageBox;
 import org.pnfolder.pnlibrary.api.plugin.ModuleContext;
 import org.pnfolder.pnlibrary.api.plugin.PluginRegistration;
 import org.pnfolder.pnlibrary.api.remote.PolicyErrorAction;
@@ -92,14 +93,38 @@ public final class PnLibraryRuntime implements PnRuntime {
     }
 
     @Override
-    public void enabled(String databaseType, int loadedCaseCount) {
+    public void started(String databaseType, int loadedCaseCount, String hologramProvider) {
         if (module == null) return;
         boolean published = registerPlaceholders(data);
-        module.getLifecycle().enabled()
-                .ok("Хранилище", databaseType)
+        MessageBox box = module.getLifecycle().enabled()
+                .ok("База данных", databaseType)
                 .ok("Кейсы", String.valueOf(loadedCaseCount))
-                .ok("Плейсхолдеры", published ? "%pncases_*%" : "недоступны")
-                .show();
+                .ok("Голограммы", hologramProvider);
+        if (published) box.ok("Плейсхолдеры", "%pncases_*%");
+        else box.warn("Плейсхолдеры", "не зарегистрированы");
+        optional(box, "Vault", "экономика");
+        optional(box, "PlayerPoints", "валюта очков");
+        optional(box, "LuckPerms", "выдача прав");
+        optional(box, "WorldGuard", "регионы");
+        box.ok("Диагностика", "/pndebug " + MODULE_ID).show();
+    }
+
+    @Override
+    public void stopped(String databaseType, int loadedCaseCount) {
+        if (module == null || module.isClosed()) return;
+        try {
+            module.getLifecycle().disabled()
+                    .ok("Кейсы", "меню и анимации закрыты (" + loadedCaseCount + ")")
+                    .ok("База данных", "соединение закрывается (" + databaseType + ")")
+                    .show();
+        } catch (RuntimeException failure) {
+            owner.getLogger().log(Level.FINE, "Не удалось вывести сообщение об остановке pnCases", failure);
+        }
+    }
+
+    private void optional(MessageBox box, String plugin, String purpose) {
+        if (owner.getServer().getPluginManager().isPluginEnabled(plugin)) box.ok(plugin, purpose);
+        else box.skip(plugin, "не установлен, " + purpose + " недоступна");
     }
 
     /**
@@ -196,15 +221,7 @@ public final class PnLibraryRuntime implements PnRuntime {
 
     @Override
     public void close() {
-        ModuleContext closing = module;
         module = null;
-        if (closing != null && !closing.isClosed()) {
-            try {
-                closing.getLifecycle().disabled().show();
-            } catch (RuntimeException failure) {
-                owner.getLogger().log(Level.FINE, "Не удалось вывести сообщение об остановке pnCases", failure);
-            }
-        }
         closeRegistration();
     }
 

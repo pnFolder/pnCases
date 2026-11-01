@@ -170,7 +170,7 @@ public final class PnCasesPlugin extends JavaPlugin {
         runtimeListener.deliverPendingToOnlinePlayers();
 
         runtimeData.set(new CaseRuntimeData(this, caseManager));
-        pnRuntime.enabled(database.type().name(), caseManager.getLoadedCaseCount());
+        pnRuntime.started(database.type().name(), caseManager.getLoadedCaseCount(), holograms.providerName());
         applyLibraryTranslations();
     }
 
@@ -192,6 +192,10 @@ public final class PnCasesPlugin extends JavaPlugin {
 
         // Drain ordered storage work before closing its connections.
         PnRuntime closingRuntime = pnRuntime;
+        if (closingRuntime != null) {
+            closingRuntime.stopped(database == null ? "-" : database.type().name(),
+                    caseManager == null ? 0 : caseManager.getLoadedCaseCount());
+        }
         pnRuntime = null;
         tasks.bind(null);
         if (closingRuntime != null) {
