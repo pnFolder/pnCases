@@ -72,6 +72,7 @@ final class MachineProximityScreen {
     static final int PARTICLES_SWIRL = 13;
     static final int PARTICLES_RING = 14;
     static final int PARTICLES_GLINTS = 15;
+    static final int PARTICLES_AURORA = 16;
     // Decor, seven counters in a row.
     static final int DECOR_MOUNDS = 10;
     static final int DECOR_TREES = 11;
@@ -252,6 +253,10 @@ final class MachineProximityScreen {
         inventory.setItem(PARTICLES_GLINTS, toggle("glints", fall ? Material.GLOWSTONE_DUST : Material.QUARTZ, "Искры",
                 fall ? "Светлячки, огоньки тыкв и блеск на корзине" : "Блеск на льдинках, снежинках и самом кейсе",
                 c.glints(), definition));
+        if (!fall) {
+            inventory.setItem(PARTICLES_AURORA, toggle("aurora", Material.LIME_STAINED_GLASS, "Северное сияние",
+                    "Переливающиеся полосы света в небе над сценой", c.aurora(), definition));
+        }
     }
 
     private void fillDecor(Inventory inventory, CaseDefinition definition, ProximitySettings p) {

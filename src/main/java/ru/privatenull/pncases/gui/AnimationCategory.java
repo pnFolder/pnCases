@@ -14,7 +14,9 @@ import java.util.Set;
  */
 public enum AnimationCategory {
     ALL("Все", "FFE66D", Set.of()),
-    SEASONAL("Сезонные", "9EFC65", EnumSet.of(AnimationType.NEW_YEAR_TREE, AnimationType.AUTUMN_MAPLE)),
+    SEASONAL("Сезонные", "9EFC65", EnumSet.of(
+            AnimationType.NEW_YEAR_TREE, AnimationType.SANTA_SLEIGH, AnimationType.ICE_BLOCK,
+            AnimationType.AUTUMN_MAPLE)),
     ROTATING("Крутящиеся", "FCA865", EnumSet.of(
             AnimationType.FORTUNE_RING, AnimationType.PRISM, AnimationType.STAR_CAROUSEL)),
     EFFECTS("Эффектные", "65D1FC", EnumSet.of(

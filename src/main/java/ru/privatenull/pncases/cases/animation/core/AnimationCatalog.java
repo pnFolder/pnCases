@@ -46,6 +46,8 @@ public class AnimationCatalog {
         register(AnimationType.PRISM, modern, "PrismAnimation");
         register(AnimationType.STAR_CAROUSEL, modern, "StarCarouselAnimation");
         register(AnimationType.NEW_YEAR_TREE, modern, "NewYearTreeAnimation");
+        register(AnimationType.SANTA_SLEIGH, modern, "SantaSleighAnimation");
+        register(AnimationType.ICE_BLOCK, modern, "IceBlockAnimation");
         register(AnimationType.AUTUMN_MAPLE, modern, "AutumnMapleAnimation");
         animations.put(AnimationType.MOB_HUNT, new MobHuntAnimation(plugin));
     }

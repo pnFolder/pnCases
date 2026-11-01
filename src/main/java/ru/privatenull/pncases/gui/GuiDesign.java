@@ -100,6 +100,8 @@ public final class GuiDesign {
             case PRISM -> STYLE;
             case STAR_CAROUSEL -> SHOWCASE;
             case NEW_YEAR_TREE -> AQUARIUM;
+            case SANTA_SLEIGH -> HOLOGRAM;
+            case ICE_BLOCK -> AQUARIUM;
             case AUTUMN_MAPLE -> HOLOGRAM;
         };
         return head(texture, animationName(type));
@@ -138,6 +140,8 @@ public final class GuiDesign {
             case PRISM -> gradient("Призма", 0x65D1FC, 0x9EFC65);
             case STAR_CAROUSEL -> gradient("Звёздный хоровод", 0xFFF5C2, 0xB5B4FF);
             case NEW_YEAR_TREE -> gradient("Новогодняя ёлка", 0xE8F6FF, 0x65D1FC);
+            case SANTA_SLEIGH -> gradient("Сани Деда Мороза", 0xFF9C8A, 0xFFE38A);
+            case ICE_BLOCK -> gradient("Ледяная глыба", 0xE8F6FF, 0x7FB2FF);
             case AUTUMN_MAPLE -> gradient("Осенний клён", 0xFFB347, 0xE05A2B);
         };
     }
@@ -159,13 +163,15 @@ public final class GuiDesign {
             case PRISM -> "Призма";
             case STAR_CAROUSEL -> "Звёздный хоровод";
             case NEW_YEAR_TREE -> "Новогодняя ёлка";
+            case SANTA_SLEIGH -> "Сани Деда Мороза";
+            case ICE_BLOCK -> "Ледяная глыба";
             case AUTUMN_MAPLE -> "Осенний клён";
         };
     }
 
     public static String animationSelectionName(AnimationType type) {
         String name = animationPlainName(type);
-        return type == AnimationType.NEW_YEAR_TREE || type == AnimationType.AUTUMN_MAPLE
+        return AnimationCategory.SEASONAL.contains(type)
                 ? name + " &8" + NEW_TAG
                 : name;
     }
@@ -233,6 +239,16 @@ public final class GuiDesign {
                     "Её гирлянду включают, и огонёк бежит по",
                     "лампочкам-наградам, замедляется и замирает",
                     "на выигрышной, которая становится призом.");
+            case SANTA_SLEIGH -> List.of(
+                    "Под звон бубенцов по небу пролетают сани.",
+                    "Над кейсом с них падает подарок, плюхается",
+                    "в снег и начинает дрожать, а потом крышка",
+                    "слетает и открывает приз.");
+            case ICE_BLOCK -> List.of(
+                    "Иней бежит по земле, и кейс вмерзает в лёд.",
+                    "Удар за ударом по льду расходятся трещины,",
+                    "глыба светится цветом редкости, разлетается",
+                    "на осколки и выпускает приз.");
             case AUTUMN_MAPLE -> List.of(
                     "Вырастает клён: листья желтеют и краснеют на глазах.",
                     "Светлячок перелетает от плода к плоду, замедляется",

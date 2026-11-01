@@ -277,6 +277,8 @@ final class AnimationSelectionMenu {
             case PRISM -> player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.14f, 1.65f);
             case STAR_CAROUSEL -> player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_TWINKLE, 0.14f, 1.5f);
             case NEW_YEAR_TREE -> player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.14f, 1.8f);
+            case SANTA_SLEIGH -> player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.16f, 1.6f);
+            case ICE_BLOCK -> player.playSound(player.getLocation(), Sound.BLOCK_GLASS_PLACE, 0.18f, 1.4f);
             case AUTUMN_MAPLE -> player.playSound(player.getLocation(), Sound.BLOCK_AZALEA_LEAVES_PLACE, 0.2f, 1.0f);
         }
     }
@@ -295,6 +297,8 @@ final class AnimationSelectionMenu {
                             && type != AnimationType.PRISM
                             && type != AnimationType.STAR_CAROUSEL
                             && type != AnimationType.NEW_YEAR_TREE
+                            && type != AnimationType.SANTA_SLEIGH
+                            && type != AnimationType.ICE_BLOCK
                             && type != AnimationType.AUTUMN_MAPLE)
                     .toArray(AnimationType[]::new);
         }

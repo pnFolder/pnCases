@@ -280,11 +280,6 @@ final class MachineActionController {
                 }
                 if (slot == MachineProximityScreen.HUB_ENABLED) change = setting("enabled", !p.enabled());
                 if (slot == MachineProximityScreen.HUB_SCENE) {
-                    if (p.scene() == ru.privatenull.pncases.cases.model.ProximitySettings.Scene.AUTUMN
-                            && !ru.privatenull.pncases.cases.animation.core.AnimationSeason.newYearOpen()) {
-                        player.sendMessage("§cЗимняя сцена " + ru.privatenull.pncases.cases.animation.core.AnimationSeason.NEW_YEAR_TEXT + ".");
-                        return;
-                    }
                     change = switchScene(p);
                 }
             }
@@ -310,6 +305,8 @@ final class MachineActionController {
                 case MachineProximityScreen.PARTICLES_SWIRL -> setting("particles.swirl", !p.particles().swirl());
                 case MachineProximityScreen.PARTICLES_RING -> setting("particles.frost_ring", !p.particles().frostRing());
                 case MachineProximityScreen.PARTICLES_GLINTS -> setting("particles.glints", !p.particles().glints());
+                case MachineProximityScreen.PARTICLES_AURORA -> p.scene() == ru.privatenull.pncases.cases.model.ProximitySettings.Scene.WINTER
+                        ? setting("particles.aurora", !p.particles().aurora()) : null;
                 default -> null;
             };
             case DECOR -> change = switch (slot) {

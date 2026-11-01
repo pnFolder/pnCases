@@ -16,5 +16,7 @@ public enum AnimationType {
     PRISM,
     STAR_CAROUSEL,
     AUTUMN_MAPLE,
-    NEW_YEAR_TREE
+    NEW_YEAR_TREE,
+    SANTA_SLEIGH,
+    ICE_BLOCK
 }

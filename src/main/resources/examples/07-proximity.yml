@@ -24,6 +24,7 @@ proximity-animation:
     swirl: true
     frost_ring: true
     glints: true
+    aurora: true
   decor:
     mounds: 11
     trees: 4

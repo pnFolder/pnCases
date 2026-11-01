@@ -121,6 +121,8 @@ final class MachineAnimationScreen {
                             && type != AnimationType.PRISM
                             && type != AnimationType.STAR_CAROUSEL
                             && type != AnimationType.NEW_YEAR_TREE
+                            && type != AnimationType.SANTA_SLEIGH
+                            && type != AnimationType.ICE_BLOCK
                             && type != AnimationType.AUTUMN_MAPLE)
                     .toArray(AnimationType[]::new);
         }

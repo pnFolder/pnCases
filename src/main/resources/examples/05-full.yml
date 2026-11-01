@@ -72,7 +72,7 @@ guarantee:
 
 # Анимация открытия. fixed — одна на кейс. Варианты: ANVIL, DYNAMITE, PORTAL, POISON, FORTUNE_RING,
 # PILLAGER_RAID, AQUARIUM, MOB_HUNT, DRAGON, MIMIC, STORM_DUEL, TIME_DISTORTION, PRISM,
-# STAR_CAROUSEL, AUTUMN_MAPLE, NEW_YEAR_TREE. Без fixed анимация выбирается случайно.
+# STAR_CAROUSEL, AUTUMN_MAPLE, NEW_YEAR_TREE, SANTA_SLEIGH, ICE_BLOCK. Без fixed анимация выбирается случайно.
 animation:
   fixed: DRAGON
   items:

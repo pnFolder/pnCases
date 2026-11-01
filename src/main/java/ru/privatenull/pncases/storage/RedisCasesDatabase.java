@@ -237,7 +237,12 @@ public final class RedisCasesDatabase implements CasesDatabase {
             } catch (IllegalArgumentException ignored) {
             }
         }
-        for (String value : redis.smembers(batchPlayers)) result.add(UUID.fromString(value));
+        for (String value : redis.smembers(batchPlayers)) {
+            try {
+                result.add(UUID.fromString(value));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
         return result;
     }
 

@@ -23,14 +23,12 @@ public final class RuntimeListener implements Listener {
     private final PnCasesPlugin plugin;
     private final CaseManager caseManager;
     private final CasesDatabase database;
-    private final NewYearNotice newYearNotice;
 
     public RuntimeListener(PnCasesPlugin plugin, CaseManager caseManager,
                            CasesDatabase database) {
         this.plugin = plugin;
         this.caseManager = caseManager;
         this.database = database;
-        this.newYearNotice = new NewYearNotice(plugin, caseManager);
     }
 
     public void deliverPendingToOnlinePlayers() {
@@ -93,7 +91,6 @@ public final class RuntimeListener implements Listener {
         plugin.tasks().later(() -> {
             if (!event.getPlayer().isOnline()) return;
             caseManager.deliverPendingRewardAsync(event.getPlayer(), ignored -> { });
-            newYearNotice.notifyIfNeeded(event.getPlayer());
         }, 20L);
     }
 

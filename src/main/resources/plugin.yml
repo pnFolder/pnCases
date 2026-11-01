@@ -9,6 +9,8 @@ depend: [ProtocolLib]
 softdepend: [pnLibrary, LuckPerms, FancyHolograms, DecentHolograms, Vault, PlayerPoints, WorldGuard]
 libraries:
   - org.xerial:sqlite-jdbc:3.53.2.0
+  - com.mysql:mysql-connector-j:9.1.0
+  - org.mongodb:mongodb-driver-sync:5.2.1
 commands:
   pncases:
     description: privatenull developer plugin

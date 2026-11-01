@@ -33,6 +33,9 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 final class WinterScene extends AmbientScene {
 
+    private static final int AURORA_COLUMNS = 28;
+    private static final int AURORA_LEVELS = 3;
+
     private static final int RING_STEPS = 14;
     private static final double[] PENTATONIC = {0.707, 0.794, 0.891, 1.059, 1.189, 1.414, 1.587, 1.782};
     private static final Material[] GIFT_COLORS = {
@@ -459,12 +462,43 @@ final class WinterScene extends AmbientScene {
             }
         }
 
+        if (cfg.aurora() && age % 3 == 0) drawAurora(eased, density);
+
         if (cfg.glints() && age % 6 == 0 && mode == SceneMode.ALL) drawCaseSparkles(eased, density);
 
         if (ringStep >= 0) {
             drawRing(ringStep, density);
             ringStep = ringStep + 1 >= RING_STEPS ? -1 : ringStep + 1;
         }
+    }
+
+    /**
+     * The northern lights: curtains of light in a ring high above the scene. Each column waves in and out and blends
+     * from green at the bottom to violet at the top; a third of the columns is drawn each time, so they shimmer.
+     */
+    private void drawAurora(double eased, double density) {
+        Particle dust = AnimationEffects.particle(AnimationEffects.Kind.DUST);
+        double radius = 4.5 * spread;
+        int points = (int) Math.max(1L, Math.round(AURORA_LEVELS * density * eased));
+        for (int column = 0; column < AURORA_COLUMNS; column++) {
+            if ((column + age / 3) % 3 != 0) continue;
+            double angle = Math.PI * 2.0 * column / AURORA_COLUMNS;
+            double wave = Math.sin(angle * 3.0 + age * 0.04) * 0.9 + Math.sin(angle * 5.0 - age * 0.03) * 0.4;
+            double r = radius + wave;
+            double glow = 0.6 + 0.4 * Math.sin(angle * 2.0 + age * 0.06);
+            for (int step = 0; step < points; step++) {
+                double level = (step + 0.5) / points;
+                Particle.DustOptions options = new Particle.DustOptions(auroraColor(level, glow), 1.8f);
+                Location at = origin.clone().add(Math.cos(angle) * r, 4.6 + level * 3.6, Math.sin(angle) * r);
+                AnimationEffects.dust(world, dust, at, 1, 0.12, 0.25, 0.12, 0, options);
+            }
+        }
+    }
+
+    private static Color auroraColor(double level, double glow) {
+        double violet = Math.max(0.0, level - 0.45) / 0.55;
+        return Color.fromRGB((int) ((40 + 150 * violet) * glow), (int) ((235 - 160 * violet) * glow),
+                (int) ((150 + 105 * violet) * glow));
     }
 
     @Override

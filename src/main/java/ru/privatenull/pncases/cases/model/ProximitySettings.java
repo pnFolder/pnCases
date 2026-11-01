@@ -31,7 +31,7 @@ public record ProximitySettings(
                 3.0,
                 new Music(true, 0.3, 4.0),
                 new Sounds(true, 1.0),
-                new Particles(1.0, true, true, true, true),
+                new Particles(1.0, true, true, true, true, true),
                 new Decor(11, 5, 4, 3, 0, 0, 4),
                 new Santa(true, Material.ORANGE_TERRACOTTA, List.of("&6Осень на дворе", "&eСегодня прохладно", "&7Одевайтесь теплее!", "&cНе забудьте шарф!")),
                 new Terrain(true, 7, CaseStyle.BASKET, Material.ORANGE_CONCRETE, Material.HAY_BLOCK, 1.0, true, false,
@@ -49,7 +49,7 @@ public record ProximitySettings(
                 3.0,
                 new Music(true, 0.3, 4.0),
                 new Sounds(true, 1.0),
-                new Particles(1.0, true, true, true, true),
+                new Particles(1.0, true, true, true, true, true),
                 new Decor(11, 4, 1, 4, 18, 10, 4),
                 new Santa(true, Material.BLUE_CONCRETE, List.of("&bХо-хо-хо!", "&fС наступающим Новым годом!", "&eСкоро Новый год!", "&aГотовь подарки!")),
                 new Terrain(true, 7, CaseStyle.GIFT, Material.RED_CONCRETE, Material.BLUE_ICE, 1.0, true, false, defaultGround(),
@@ -86,7 +86,8 @@ public record ProximitySettings(
     }
 
     /** {@code density} multiplies every particle count, 0 disables particles. */
-    public record Particles(double density, boolean snowfall, boolean swirl, boolean frostRing, boolean glints) {
+    public record Particles(double density, boolean snowfall, boolean swirl, boolean frostRing, boolean glints,
+                            boolean aurora) {
     }
 
     public record Decor(int mounds, int trees, int snowmen, int crystals, int garland, int snowflakes, int gifts) {

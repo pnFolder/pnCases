@@ -1,6 +1,5 @@
 package ru.privatenull.pncases.cases.config;
 
-import ru.privatenull.pncases.cases.animation.core.AnimationSeason;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
@@ -86,11 +85,6 @@ final class CaseViewConfigParser {
             }
         }
 
-        // The winter scene is the New Year decoration: out of season the case shows the autumn one instead.
-        if (scene == ProximitySettings.Scene.WINTER && !AnimationSeason.newYearOpen()) {
-            scene = ProximitySettings.Scene.AUTUMN;
-        }
-
         // Each scene brings its own defaults, so the scene is read before anything else.
         ProximitySettings d = ProximitySettings.defaults(scene);
 
@@ -128,7 +122,8 @@ final class CaseViewConfigParser {
                         particles == null ? dp.snowfall() : particles.getBoolean("snowfall", dp.snowfall()),
                         particles == null ? dp.swirl() : particles.getBoolean("swirl", dp.swirl()),
                         particles == null ? dp.frostRing() : particles.getBoolean("frost_ring", dp.frostRing()),
-                        particles == null ? dp.glints() : particles.getBoolean("glints", dp.glints())),
+                        particles == null ? dp.glints() : particles.getBoolean("glints", dp.glints()),
+                        particles == null ? dp.aurora() : particles.getBoolean("aurora", dp.aurora())),
                 new ProximitySettings.Decor(
                         count(decor, key(decor, "mounds", "leaf_piles"), dd.mounds(), 30),
                         count(decor, key(decor, "trees", "maples"), dd.trees(), 12),

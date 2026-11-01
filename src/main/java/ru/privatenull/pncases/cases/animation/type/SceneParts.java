@@ -18,6 +18,7 @@ import org.joml.Vector3f;
 import ru.privatenull.pncases.cases.animation.core.AbstractCaseAnimation;
 import ru.privatenull.pncases.cases.animation.core.AnimationSession;
 import ru.privatenull.pncases.cases.animation.effect.AnimationEffects;
+import ru.privatenull.pncases.cases.model.Reward;
 
 /** Building blocks shared by the seasonal scenes: display spawning, posing, the prize and its celebration. */
 final class SceneParts {
@@ -141,6 +142,24 @@ final class SceneParts {
         to.normalize();
         Vector blended = side.clone().multiply(0.88).add(to.multiply(0.12));
         return blended.lengthSquared() > 1.0e-4 ? blended.normalize() : side;
+    }
+
+    /** The size of the celebration for a reward; a middle one when rarities are switched off. */
+    static int rarityTier(Reward reward, boolean rarityShown) {
+        return rarityShown ? reward.rarity().ordinal() : 2;
+    }
+
+    /** The colour of a reward's rarity; a neutral ice blue when rarities are switched off. */
+    static Color rarityColor(Reward reward, boolean rarityShown) {
+        if (!rarityShown) return Color.fromRGB(150, 215, 255);
+        return switch (reward.rarity()) {
+            case COMMON -> Color.fromRGB(205, 205, 205);
+            case UNCOMMON -> Color.fromRGB(90, 230, 110);
+            case RARE -> Color.fromRGB(80, 140, 255);
+            case EPIC -> Color.fromRGB(180, 90, 255);
+            case LEGENDARY -> Color.fromRGB(255, 190, 40);
+            case MYTHIC -> Color.fromRGB(255, 90, 210);
+        };
     }
 
     /** The bigger the rarity tier, the bigger the show. */
