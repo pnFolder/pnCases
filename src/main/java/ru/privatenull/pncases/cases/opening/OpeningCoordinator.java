@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases.opening;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -205,8 +206,7 @@ public final class OpeningCoordinator {
                 result -> finishOpeningReservation(p, def, sourceBlock, prepared, amount, result),
                 failure -> {
                     releaseOpeningState(playerId, sourceBlock);
-                    plugin.getLogger().log(Level.SEVERE,
-                            "Не удалось подготовить storage для открытия игрока " + p.getName() + ".", failure);
+                    Log.error("Не удалось подготовить storage для открытия игрока " + p.getName() + ".", failure);
                     if (p.isOnline()) p.sendMessage(plugin.getUi().get("case-open-storage-error"));
                 });
     }
@@ -244,7 +244,7 @@ public final class OpeningCoordinator {
         if (selectedReward == null) {
             cancelReservationAsync(playerId, cost);
             releaseOpeningState(playerId, sourceBlock);
-            plugin.getLogger().severe("Storage не вернул выбранную награду для кейса '" + definition.name() + "'.");
+            Log.error("Storage не вернул выбранную награду для кейса '" + definition.name() + "'.");
             return;
         }
         try {
@@ -252,8 +252,7 @@ public final class OpeningCoordinator {
         } catch (RuntimeException exception) {
             cancelReservationAsync(playerId, cost);
             releaseOpeningState(playerId, sourceBlock);
-            plugin.getLogger().log(Level.WARNING,
-                    "Не удалось закрыть GUI перед открытием кейса игроку " + player.getName() + ".", exception);
+            Log.warning("Не удалось закрыть GUI перед открытием кейса игроку " + player.getName() + ".", exception);
             return;
         }
         startAnimationAndReward(player, definition, sourceBlock,
@@ -291,8 +290,7 @@ public final class OpeningCoordinator {
                 throw new IllegalStateException("Animation is not registered: " + animationType);
             }
         } catch (RuntimeException | LinkageError exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "Не удалось подготовить анимацию кейса '" + def.name() + "'.", exception);
+            Log.error("Не удалось подготовить анимацию кейса '" + def.name() + "'.", exception);
             return null;
         }
 
@@ -307,7 +305,7 @@ public final class OpeningCoordinator {
         AnimationAvailability.Availability result = availability.check(wanted, caseBlock);
         if (result.available()) return wanted;
         if (reportedFallbacks.add(def.name() + ":" + wanted)) {
-            plugin.getLogger().warning("Анимация " + wanted + " не может запуститься у кейса '"
+            Log.warning("Анимация " + wanted + " не может запуститься у кейса '"
                     + def.name() + "': " + result.reason() + ". Вместо неё играет " + AnimationType.FORTUNE_RING + ".");
         }
         return AnimationType.FORTUNE_RING;
@@ -337,7 +335,7 @@ public final class OpeningCoordinator {
         );
         ActiveOpening previous = activeOpenings.putIfAbsent(playerId, opening);
         if (previous != null) {
-            plugin.getLogger().severe("Повторный активный сеанс открытия для игрока " + p.getName()
+            Log.error("Повторный активный сеанс открытия для игрока " + p.getName()
                     + " был отклонён.");
             cancelReservationAsync(playerId, cost);
             if (!Objects.equals(previous.sourceBlock, sourceBlock)) {
@@ -361,13 +359,12 @@ public final class OpeningCoordinator {
             }
             opening.watchdog = plugin.tasks().later(() -> {
                 if (opening.completed.get()) return;
-                plugin.getLogger().warning("Анимация кейса '" + opening.caseName
+                Log.warning("Анимация кейса '" + opening.caseName
                         + "' не завершилась вовремя; выполняется безопасная отмена.");
                 cancelAnimationSession(opening, true);
             }, ANIMATION_WATCHDOG_TICKS);
         } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "Не удалось запустить окружение анимации кейса '" + def.name() + "'.", exception);
+            Log.error("Не удалось запустить окружение анимации кейса '" + def.name() + "'.", exception);
             completeOpening(opening, true, null);
             return true;
         }
@@ -376,8 +373,7 @@ public final class OpeningCoordinator {
             opening.animationRun = prepared.animation.play(
                     p, def, prepared.reward, prepared.base, completion);
         } catch (RuntimeException | LinkageError exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "Анимация кейса '" + def.name() + "' аварийно остановлена.", exception);
+            Log.error("Анимация кейса '" + def.name() + "' аварийно остановлена.", exception);
             cancelAnimationSession(opening, true);
         }
         return true;
@@ -422,8 +418,7 @@ public final class OpeningCoordinator {
                         delivered = player.isOnline() && rewardDelivery.deliver(player, null, pending);
                     } catch (RuntimeException exception) {
                         delivered = false;
-                        plugin.getLogger().log(Level.SEVERE,
-                                "Не удалось выдать отложенную награду игроку " + player.getName() + ".", exception);
+                        Log.error("Не удалось выдать отложенную награду игроку " + player.getName() + ".", exception);
                     }
                     if (!delivered) {
                         pendingDeliveries.remove(playerId);
@@ -436,8 +431,7 @@ public final class OpeningCoordinator {
                 },
                 failure -> {
                     pendingDeliveries.remove(playerId);
-                    plugin.getLogger().log(Level.SEVERE,
-                            "Не удалось проверить отложенную награду игрока " + player.getName() + ".", failure);
+                    Log.error("Не удалось проверить отложенную награду игрока " + player.getName() + ".", failure);
                     completion.accept(false);
                 });
     }
@@ -455,7 +449,7 @@ public final class OpeningCoordinator {
         try {
             if (opening.animationRun != null) opening.animationRun.cancel();
         } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Не удалось полностью отменить анимацию кейса.", exception);
+            Log.error("Не удалось полностью отменить анимацию кейса.", exception);
         }
         completeOpening(opening, deliverReward, null);
     }
@@ -484,8 +478,7 @@ public final class OpeningCoordinator {
                     && opening.player.isOnline();
             delivered = mayDeliver && rewardDelivery.deliver(opening.player, opening.definition, opening.reward);
         } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE,
-                    "Не удалось завершить выдачу награды игроку " + opening.player.getName()
+            Log.error("Не удалось завершить выдачу награды игроку " + opening.player.getName()
                             + "; награда оставлена в pending storage.", exception);
         }
         if (delivered && opening.pendingStored && !shuttingDown && plugin.isEnabled()) {
@@ -519,7 +512,7 @@ public final class OpeningCoordinator {
             delivered = !shuttingDown && plugin.isEnabled() && player.isOnline()
                     && rewardDelivery.deliverSilently(player, definition, batch.rewards().get(index));
         } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Не удалось выдать награду из серии " + batch.id(), exception);
+            Log.error("Не удалось выдать награду из серии " + batch.id(), exception);
         }
         if (!delivered) {
             pendingDeliveries.remove(playerId);
@@ -567,8 +560,7 @@ public final class OpeningCoordinator {
                                 delay);
                         return;
                     }
-                    plugin.getLogger().log(Level.SEVERE,
-                            "Награда уже выдана, но pending-запись не удалось очистить для "
+                    Log.error("Награда уже выдана, но pending-запись не удалось очистить для "
                                     + playerName + " после " + (attempt + 1) + " попыток. "
                                     + "Повторная выдача заблокирована до перезапуска.", failure);
                     exhausted.run();
@@ -605,8 +597,7 @@ public final class OpeningCoordinator {
                     opening.sourceBlock.x(), opening.sourceBlock.y(), opening.sourceBlock.z());
             holograms.showCase(current, currentLocation);
         } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.WARNING,
-                    "Не удалось восстановить голограмму кейса '" + opening.caseName + "'.", exception);
+            Log.warning("Не удалось восстановить голограмму кейса '" + opening.caseName + "'.", exception);
         }
     }
 
@@ -659,8 +650,7 @@ public final class OpeningCoordinator {
                     database.cancelOpening(playerId, receipt.keyId);
                 }),
                 ignored -> { },
-                failure -> plugin.getLogger().log(Level.SEVERE,
-                        "Не удалось отменить резерв открытия игрока " + playerId + ".", failure));
+                failure -> Log.error("Не удалось отменить резерв открытия игрока " + playerId + ".", failure));
     }
 
     private record PreparedOpening(

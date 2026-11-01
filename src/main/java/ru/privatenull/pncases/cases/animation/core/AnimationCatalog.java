@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases.animation.core;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.World;
 import ru.privatenull.pncases.PnCasesPlugin;
 import ru.privatenull.pncases.cases.animation.legacy.LegacyCaseAnimation;
@@ -61,7 +62,7 @@ public class AnimationCatalog {
             try {
                 animation.shutdown();
             } catch (RuntimeException exception) {
-                plugin.getLogger().log(Level.SEVERE, "Could not shut down case animation", exception);
+                Log.error("Could not shut down case animation", exception);
             }
         }
     }
@@ -72,8 +73,7 @@ public class AnimationCatalog {
             try {
                 animation.cancelWorld(world);
             } catch (RuntimeException exception) {
-                plugin.getLogger().log(Level.SEVERE,
-                        "Could not cancel case animation state for world unload: " + world.getName(),
+                Log.error("Could not cancel case animation state for world unload: " + world.getName(),
                         exception);
             }
         }

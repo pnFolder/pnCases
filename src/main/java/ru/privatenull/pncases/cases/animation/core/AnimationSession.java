@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases.animation.core;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -185,8 +186,7 @@ public final class AnimationSession {
     public void fail(String stage, Throwable failure) {
         String caseName = definition == null ? "unknown" : definition.name();
         String playerName = player == null ? "unknown" : player.getName();
-        plugin.getLogger().log(Level.SEVERE,
-                "Анимация кейса '" + caseName + "' аварийно завершена на этапе '"
+        Log.error("Анимация кейса '" + caseName + "' аварийно завершена на этапе '"
                         + stage + "' для игрока " + playerName
                         + ". Награда будет выдана безопасно.", failure);
         complete();
@@ -227,7 +227,7 @@ public final class AnimationSession {
         try {
             action.run();
         } catch (RuntimeException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Could not execute " + operation, exception);
+            Log.error("Could not execute " + operation, exception);
         }
     }
 

@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.compat;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.DataInputStream;
@@ -46,7 +47,7 @@ public final class HotReloadClassCache {
                     : classesFromJar(source);
             if (!Files.isDirectory(source)) wrapperNames = anvilWrappersFromJar(source);
         } catch (IOException | URISyntaxException | RuntimeException exception) {
-            plugin.getLogger().warning("Не удалось подготовить классы для безопасного restart: "
+            Log.warning("Не удалось подготовить классы для безопасного restart: "
                     + message(exception));
             return;
         }
@@ -79,7 +80,7 @@ public final class HotReloadClassCache {
             }
         }
         loaded = true;
-        plugin.getLogger().info("Классы подготовлены для безопасного restart: "
+        Log.info("Классы подготовлены для безопасного restart: "
                 + prepared + (skipped == 0 ? "" : ", пропущено необязательных: " + skipped)
                 + ", классов окна ввода для этой версии сервера: " + wrappers);
     }

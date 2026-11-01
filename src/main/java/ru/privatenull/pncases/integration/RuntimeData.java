@@ -19,6 +19,6 @@ public interface RuntimeData {
 
     String version();
 
-    /** Summary for the /pndebug support report. Must not contain secrets. */
+    /** Summary for the /pn debug support report. Must not contain secrets. */
     java.util.Map<String, Object> diagnostics();
 }

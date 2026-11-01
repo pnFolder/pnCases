@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.gift;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -273,7 +274,7 @@ public final class GiftLimits {
         try {
             yaml.save(file);
         } catch (IOException exception) {
-            plugin.getLogger().log(Level.WARNING, "Не удалось сохранить счётчик подарков ключей.", exception);
+            Log.warning("Не удалось сохранить счётчик подарков ключей.", exception);
         }
     }
 }

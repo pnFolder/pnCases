@@ -1,5 +1,7 @@
 package ru.privatenull.pncases.support.task;
 
+import ru.privatenull.pncases.integration.Log;
+
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -61,7 +63,7 @@ public final class PluginTasks {
             try {
                 action.run();
             } catch (Throwable failure) {
-                plugin.getLogger().log(Level.WARNING, "Ошибка в задаче pnCases", failure);
+                Log.warning("Ошибка в задаче pnCases", failure);
             }
         };
         TaskBackend current = backend;

@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.config;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -107,7 +108,7 @@ public final class UiConfig {
             try {
                 result.add(Integer.parseInt(String.valueOf(value)));
             } catch (NumberFormatException exception) {
-                plugin.getLogger().warning("gui.yml: '" + path
+                Log.warning("gui.yml: '" + path
                         + "' содержит неверный номер слота: " + value);
             }
         }
@@ -120,15 +121,14 @@ public final class UiConfig {
             YamlConfiguration current
     ) {
         if (!BundledConfigurationResources.copyIfMissing(plugin, resourceName, file)) {
-            plugin.getLogger().severe("Не удалось создать " + resourceName);
+            Log.error("Не удалось создать " + resourceName);
         }
         YamlConfiguration defaults = loadResource(resourceName);
         YamlConfiguration loaded = new YamlConfiguration();
         try {
             loaded.load(file);
         } catch (IOException | InvalidConfigurationException exception) {
-            plugin.getLogger().severe(resourceName + " повреждён и не был перезаписан: "
-                    + exception.getMessage());
+            Log.error(resourceName + " повреждён и не был перезаписан", exception);
             if (current == null) return defaults;
             current.setDefaults(defaults);
             return current;
@@ -148,8 +148,7 @@ public final class UiConfig {
                 defaults.load(reader);
             }
         } catch (IOException | InvalidConfigurationException exception) {
-            plugin.getLogger().severe("Не удалось прочитать встроенный " + resourceName + ": "
-                    + exception.getMessage());
+            Log.error("Не удалось прочитать встроенный " + resourceName, exception);
         }
         return defaults;
     }

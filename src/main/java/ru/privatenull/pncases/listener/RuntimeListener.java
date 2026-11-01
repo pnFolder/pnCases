@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.listener;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -38,12 +39,11 @@ public final class RuntimeListener implements Listener {
                     var player = plugin.getServer().getPlayer(playerId);
                     if (player == null || !player.isOnline()) return;
                     caseManager.deliverPendingRewardAsync(player, delivered -> {
-                        if (delivered) plugin.getLogger().info("Выдал отложенную награду игроку "
+                        if (delivered) Log.info("Выдал отложенную награду игроку "
                                 + player.getName() + " после перезапуска.");
                     });
                 }),
-                failure -> plugin.getLogger().log(Level.SEVERE,
-                        "Не удалось прочитать отложенные награды.", failure));
+                failure -> Log.error("Не удалось прочитать отложенные награды.", failure));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)

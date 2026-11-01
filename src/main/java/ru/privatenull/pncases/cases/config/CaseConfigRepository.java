@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases.config;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -109,7 +110,7 @@ public final class CaseConfigRepository {
             updater.accept(writable.section());
         } catch (RuntimeException ex) {
             restoreSection(writable.section(), before);
-            plugin.getLogger().severe("Не удалось изменить конфиг кейса '" + normalizeName(caseName) + "': " + ex.getMessage());
+            Log.error("Не удалось изменить конфиг кейса '" + normalizeName(caseName) + "'", ex);
             return false;
         }
         if (save(writable)) {
@@ -151,7 +152,7 @@ public final class CaseConfigRepository {
 
         File directory = directory();
         if (!directory.exists() && !directory.mkdirs()) {
-            plugin.getLogger().severe("Не удалось создать папку кейсов: " + directory.getPath());
+            Log.error("Не удалось создать папку кейсов: " + directory.getPath());
             return CreateResult.SAVE_FAILED;
         }
 
@@ -197,7 +198,7 @@ public final class CaseConfigRepository {
         }
         File[] files = casesDirectory.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml"));
         if (files == null) {
-            plugin.getLogger().severe("Не удалось прочитать папку cases: путь недоступен или не является папкой.");
+            Log.error("Не удалось прочитать папку cases: путь недоступен или не является папкой.");
             return new LoadResult(List.of(), false);
         }
 
@@ -205,7 +206,7 @@ public final class CaseConfigRepository {
         for (File file : files) {
             String canonicalId = fileId(file.getName());
             if (!isValidId(canonicalId)) {
-                plugin.getLogger().severe("Пропущен конфиг кейса с недопустимым именем файла: " + file.getName());
+                Log.error("Пропущен конфиг кейса с недопустимым именем файла: " + file.getName());
                 successful = false;
                 continue;
             }
@@ -216,7 +217,7 @@ public final class CaseConfigRepository {
             }
             warnIdMismatch(file.getName(), canonicalId, yaml);
             if (sources.putIfAbsent(canonicalId, new Source(canonicalId, yaml)) != null) {
-                plugin.getLogger().severe("Дубликат id кейса '" + canonicalId + "' в папке cases. Файл "
+                Log.error("Дубликат id кейса '" + canonicalId + "' в папке cases. Файл "
                         + file.getName() + " пропущен.");
                 successful = false;
             }
@@ -262,7 +263,7 @@ public final class CaseConfigRepository {
         try {
             return Files.deleteIfExists(caseFile.toPath());
         } catch (IOException ex) {
-            plugin.getLogger().severe("Не удалось удалить конфиг кейса '" + normalizeName(caseName) + "': " + ex.getMessage());
+            Log.error("Не удалось удалить конфиг кейса '" + normalizeName(caseName) + "'", ex);
             return false;
         }
     }
@@ -277,7 +278,7 @@ public final class CaseConfigRepository {
 
     private boolean ensureDirectory(File directory) {
         if (directory.exists() || directory.mkdirs()) return true;
-        plugin.getLogger().warning("Не удалось создать папку cases для отдельных конфигов кейсов.");
+        Log.warning("Не удалось создать папку cases для отдельных конфигов кейсов.");
         return false;
     }
 
@@ -322,7 +323,7 @@ public final class CaseConfigRepository {
             yaml.load(file);
             return yaml;
         } catch (IOException | InvalidConfigurationException ex) {
-            plugin.getLogger().severe("Не удалось прочитать конфиг кейса " + file.getName() + ": " + ex.getMessage());
+            Log.error("Не удалось прочитать конфиг кейса " + file.getName(), ex);
             return null;
         }
     }
@@ -330,7 +331,7 @@ public final class CaseConfigRepository {
     private void warnIdMismatch(String source, String canonicalId, ConfigurationSection section) {
         String explicitId = section == null ? null : section.getString("id");
         if (explicitId != null && !explicitId.isBlank() && !canonicalId.equals(normalizeName(explicitId))) {
-            plugin.getLogger().warning(source + " содержит id='" + explicitId + "', но используется канонический id '"
+            Log.warning(source + " содержит id='" + explicitId + "', но используется канонический id '"
                     + canonicalId + "' из имени файла/секции. Измените id, чтобы убрать предупреждение.");
         }
     }

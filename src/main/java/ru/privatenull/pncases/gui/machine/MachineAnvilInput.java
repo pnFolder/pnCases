@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.gui.machine;
 
+import ru.privatenull.pncases.integration.Log;
 import ru.privatenull.pncases.PnCasesPlugin;
 import net.wesjd.anvilgui.AnvilGUI;
 import org.bukkit.Material;
@@ -38,11 +39,10 @@ final class MachineAnvilInput {
     static void selfTest(PnCasesPlugin plugin) {
         try {
             Class.forName(AnvilGUI.class.getName(), true, MachineAnvilInput.class.getClassLoader());
-            plugin.getLogger().info("Окно ввода (AnvilGUI) готово к работе.");
+            Log.info("Окно ввода (AnvilGUI) готово к работе.");
         } catch (LinkageError | ClassNotFoundException failure) {
             if (FAILURE_REPORTED.compareAndSet(false, true)) {
-                plugin.getLogger().log(Level.SEVERE,
-                        "Окно ввода (AnvilGUI) не запускается на этой версии сервера.", failure);
+                Log.error("Окно ввода (AnvilGUI) не запускается на этой версии сервера.", failure);
             }
         }
     }
@@ -54,8 +54,7 @@ final class MachineAnvilInput {
         } catch (LinkageError | RuntimeException failure) {
             // The first failure carries the real cause; later ones only say the class could not be initialised.
             if (FAILURE_REPORTED.compareAndSet(false, true)) {
-                plugin.getLogger().log(Level.SEVERE,
-                        "Окно ввода (AnvilGUI) не запускается на этой версии сервера.", failure);
+                Log.error("Окно ввода (AnvilGUI) не запускается на этой версии сервера.", failure);
             }
             player.sendMessage(ColorUtil.colorize(
                     "&#FC7165Окно ввода недоступно на этой версии сервера. Подробности в консоли."));

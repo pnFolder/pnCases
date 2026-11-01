@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.cases;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import ru.privatenull.pncases.PnCasesPlugin;
@@ -51,8 +52,7 @@ public final class KeyService {
                     Bukkit.getPluginManager().callEvent(new CaseKeyGiveEvent(player, normalizedKey, amount, balance));
                 },
                 failure -> {
-                    plugin.getLogger().log(Level.SEVERE,
-                            "Не удалось выдать ключи игроку " + player.getName() + ".", failure);
+                    Log.error("Не удалось выдать ключи игроку " + player.getName() + ".", failure);
                     onFailure.accept(failure);
                 });
     }

@@ -6,6 +6,7 @@ import org.pnfolder.pnlibrary.localization.TranslationRequest;
 import org.pnfolder.pnlibrary.api.placeholders.PlaceholderService;
 import org.pnfolder.pnlibrary.api.diagnostics.DiagnosticConfiguration;
 import org.pnfolder.pnlibrary.api.diagnostics.DiagnosticContainer;
+import org.pnfolder.pnlibrary.api.logging.MessageBox;
 import org.pnfolder.pnlibrary.api.plugin.ModuleContext;
 import org.pnfolder.pnlibrary.api.plugin.PluginRegistration;
 import org.pnfolder.pnlibrary.api.remote.PolicyErrorAction;
@@ -29,7 +30,7 @@ import java.util.logging.Level;
 /** Managed pnLibrary integration loaded only after the dependency is enabled. */
 public final class PnLibraryRuntime implements PnRuntime {
 
-    public static final String MINIMUM_VERSION = "0.0.1-dev.5";
+    public static final String MINIMUM_VERSION = "0.0.1-dev.6";
     private static final String MODULE_ID = "pncases";
     private static final int BSTATS_PROJECT_ID = 32592;
     private static final String POLICY_SOURCE =
@@ -88,18 +89,43 @@ public final class PnLibraryRuntime implements PnRuntime {
             closeRegistration();
             throw failure;
         }
+        Log.bind(module);
         this.data = runtimeData;
     }
 
     @Override
-    public void enabled(String databaseType, int loadedCaseCount) {
+    public void started(String databaseType, int loadedCaseCount, String hologramProvider) {
         if (module == null) return;
         boolean published = registerPlaceholders(data);
-        module.getLifecycle().enabled()
-                .ok("Хранилище", databaseType)
+        MessageBox box = module.getLifecycle().enabled()
+                .ok("База данных", databaseType)
                 .ok("Кейсы", String.valueOf(loadedCaseCount))
-                .ok("Плейсхолдеры", published ? "%pncases_*%" : "недоступны")
-                .show();
+                .ok("Голограммы", hologramProvider);
+        if (published) box.ok("Плейсхолдеры", "%pncases_*%");
+        else box.warn("Плейсхолдеры", "не зарегистрированы");
+        optional(box, "Vault", "экономика");
+        optional(box, "PlayerPoints", "валюта очков");
+        optional(box, "LuckPerms", "выдача прав");
+        optional(box, "WorldGuard", "регионы");
+        box.ok("Диагностика", "/pn debug " + MODULE_ID).show();
+    }
+
+    @Override
+    public void stopped(String databaseType, int loadedCaseCount) {
+        if (module == null || module.isClosed()) return;
+        try {
+            module.getLifecycle().disabled()
+                    .ok("Кейсы", "меню и анимации закрыты (" + loadedCaseCount + ")")
+                    .ok("База данных", "соединение закрывается (" + databaseType + ")")
+                    .show();
+        } catch (RuntimeException failure) {
+            owner.getLogger().log(Level.FINE, "Не удалось вывести сообщение об остановке pnCases", failure);
+        }
+    }
+
+    private void optional(MessageBox box, String plugin, String purpose) {
+        if (owner.getServer().getPluginManager().isPluginEnabled(plugin)) box.ok(plugin, purpose);
+        else box.skip(plugin, "не установлен, " + purpose + " недоступна");
     }
 
     /**
@@ -126,8 +152,7 @@ public final class PnLibraryRuntime implements PnRuntime {
                     .publishToPlaceholderApi(PLACEHOLDER_NAMESPACE, "version"));
             return true;
         } catch (RuntimeException | LinkageError failure) {
-            owner.getLogger().log(Level.WARNING,
-                    "Плейсхолдеры pnCases не зарегистрированы; остальные функции работают.", failure);
+            Log.warning("Плейсхолдеры pnCases не зарегистрированы; остальные функции работают.", failure);
             return false;
         }
     }
@@ -171,14 +196,14 @@ public final class PnLibraryRuntime implements PnRuntime {
         try {
             MinecraftVersion version = MinecraftVersion.parse(serverVersion);
             if (!version.getKnown()) {
-                owner.getLogger().info("pnLibrary не знает версию сервера " + serverVersion
+                Log.info("pnLibrary не знает версию сервера " + serverVersion
                         + ", названия предметов берутся из встроенного файла.");
                 return;
             }
             TranslationRequest request = TranslationRequest.builder().version(version).locale(locale).build();
             module.getLocalization().load(request).whenComplete((bundle, failure) -> {
                 if (failure != null || bundle == null) {
-                    owner.getLogger().info("Переводы Minecraft недоступны (нет сети?), "
+                    Log.info("Переводы Minecraft недоступны (нет сети?), "
                             + "названия предметов берутся из встроенного файла.");
                     return;
                 }
@@ -196,15 +221,8 @@ public final class PnLibraryRuntime implements PnRuntime {
 
     @Override
     public void close() {
-        ModuleContext closing = module;
+        Log.bind((ModuleContext) null);
         module = null;
-        if (closing != null && !closing.isClosed()) {
-            try {
-                closing.getLifecycle().disabled().show();
-            } catch (RuntimeException failure) {
-                owner.getLogger().log(Level.FINE, "Не удалось вывести сообщение об остановке pnCases", failure);
-            }
-        }
         closeRegistration();
     }
 

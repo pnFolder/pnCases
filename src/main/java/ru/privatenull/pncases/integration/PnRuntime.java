@@ -13,7 +13,10 @@ public interface PnRuntime extends AutoCloseable {
     void register(Supplier<String> databaseType, RuntimeData data);
 
     /** Reports that pnCases has started: shows the console card and publishes placeholders. */
-    void enabled(String databaseType, int loadedCaseCount);
+    void started(String databaseType, int loadedCaseCount, String hologramProvider);
+
+    /** Shows the shutdown card. Called before the registration is closed. */
+    void stopped(String databaseType, int loadedCaseCount);
 
     /** Scheduling through pnLibrary's task scope. */
     TaskBackend taskBackend();

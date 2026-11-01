@@ -1,5 +1,7 @@
 package ru.privatenull.pncases.support.gui.protocollib;
 
+import ru.privatenull.pncases.integration.Log;
+
 import com.comphenix.protocol.PacketType;
 import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
@@ -66,10 +68,8 @@ public final class ProtocolLibSlotPacketSender
             sendSlot(player, state, slot, item);
         } catch (RuntimeException exception) {
             if (failureLogged.compareAndSet(false, true)) {
-                plugin.getLogger().warning(
-                        "ProtocolLib SET_SLOT transport failed: "
-                                + exception.getMessage()
-                );
+                Log.warning(
+                        "ProtocolLib SET_SLOT transport failed", exception);
             }
             throw new IllegalStateException("ProtocolLib SET_SLOT transport failed", exception);
         }
@@ -94,9 +94,8 @@ public final class ProtocolLibSlotPacketSender
             return true;
         } catch (RuntimeException exception) {
             if (failureLogged.compareAndSet(false, true)) {
-                plugin.getLogger().warning(
-                        "ProtocolLib title transport failed: "
-                                + exception.getMessage());
+                Log.warning(
+                        "ProtocolLib title transport failed", exception);
             }
             throw new IllegalStateException("ProtocolLib title transport failed", exception);
         }

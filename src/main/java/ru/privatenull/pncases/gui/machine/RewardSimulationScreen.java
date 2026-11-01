@@ -1,5 +1,6 @@
 package ru.privatenull.pncases.gui.machine;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -122,8 +123,7 @@ final class RewardSimulationScreen {
                 });
             } catch (RuntimeException failure) {
                 simulationRequests.remove(playerId, request);
-                caseManager.getPlugin().getLogger().log(java.util.logging.Level.WARNING,
-                        "Не удалось выполнить симуляцию кейса '" + definition.name() + "'.", failure);
+                Log.warning("Не удалось выполнить симуляцию кейса '" + definition.name() + "'.", failure);
                 if (caseManager.getPlugin().isEnabled()) {
                     caseManager.getPlugin().tasks().run(() -> {
                         if (player.isOnline()) player.sendMessage(ColorUtil.colorize(

@@ -1,5 +1,6 @@
 package ru.privatenull.pncases;
 
+import ru.privatenull.pncases.integration.Log;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -65,11 +66,11 @@ public final class PnCasesPlugin extends JavaPlugin {
 
     @Override
     public void onLoad() {
+        Log.bind(this);
         try {
             pnLibraryReady = PnLibraryBootstrap.ensureInstalled(this, PnLibraryRuntime.MINIMUM_VERSION);
         } catch (Throwable failure) {
-            getLogger().log(Level.SEVERE,
-                    "Не удалось автоматически подготовить pnLibrary. pnCases не будет запущен.", failure);
+            Log.error("Не удалось автоматически подготовить pnLibrary. pnCases не будет запущен.", failure);
         }
         BundledConfigurationResources.capture(this);
         HotReloadClassCache.preload(this);
@@ -77,23 +78,23 @@ public final class PnCasesPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        Log.bind(this);
         if (!pnLibraryReady) {
-            getLogger().severe("pnLibrary не подготовлена: проверьте доступ к GitHub и ошибку загрузки выше.");
+            Log.error("pnLibrary не подготовлена: проверьте доступ к GitHub и ошибку загрузки выше.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
         try {
             pnRuntime = PnLibraryRuntime.connect(this);
         } catch (Throwable failure) {
-            getLogger().log(Level.SEVERE,
-                    "pnLibrary не удалось включить или подключить к pnCases.", failure);
+            Log.error("pnLibrary не удалось включить или подключить к pnCases.", failure);
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
         getServer().getPluginManager().registerEvents(
                 new PnLibraryLifecycleListener(this), this);
         if (!ServerVersion.current().isAtLeast(1, 16, 5)) {
-            getLogger().severe("pnCases " + getDescription().getVersion()
+            Log.error("pnCases " + getDescription().getVersion()
                     + " поддерживает Minecraft 1.16.5 - 1.21.11. Плагин отключён.");
             getServer().getPluginManager().disablePlugin(this);
             return;
@@ -109,7 +110,7 @@ public final class PnCasesPlugin extends JavaPlugin {
         backupConfigurationOnUpgrade();
         ConfigurationSyncService.Result sync = synchronizeConfiguration();
         if (!sync.successful()) {
-            getLogger().severe("Не удалось безопасно обновить конфигурацию: " + sync.error());
+            Log.error("Не удалось безопасно обновить конфигурацию: " + sync.error());
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -125,9 +126,9 @@ public final class PnCasesPlugin extends JavaPlugin {
                     MongoCasesDatabase::new,
                     RedisCasesDatabase::new);
             database.initialize();
-            getLogger().info("Database connected: " + database.type());
+            Log.info("Database connected: " + database.type());
         } catch (Exception exception) {
-            getLogger().severe("Could not initialize pnCases database: " + exception.getMessage());
+            Log.error("Could not initialize pnCases database", exception);
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -137,12 +138,12 @@ public final class PnCasesPlugin extends JavaPlugin {
         rewardVisibility = new RewardVisibilityGuard(this);
         holograms = new CaseHologramManager(this);
         if (!holograms.hasProvider()) {
-            getLogger().severe("pnCases требует FancyHolograms или DecentHolograms для анимаций. "
+            Log.error("pnCases требует FancyHolograms или DecentHolograms для анимаций. "
                     + "Установите совместимый провайдер и полностью перезапустите сервер.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        getLogger().info("Hologram provider connected: " + holograms.providerName());
+        Log.info("Hologram provider connected: " + holograms.providerName());
 
         caseManager = new CaseManager(this);
         caseManager.setCaseView(new CaseMenuService(this, caseManager));
@@ -170,7 +171,7 @@ public final class PnCasesPlugin extends JavaPlugin {
         runtimeListener.deliverPendingToOnlinePlayers();
 
         runtimeData.set(new CaseRuntimeData(this, caseManager));
-        pnRuntime.enabled(database.type().name(), caseManager.getLoadedCaseCount());
+        pnRuntime.started(database.type().name(), caseManager.getLoadedCaseCount(), holograms.providerName());
         applyLibraryTranslations();
     }
 
@@ -192,13 +193,17 @@ public final class PnCasesPlugin extends JavaPlugin {
 
         // Drain ordered storage work before closing its connections.
         PnRuntime closingRuntime = pnRuntime;
+        if (closingRuntime != null) {
+            closingRuntime.stopped(database == null ? "-" : database.type().name(),
+                    caseManager == null ? 0 : caseManager.getLoadedCaseCount());
+        }
         pnRuntime = null;
         tasks.bind(null);
         if (closingRuntime != null) {
             try {
                 closingRuntime.close();
             } catch (Exception exception) {
-                getLogger().log(Level.WARNING, "Не удалось корректно закрыть контекст pnLibrary", exception);
+                Log.warning("Не удалось корректно закрыть контекст pnLibrary", exception);
             }
         }
         if (databaseExecutor != null) databaseExecutor.close();
@@ -345,10 +350,10 @@ public void reloadRuntimeConfig() {
         try {
             ConfigBackup.backupIfVersionChanged(getDataFolder().toPath(), BundledConfigurationResources.DOCUMENTS,
                             getDescription().getVersion(), java.time.Instant.now())
-                    .ifPresent(path -> getLogger().info("Версия плагина изменилась: конфиги сохранены в "
+                    .ifPresent(path -> Log.info("Версия плагина изменилась: конфиги сохранены в "
                             + getDataFolder().toPath().relativize(path) + " (хранятся 5 последних копий)."));
         } catch (java.io.IOException | RuntimeException failure) {
-            getLogger().log(Level.WARNING, "Не удалось создать резервную копию конфигов перед обновлением.", failure);
+            Log.warning("Не удалось создать резервную копию конфигов перед обновлением.", failure);
         }
     }
 
@@ -361,7 +366,7 @@ public void reloadRuntimeConfig() {
         try {
             itemLocalization = ItemLocalization.load(configured);
         } catch (IllegalArgumentException exception) {
-            getLogger().warning("Неизвестная локализация предметов '" + configured
+            Log.warning("Неизвестная локализация предметов '" + configured
                     + "', используется ru_ru.");
             itemLocalization = ItemLocalization.load(MinecraftLocale.RU_RU);
         }
