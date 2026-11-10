@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'ru.privatenull'
-version = '1.5.5-remaster'
+version = '1.5.6-remaster'
 
 repositories {
     mavenCentral()

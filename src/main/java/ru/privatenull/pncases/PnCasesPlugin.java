@@ -331,7 +331,7 @@ public final class PnCasesPlugin extends JavaPlugin {
     }
 
     public String getSupportDiscord() {
-        return pnRuntime == null ? "https://discord.gg/jqRFJC6WDM" : pnRuntime.supportUrl();
+        return pnRuntime == null ? "https://discord.gg/wYgprUUMhm" : pnRuntime.supportUrl();
     }
 
     public ItemLocalization getItemLocalization() {
