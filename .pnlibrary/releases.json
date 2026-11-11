@@ -3,29 +3,6 @@
   "product": "pncases",
   "releases": [
     {
-      "version": "1.5.5-remaster",
-      "channel": "stable",
-      "description": "Новая ссылка поддержки в Discord.",
-      "changelogUrl": "https://github.com/PnFolder/pnCases/blob/master/.pnlibrary/changelogs/1.5.5-remaster.md",
-      "publishedAt": "2026-11-10T21:05:38Z",
-      "api": {
-        "minimum": 1,
-        "maximum": 1
-      },
-      "artifacts": [
-        {
-          "file": "pnCases-1.5.5-remaster.jar",
-          "platform": "BUKKIT",
-          "java": {
-            "minimum": 17
-          },
-          "url": "https://github.com/PnFolder/pnCases/releases/download/v1.5.5-remaster/pnCases-1.5.5-remaster.jar",
-          "sha256": "0bc4f8f187000519bc04c1d140ac2ae0bbb4f3e4dc75f4103bea746688203981",
-          "size": 3679236
-        }
-      ]
-    },
-    {
       "version": "1.5.4-remaster",
       "channel": "stable",
       "description": "Сцены у кейса, новые анимации, подарок ключей, серия открытий, переработанный Machine и крафт ключей в верстаке.",
