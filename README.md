@@ -9,7 +9,7 @@
   <a href="https://github.com/PnFolder/pnCases/releases/latest">
     <img src="https://img.shields.io/badge/Скачать-последняя%20версия-EFF7B9?style=for-the-badge&labelColor=17241F" alt="Скачать">
   </a>
-  <a href="https://discord.gg/jfjxY6Q57">
+  <a href="https://discord.gg/rSxZAVW7uC">
     <img src="https://img.shields.io/badge/Discord-Поддержка-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord">
   </a>
 </p>
@@ -160,7 +160,7 @@ plugins/pnCases/
 
 ## Поддержка
 
-Если что-то не работает или есть идея, пишите в [Discord](https://discord.gg/jfjxY6Q57) или заведите
+Если что-то не работает или есть идея, пишите в [Discord](https://discord.gg/rSxZAVW7uC) или заведите
 [issue](https://github.com/PnFolder/pnCases/issues). Список изменений по версиям: [релизы](https://github.com/PnFolder/pnCases/releases).
 
 Лицензия: [MIT](LICENSE).
