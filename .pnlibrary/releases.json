@@ -3,6 +3,29 @@
   "product": "pncases",
   "releases": [
     {
+      "version": "1.6.0",
+      "channel": "stable",
+      "description": "Переход на pnLibrary 0.1.0-dev.6 (API 2): нужна новая библиотека.",
+      "changelogUrl": "https://github.com/PnFolder/pnCases/blob/master/.pnlibrary/changelogs/1.6.0.md",
+      "publishedAt": "2026-11-21T15:49:11Z",
+      "api": {
+        "minimum": 2,
+        "maximum": 2
+      },
+      "artifacts": [
+        {
+          "file": "pnCases-1.6.0.jar",
+          "platform": "BUKKIT",
+          "java": {
+            "minimum": 17
+          },
+          "url": "https://github.com/PnFolder/pnCases/releases/download/v1.6.0/pnCases-1.6.0.jar",
+          "sha256": "85a097f5f71339c6768baf8ca8723924ff5030567cecc445c1f1ac66e0098af6",
+          "size": 3679456
+        }
+      ]
+    },
+    {
       "version": "1.5.4-remaster",
       "channel": "stable",
       "description": "Сцены у кейса, новые анимации, подарок ключей, серия открытий, переработанный Machine и крафт ключей в верстаке.",
