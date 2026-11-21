@@ -5,9 +5,10 @@ plugins {
 }
 
 group = 'ru.privatenull'
-version = '1.5.4-remaster'
+version = '1.6.0'
 
 repositories {
+    mavenLocal()
     mavenCentral()
     maven {
         name = "papermc-repo"
@@ -31,7 +32,7 @@ repositories {
     }
 }
 
-def pnLibraryVersion = '0.0.1-dev.6'
+def pnLibraryVersion = '0.1.0-dev.6'
 
 dependencies {
     // The shared runtime plugin is installed by the pnLibrary bootstrap that is shaded into the jar;
